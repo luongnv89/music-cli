@@ -5,8 +5,8 @@ Complete guide to using music-cli for background music while coding.
 ## Quick Start
 
 ```bash
-# Install
-pip install music-cli
+# Install from PyPI
+pip install coder-music-cli
 
 # Play context-aware radio (based on time of day)
 music-cli play
@@ -43,16 +43,19 @@ sudo pacman -S ffmpeg
 ### Install music-cli
 
 ```bash
-# From PyPI (when published)
-pip install music-cli
+# From PyPI
+pip install coder-music-cli
+
+# Or with uv (faster)
+uv pip install coder-music-cli
 
 # From source
-git clone https://github.com/example/music-cli
+git clone https://github.com/luongnv89/music-cli
 cd music-cli
 pip install -e .
 
 # With AI support (~5GB download)
-pip install -e ".[ai]"
+pip install 'coder-music-cli[ai]'
 ```
 
 ## Commands Reference

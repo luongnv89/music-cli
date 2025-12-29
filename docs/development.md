@@ -13,7 +13,7 @@ Guide for contributing to music-cli.
 ### Clone & Install
 
 ```bash
-git clone https://github.com/example/music-cli
+git clone https://github.com/luongnv89/music-cli
 cd music-cli
 
 # Create virtual environment
