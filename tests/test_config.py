@@ -1,9 +1,6 @@
 """Tests for configuration module."""
 
-import tempfile
 from pathlib import Path
-
-import pytest
 
 from music_cli.config import Config
 

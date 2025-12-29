@@ -2,8 +2,6 @@
 
 from datetime import datetime
 
-import pytest
-
 from music_cli.context.mood import Mood, MoodContext
 from music_cli.context.temporal import DayType, Season, TemporalContext, TimePeriod
 

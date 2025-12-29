@@ -2,8 +2,6 @@
 
 from pathlib import Path
 
-import pytest
-
 from music_cli.history import History, HistoryEntry
 
 
