@@ -1,7 +1,6 @@
 """AI music generation using MusicGen (optional feature)."""
 
 import logging
-import os
 import tempfile
 from pathlib import Path
 
@@ -22,8 +21,8 @@ def is_ai_available() -> bool:
         return _AI_AVAILABLE
 
     try:
-        import torch
-        from audiocraft.models import MusicGen
+        import torch  # noqa: F401
+        from audiocraft.models import MusicGen  # noqa: F401
 
         _AI_AVAILABLE = True
         logger.info("AI music generation is available")
@@ -100,7 +99,6 @@ class AIGenerator:
 
         try:
             import scipy.io.wavfile
-            import torch
 
             # Clamp duration
             duration = max(5, min(300, duration))
@@ -117,7 +115,9 @@ class AIGenerator:
                 import time
 
                 hash_input = f"{prompt}{time.time()}"
-                short_hash = hashlib.md5(hash_input.encode()).hexdigest()[:8]
+                short_hash = hashlib.md5(  # noqa: S324
+                    hash_input.encode(), usedforsecurity=False
+                ).hexdigest()[:8]
                 filename = f"ai_music_{short_hash}.wav"
 
             # Save to file

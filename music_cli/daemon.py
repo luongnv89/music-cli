@@ -5,8 +5,6 @@ import json
 import logging
 import os
 import signal
-import sys
-from pathlib import Path
 
 from .config import get_config
 from .context.mood import Mood, MoodContext
@@ -58,7 +56,7 @@ class MusicDaemon:
         )
 
         # Set socket permissions
-        os.chmod(socket_path, 0o600)
+        socket_path.chmod(0o600)
 
         # Write PID file
         self.config.pid_file.write_text(str(os.getpid()))
@@ -326,11 +324,7 @@ class MusicDaemon:
         """List playback history."""
         limit = args.get("limit", 20)
         entries = self.history.get_all(limit=limit)
-        return {
-            "history": [
-                {"index": i + 1, **e.to_dict()} for i, e in enumerate(entries)
-            ]
-        }
+        return {"history": [{"index": i + 1, **e.to_dict()} for i, e in enumerate(entries)]}
 
 
 def run_daemon() -> None:

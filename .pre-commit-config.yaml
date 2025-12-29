@@ -1,0 +1,60 @@
+# Pre-commit hooks for music-cli
+# Install: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  # General checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-added-large-files
+        args: ['--maxkb=500']
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  # Python formatting with Black
+  - repo: https://github.com/psf/black
+    rev: 24.3.0
+    hooks:
+      - id: black
+        language_version: python3
+
+  # Python linting with Ruff (fast, replaces flake8/isort/etc)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.3.4
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+
+  # Type checking with mypy
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.9.0
+    hooks:
+      - id: mypy
+        additional_dependencies:
+          - click>=8.0
+          - tomli>=2.0
+          - tomli-w>=1.0
+          - types-click
+        args: [--ignore-missing-imports]
+        exclude: ^tests/
+
+  # Security scanning with Bandit
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.8
+    hooks:
+      - id: bandit
+        args: [-c, pyproject.toml, -r, music_cli]
+        additional_dependencies: ["bandit[toml]"]
+
+# CI configuration
+ci:
+  autofix_commit_msg: "style: auto-fix pre-commit hooks"
+  autofix_prs: true
+  autoupdate_commit_msg: "chore: update pre-commit hooks"
+  autoupdate_schedule: monthly

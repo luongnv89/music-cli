@@ -1,7 +1,6 @@
 """Configuration management for music-cli."""
 
 import logging
-import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -49,7 +48,7 @@ class Config:
     def __init__(self, config_dir: Path | None = None):
         """Initialize config with optional custom directory."""
         if config_dir is None:
-            config_dir = Path(os.path.expanduser("~/.config/music-cli"))
+            config_dir = Path("~/.config/music-cli").expanduser()
         self.config_dir = config_dir
         self.config_file = self.config_dir / "config.toml"
         self.radios_file = self.config_dir / "radios.txt"
@@ -75,7 +74,7 @@ class Config:
 
     def _write_default_config(self) -> None:
         """Write default configuration file."""
-        with open(self.config_file, "wb") as f:
+        with self.config_file.open("wb") as f:
             tomli_w.dump(self.DEFAULT_CONFIG, f)
 
     def _write_default_radios(self) -> None:
@@ -104,7 +103,7 @@ Classical|http://stream.srg-ssr.ch/m/rsc_de/mp3_128
     def _load_config(self) -> None:
         """Load configuration from file."""
         try:
-            with open(self.config_file, "rb") as f:
+            with self.config_file.open("rb") as f:
                 self._config = tomllib.load(f)
         except (OSError, tomllib.TOMLDecodeError) as e:
             logger.warning(f"Failed to load config from {self.config_file}: {e}")
@@ -113,7 +112,7 @@ Classical|http://stream.srg-ssr.ch/m/rsc_de/mp3_128
     def get(self, key: str, default: Any = None) -> Any:
         """Get a config value using dot notation (e.g., 'player.volume')."""
         keys = key.split(".")
-        value = self._config
+        value: Any = self._config
         for k in keys:
             if isinstance(value, dict):
                 value = value.get(k)
@@ -136,7 +135,7 @@ Classical|http://stream.srg-ssr.ch/m/rsc_de/mp3_128
 
     def save(self) -> None:
         """Save current configuration to file."""
-        with open(self.config_file, "wb") as f:
+        with self.config_file.open("wb") as f:
             tomli_w.dump(self._config, f)
 
     def get_radios(self) -> list[tuple[str, str]]:
@@ -144,7 +143,7 @@ Classical|http://stream.srg-ssr.ch/m/rsc_de/mp3_128
 
         Returns list of (name, url) tuples.
         """
-        radios = []
+        radios: list[tuple[str, str]] = []
         if not self.radios_file.exists():
             return radios
 

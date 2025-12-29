@@ -1,6 +1,5 @@
 """Local MP3 file source."""
 
-import os
 import random
 from pathlib import Path
 
@@ -16,7 +15,7 @@ class LocalSource:
         """Initialize with optional music directory."""
         if music_dir is None:
             # Default to ~/Music
-            music_dir = Path(os.path.expanduser("~/Music"))
+            music_dir = Path("~/Music").expanduser()
         self.music_dir = music_dir
 
     def get_track(self, path: str) -> TrackInfo | None:
@@ -48,7 +47,7 @@ class LocalSource:
         if not directory.exists():
             return []
 
-        files = []
+        files: list[Path] = []
         for ext in self.SUPPORTED_EXTENSIONS:
             files.extend(directory.rglob(f"*{ext}"))
 

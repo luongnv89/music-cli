@@ -91,7 +91,7 @@ class History:
             context=context,
         )
 
-        with open(self.history_file, "a") as f:
+        with self.history_file.open("a") as f:
             f.write(json.dumps(entry.to_dict()) + "\n")
 
         return entry
@@ -101,7 +101,7 @@ class History:
 
         Returns entries in reverse chronological order (newest first).
         """
-        entries = []
+        entries: list[HistoryEntry] = []
 
         if not self.history_file.exists():
             return entries

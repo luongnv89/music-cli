@@ -66,12 +66,12 @@ class DaemonClient:
             else:
                 return {"error": "Empty response from daemon"}
 
-        except FileNotFoundError:
-            raise ConnectionError("Daemon not running (socket not found)")
-        except ConnectionRefusedError:
-            raise ConnectionError("Daemon not running (connection refused)")
-        except socket.timeout:
-            raise ConnectionError("Daemon not responding (timeout)")
+        except FileNotFoundError as e:
+            raise ConnectionError("Daemon not running (socket not found)") from e
+        except ConnectionRefusedError as e:
+            raise ConnectionError("Daemon not running (connection refused)") from e
+        except socket.timeout as e:
+            raise ConnectionError("Daemon not responding (timeout)") from e
         except json.JSONDecodeError as e:
             logger.warning(f"Invalid JSON response from daemon: {e}")
             return {"error": "Invalid response from daemon"}

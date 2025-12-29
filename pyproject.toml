@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "A command-line music application for coders with daemon support, radio streaming, and AI-generated music"
 readme = "README.md"
 requires-python = ">=3.9"
-license = {text = "MIT"}
+license = "MIT"
 authors = [
     {name = "Developer", email = "dev@example.com"}
 ]
@@ -17,7 +17,6 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: POSIX :: Linux",
     "Operating System :: MacOS",
     "Programming Language :: Python :: 3",
@@ -43,8 +42,12 @@ ai = [
 dev = [
     "pytest>=7.0",
     "pytest-asyncio>=0.21",
+    "pytest-cov>=4.0",
     "black>=23.0",
     "ruff>=0.1",
+    "mypy>=1.0",
+    "bandit>=1.7",
+    "pre-commit>=3.0",
 ]
 
 [project.scripts]
@@ -64,5 +67,43 @@ target-version = ["py39"]
 
 [tool.ruff]
 line-length = 100
-select = ["E", "F", "W", "I", "N", "UP", "B", "C4"]
-ignore = ["E501"]
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "S", "PTH"]
+ignore = [
+    "E501",   # Allow long lines
+    "S101",   # Allow assert statements
+    "S311",   # Allow random for non-crypto (music shuffle)
+    "S324",   # Allow md5 for non-crypto (file naming)
+    "S603",   # Allow subprocess without shell=True validation
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]  # Allow assert in tests
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = false
+warn_unused_ignores = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+check_untyped_defs = false
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-v --cov=music_cli --cov-report=term-missing"
+
+[tool.bandit]
+exclude_dirs = ["tests", "venv"]
+skips = [
+    "B101",  # Allow assert statements
+    "B311",  # Allow random for non-crypto purposes (music shuffle)
+    "B404",  # Allow subprocess import (controlled usage)
+    "B603",  # Allow subprocess without shell=True (controlled usage)
+]
+
+[tool.coverage.run]
+source = ["music_cli"]
+omit = ["music_cli/sources/ai_generator.py"]  # Skip AI module (optional dependency)

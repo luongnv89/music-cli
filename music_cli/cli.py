@@ -300,7 +300,7 @@ def list_history(limit):
             timestamp = entry.get("timestamp", "")[:16]  # Truncate to date/time
             click.echo(f"  {idx}. [{timestamp}] {title} ({source_type})")
 
-        click.echo(f"\nReplay with: music-cli play -m history -i <number>")
+        click.echo("\nReplay with: music-cli play -m history -i <number>")
 
     except ConnectionError as e:
         click.echo(f"Error: {e}", err=True)

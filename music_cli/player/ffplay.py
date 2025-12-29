@@ -4,7 +4,6 @@ import asyncio
 import logging
 import shutil
 import signal
-from pathlib import Path
 
 from .base import Player, PlayerState, TrackInfo
 
@@ -46,14 +45,16 @@ class FFplayPlayer(Player):
 
             # For streams, add reconnect options
             if track.source_type == "radio":
-                cmd.extend([
-                    "-reconnect",
-                    "1",
-                    "-reconnect_streamed",
-                    "1",
-                    "-reconnect_delay_max",
-                    "5",
-                ])
+                cmd.extend(
+                    [
+                        "-reconnect",
+                        "1",
+                        "-reconnect_streamed",
+                        "1",
+                        "-reconnect_delay_max",
+                        "5",
+                    ]
+                )
 
             cmd.append(track.source)
 

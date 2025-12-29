@@ -80,9 +80,11 @@ class RadioSource:
         """List all stations with their indices."""
         stations = []
         for i, (name, url) in enumerate(self.get_stations(), 1):
-            stations.append({
-                "index": i,
-                "name": name,
-                "url": url,
-            })
+            stations.append(
+                {
+                    "index": i,
+                    "name": name,
+                    "url": url,
+                }
+            )
         return stations
