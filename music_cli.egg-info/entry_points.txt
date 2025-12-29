@@ -1,0 +1,2 @@
+[console_scripts]
+music-cli = music_cli.cli:main

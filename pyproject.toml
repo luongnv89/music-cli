@@ -1,0 +1,68 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "music-cli"
+version = "0.1.0"
+description = "A command-line music application for coders with daemon support, radio streaming, and AI-generated music"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+    {name = "Developer", email = "dev@example.com"}
+]
+keywords = ["music", "cli", "daemon", "radio", "ai-music"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Sound/Audio :: Players",
+]
+
+dependencies = [
+    "click>=8.0",
+    "tomli>=2.0;python_version<'3.11'",
+    "tomli-w>=1.0",
+]
+
+[project.optional-dependencies]
+ai = [
+    "torch>=2.0",
+    "transformers>=4.30",
+    "audiocraft>=1.0",
+]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "black>=23.0",
+    "ruff>=0.1",
+]
+
+[project.scripts]
+music-cli = "music_cli.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/example/music-cli"
+Repository = "https://github.com/example/music-cli"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["music_cli*"]
+
+[tool.black]
+line-length = 100
+target-version = ["py39"]
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4"]
+ignore = ["E501"]

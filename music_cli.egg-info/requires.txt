@@ -1,0 +1,16 @@
+click>=8.0
+tomli-w>=1.0
+
+[:python_version < "3.11"]
+tomli>=2.0
+
+[ai]
+torch>=2.0
+transformers>=4.30
+audiocraft>=1.0
+
+[dev]
+pytest>=7.0
+pytest-asyncio>=0.21
+black>=23.0
+ruff>=0.1
