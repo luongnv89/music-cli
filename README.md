@@ -1,11 +1,35 @@
 # music-cli
 
+[![PyPI version](https://badge.fury.io/py/coder-music-cli.svg)](https://badge.fury.io/py/coder-music-cli)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A command-line music player for coders. Background daemon with radio streaming, local MP3s, and AI-generated music.
 
 ```bash
 music-cli play --mood focus    # Start focus music
 music-cli pause                # Pause for meeting
 music-cli resume               # Back to coding
+```
+
+## Installation
+
+```bash
+# Install from PyPI
+pip install coder-music-cli
+
+# Or with uv (faster)
+uv pip install coder-music-cli
+
+# Install FFmpeg (required)
+brew install ffmpeg      # macOS
+sudo apt install ffmpeg  # Ubuntu/Debian
+```
+
+### Optional: AI Music Generation
+
+```bash
+pip install 'coder-music-cli[ai]'  # ~5GB (PyTorch + MusicGen)
 ```
 
 ## Features
@@ -18,10 +42,6 @@ music-cli resume               # Back to coding
 ## Quick Start
 
 ```bash
-# Install
-pip install -e .
-brew install ffmpeg  # or: apt install ffmpeg
-
 # Play
 music-cli play                    # Context-aware radio
 music-cli play --mood focus       # Focus music
@@ -96,11 +116,6 @@ Jazz FM|https://streams.example.com/jazz.mp3
 
 - Python 3.9+
 - FFmpeg
-
-Optional for AI mode:
-```bash
-pip install 'music-cli[ai]'  # ~5GB (PyTorch + MusicGen)
-```
 
 ## License
 

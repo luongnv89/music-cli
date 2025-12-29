@@ -1,3 +1,4 @@
+LICENSE
 README.md
 pyproject.toml
 music_cli/__init__.py
@@ -23,3 +24,6 @@ music_cli/sources/__init__.py
 music_cli/sources/ai_generator.py
 music_cli/sources/local.py
 music_cli/sources/radio.py
+tests/test_config.py
+tests/test_context.py
+tests/test_history.py

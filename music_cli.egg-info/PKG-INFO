@@ -2,15 +2,18 @@ Metadata-Version: 2.4
 Name: music-cli
 Version: 0.1.0
 Summary: A command-line music application for coders with daemon support, radio streaming, and AI-generated music
-Author-email: Developer <dev@example.com>
-License: MIT
-Project-URL: Homepage, https://github.com/example/music-cli
-Project-URL: Repository, https://github.com/example/music-cli
-Keywords: music,cli,daemon,radio,ai-music
+Author-email: Luong Nguyen <luongnv89@gmail.com>
+Maintainer-email: Luong Nguyen <luongnv89@gmail.com>
+License-Expression: MIT
+Project-URL: Homepage, https://github.com/luongnv89/music-cli
+Project-URL: Repository, https://github.com/luongnv89/music-cli
+Project-URL: Documentation, https://github.com/luongnv89/music-cli#readme
+Project-URL: Issues, https://github.com/luongnv89/music-cli/issues
+Project-URL: Changelog, https://github.com/luongnv89/music-cli/releases
+Keywords: music,cli,daemon,radio,ai-music,focus,coding,background-music,lofi,productivity
 Classifier: Development Status :: 3 - Alpha
 Classifier: Environment :: Console
 Classifier: Intended Audience :: Developers
-Classifier: License :: OSI Approved :: MIT License
 Classifier: Operating System :: POSIX :: Linux
 Classifier: Operating System :: MacOS
 Classifier: Programming Language :: Python :: 3
@@ -21,6 +24,7 @@ Classifier: Programming Language :: Python :: 3.12
 Classifier: Topic :: Multimedia :: Sound/Audio :: Players
 Requires-Python: >=3.9
 Description-Content-Type: text/markdown
+License-File: LICENSE
 Requires-Dist: click>=8.0
 Requires-Dist: tomli>=2.0; python_version < "3.11"
 Requires-Dist: tomli-w>=1.0
@@ -31,209 +35,132 @@ Requires-Dist: audiocraft>=1.0; extra == "ai"
 Provides-Extra: dev
 Requires-Dist: pytest>=7.0; extra == "dev"
 Requires-Dist: pytest-asyncio>=0.21; extra == "dev"
+Requires-Dist: pytest-cov>=4.0; extra == "dev"
 Requires-Dist: black>=23.0; extra == "dev"
 Requires-Dist: ruff>=0.1; extra == "dev"
+Requires-Dist: mypy>=1.0; extra == "dev"
+Requires-Dist: bandit>=1.7; extra == "dev"
+Requires-Dist: pre-commit>=3.0; extra == "dev"
+Dynamic: license-file
 
 # music-cli
 
-A command-line music application for coders. Play local MP3s, stream radio, or generate AI music based on your mood and the time of day.
+[![PyPI version](https://badge.fury.io/py/music-cli.svg)](https://badge.fury.io/py/music-cli)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## Features
+A command-line music player for coders. Background daemon with radio streaming, local MP3s, and AI-generated music.
 
-- **Background Daemon**: Runs as a background process, controlled via simple commands
-- **Multiple Playback Modes**:
-  - Local MP3 files with shuffle/auto-play
-  - Radio streaming from configurable stations
-  - AI-generated music (optional, via MusicGen)
-  - Context-aware playback based on time of day and mood
-- **History Tracking**: View and replay tracks from your history
-- **Human-readable Config**: All settings stored in simple text files
-
-## Requirements
-
-- Python 3.9+
-- FFmpeg (for `ffplay`)
+```bash
+music-cli play --mood focus    # Start focus music
+music-cli pause                # Pause for meeting
+music-cli resume               # Back to coding
+```
 
 ## Installation
 
 ```bash
-# Install from source
-cd music-cli
-pip install -e .
+# Install from PyPI
+pip install music-cli
 
-# Or with AI music generation support (~5GB download)
-pip install -e ".[ai]"
+# Or with uv (faster)
+uv pip install music-cli
+
+# Install FFmpeg (required)
+brew install ffmpeg      # macOS
+sudo apt install ffmpeg  # Ubuntu/Debian
 ```
 
-### Install FFmpeg
+### Optional: AI Music Generation
 
-**macOS**:
 ```bash
-brew install ffmpeg
+pip install 'music-cli[ai]'  # ~5GB (PyTorch + MusicGen)
 ```
 
-**Ubuntu/Debian**:
-```bash
-sudo apt install ffmpeg
-```
+## Features
+
+- **Daemon-based** - Persistent background playback
+- **Multiple sources** - Local files, radio streams, AI generation
+- **Context-aware** - Selects music based on time of day and mood
+- **Simple config** - Human-readable text files
 
 ## Quick Start
 
 ```bash
-# Play context-aware radio (based on time of day)
-music-cli play
+# Play
+music-cli play                    # Context-aware radio
+music-cli play --mood focus       # Focus music
+music-cli play -m local --auto    # Shuffle local library
 
-# Play with a specific mood
-music-cli play --mood focus
-
-# Play a local file
-music-cli play -m local -s ~/Music/song.mp3
-
-# Play a radio station by name
-music-cli play -m radio -s "chill"
-
-# Shuffle local music library
-music-cli play -m local --auto
-
-# Control playback
-music-cli pause
-music-cli resume
-music-cli stop
-
-# Check status
-music-cli status
-
-# View history
-music-cli history
-
-# Replay from history
-music-cli play -m history -i 3
+# Control
+music-cli pause | resume | stop | status
 ```
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `play` | Start playing music |
-| `stop` | Stop playback |
-| `pause` | Pause playback |
-| `resume` | Resume playback |
-| `status` | Show current status |
-| `next` | Skip to next track (auto-play mode) |
+| `play` | Start playing (radio/local/ai/history) |
+| `stop` / `pause` / `resume` | Playback control |
+| `status` | Current track and state |
+| `next` | Skip track (auto-play mode) |
 | `volume [0-100]` | Get/set volume |
-| `radios` | List available radio stations |
-| `history` | Show playback history |
-| `moods` | List available mood tags |
-| `daemon [start\|stop\|status]` | Control the daemon |
-| `config` | Show config file locations |
+| `radios` | List stations |
+| `history` | Playback log |
+| `moods` | Available mood tags |
+| `daemon start\|stop\|status` | Daemon control |
 
 ## Play Modes
 
-### Radio Mode (default)
 ```bash
-music-cli play                    # Context-aware radio
-music-cli play -s "deep house"    # Play station by name
-music-cli play --mood focus       # Play mood-appropriate station
+# Radio (default)
+music-cli play                     # Time-based selection
+music-cli play -s "deep house"     # By station name
+music-cli play --mood focus        # By mood
+
+# Local
+music-cli play -m local -s song.mp3
+music-cli play -m local --auto     # Shuffle
+
+# AI (requires [ai] extras)
+music-cli play -m ai --mood happy -d 60
+
+# History
+music-cli play -m history -i 3     # Replay item #3
 ```
 
-### Local Mode
-```bash
-music-cli play -m local -s song.mp3   # Play specific file
-music-cli play -m local --auto        # Shuffle local library
-```
+## Moods
 
-### AI Mode (requires `[ai]` extras)
-```bash
-music-cli play -m ai                      # Generate based on context
-music-cli play -m ai --mood happy         # Generate happy music
-music-cli play -m ai --mood focus -d 60   # 60-second focus track
-```
-
-### History Mode
-```bash
-music-cli history              # View recent plays
-music-cli play -m history -i 5 # Replay item #5
-```
-
-## Mood Tags
-
-- `happy` - Upbeat, cheerful music
-- `sad` - Melancholic, emotional music
-- `excited` - High-energy, fast tempo
-- `focus` - Lo-fi, ambient for concentration
-- `relaxed` - Chill, smooth jazz
-- `energetic` - Powerful, driving beats
+`focus` `happy` `sad` `excited` `relaxed` `energetic` `melancholic` `peaceful`
 
 ## Configuration
 
-All config files are in `~/.config/music-cli/`:
+Files in `~/.config/music-cli/`:
 
-| File | Description |
-|------|-------------|
-| `config.toml` | Main settings |
-| `radios.txt` | Radio station URLs |
-| `history.jsonl` | Playback history |
+| File | Purpose |
+|------|---------|
+| `config.toml` | Settings |
+| `radios.txt` | Station URLs |
+| `history.jsonl` | Play history |
 
-### Adding Radio Stations
-
-Edit `~/.config/music-cli/radios.txt`:
-
+Add stations to `radios.txt`:
 ```
-# Format: name|url or just url
 ChillHop|https://streams.example.com/chillhop.mp3
 Jazz FM|https://streams.example.com/jazz.mp3
-https://raw-stream-url.example.com/stream
 ```
 
-### Configuration Options
+## Documentation
 
-Edit `~/.config/music-cli/config.toml`:
+| Document | Description |
+|----------|-------------|
+| [User Guide](docs/user-guide.md) | Complete usage instructions |
+| [Architecture](docs/architecture.md) | System design and diagrams |
+| [Development](docs/development.md) | Contributing guide |
 
-```toml
-[player]
-backend = "ffplay"
-volume = 80
+## Requirements
 
-[mood_radio_map]
-focus = "https://streams.example.com/focus.mp3"
-happy = "https://streams.example.com/happy.mp3"
-
-[time_radio_map]
-morning = "https://streams.example.com/morning.mp3"
-evening = "https://streams.example.com/evening.mp3"
-```
-
-## AI Music Generation
-
-AI music requires additional dependencies (~5GB):
-
-```bash
-pip install 'music-cli[ai]'
-```
-
-The first AI generation will download the MusicGen model (~3GB).
-
-```bash
-# Generate context-aware music
-music-cli play -m ai
-
-# Generate with specific mood
-music-cli play -m ai --mood focus
-
-# Longer generation (up to 300 seconds)
-music-cli play -m ai -d 120
-```
-
-## Daemon Management
-
-The daemon starts automatically when you run any command. To manage it manually:
-
-```bash
-music-cli daemon status   # Check if running
-music-cli daemon start    # Start daemon
-music-cli daemon stop     # Stop daemon
-music-cli daemon restart  # Restart daemon
-```
+- Python 3.9+
+- FFmpeg
 
 ## License
 
