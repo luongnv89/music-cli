@@ -1,10 +1,18 @@
-# music-cli
+<p align="center">
+  <img src="assets/logo/logo-mark.svg" alt="music-cli logo" width="80" height="80">
+</p>
 
-[![PyPI version](https://img.shields.io/pypi/v/coder-music-cli.svg)](https://pypi.org/project/coder-music-cli/)
-[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+<h1 align="center">music-cli</h1>
 
-![music-cli AI demo](music-cli-ai.gif)
+<p align="center">
+  <a href="https://pypi.org/project/coder-music-cli/"><img src="https://img.shields.io/pypi/v/coder-music-cli.svg" alt="PyPI version"></a>
+  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.9+-blue.svg" alt="Python 3.9+"></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+</p>
+
+<p align="center">
+  <img src="music-cli-ai.gif" alt="music-cli AI demo" width="600">
+</p>
 
 A command-line music player for coders. Background daemon with radio streaming, local MP3s, and AI-generated music.
 
