@@ -1,18 +1,80 @@
 """Command-line interface for music-cli."""
 
+import logging
 import os
 import signal
 import subprocess
 import sys
+import threading
 import time
 
 import click
 
-from . import __version__
+from . import __github_url__, __version__
 from .client import DaemonClient
 from .config import get_config
 from .daemon import get_daemon_pid, is_daemon_running
 from .player.ffplay import check_ffplay_available
+
+logger = logging.getLogger(__name__)
+
+# Track if we've already checked for updates this session
+_update_checked = False
+
+
+def _check_for_updates_once() -> None:
+    """Check for updates only once per CLI session."""
+    global _update_checked
+    if _update_checked:
+        return
+    _update_checked = True
+
+    try:
+        config = get_config()
+        if not config.needs_update():
+            return
+
+        new_stations = config.get_new_default_stations()
+        if new_stations:
+            click.echo(
+                f"\nNew version detected! {len(new_stations)} new radio station(s) available.",
+                err=True,
+            )
+            click.echo("Run 'music-cli update-radios' to update your stations.\n", err=True)
+    except Exception as e:
+        # Don't let update check break normal operation
+        logger.debug(f"Update check failed: {e}")
+
+
+class ComposingAnimation:
+    """Animated text display for AI music generation."""
+
+    def __init__(self):
+        self._stop_event = threading.Event()
+        self._thread: threading.Thread | None = None
+
+    def start(self) -> None:
+        """Start the composing animation."""
+        self._stop_event.clear()
+        self._thread = threading.Thread(target=self._animate, daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        """Stop the animation."""
+        self._stop_event.set()
+        if self._thread:
+            self._thread.join(timeout=1.0)
+        # Clear the animation line
+        click.echo("\r" + " " * 40 + "\r", nl=False)
+
+    def _animate(self) -> None:
+        """Animation loop."""
+        frames = ["composing", "composing.", "composing..", "composing..."]
+        idx = 0
+        while not self._stop_event.is_set():
+            click.echo(f"\r{frames[idx]}", nl=False)
+            idx = (idx + 1) % len(frames)
+            time.sleep(0.5)
 
 
 def ensure_daemon() -> DaemonClient:
@@ -44,15 +106,18 @@ def start_daemon_background() -> None:
     )
 
 
-@click.group()
+@click.group(invoke_without_command=True)
 @click.version_option(__version__)
-def main():
+@click.pass_context
+def main(ctx):
     """music-cli: A command-line music player for coders.
 
     Play local MP3s, stream radio, or generate AI music based on your mood
     and the time of day.
     """
-    pass
+    # Check for updates on any command
+    if ctx.invoked_subcommand is not None:
+        _check_for_updates_once()
 
 
 @main.command()
@@ -93,6 +158,12 @@ def play(mode, source, mood, auto, duration, index):
 
     client = ensure_daemon()
 
+    # Show animation for AI generation
+    animation = None
+    if mode == "ai":
+        animation = ComposingAnimation()
+        animation.start()
+
     try:
         response = client.play(
             mode=mode,
@@ -102,6 +173,9 @@ def play(mode, source, mood, auto, duration, index):
             duration=duration,
             index=index,
         )
+
+        if animation:
+            animation.stop()
 
         if "error" in response:
             click.echo(f"Error: {response['error']}", err=True)
@@ -116,6 +190,8 @@ def play(mode, source, mood, auto, duration, index):
             click.echo("  Auto-play enabled (shuffle mode)")
 
     except ConnectionError as e:
+        if animation:
+            animation.stop()
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
 
@@ -212,6 +288,9 @@ def status():
         if time_period:
             click.echo(f"Context: {time_period} / {context.get('day_type', '')}")
 
+        click.echo(f"\nVersion: {__version__}")
+        click.echo(f"GitHub: {__github_url__}")
+
     except ConnectionError as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
@@ -257,25 +336,142 @@ def volume(level):
         sys.exit(1)
 
 
-@main.command("radios")
-def list_radios():
-    """List available radio stations."""
+@main.group("radios", invoke_without_command=True)
+@click.pass_context
+def radios_group(ctx):
+    """Manage radio stations.
+
+    \b
+    Commands:
+      list          - Show all radio stations (default)
+      play <number> - Play a station by number
+      add           - Add a new radio station
+      remove <num>  - Remove a station by number
+
+    \b
+    Examples:
+      music-cli radios              # List all stations
+      music-cli radios list         # List all stations
+      music-cli radios play 5       # Play station #5
+      music-cli radios add          # Add new station interactively
+      music-cli radios remove 3     # Remove station #3
+    """
+    if ctx.invoked_subcommand is None:
+        # Default action: list radios
+        ctx.invoke(radios_list)
+
+
+@radios_group.command("list")
+def radios_list():
+    """List all available radio stations."""
+    config = get_config()
+    radios = config.get_radios()
+
+    if not radios:
+        click.echo(f"No stations configured. Add stations to: {config.radios_file}")
+        click.echo("Or run: music-cli radios add")
+        return
+
+    click.echo("Available radio stations:\n")
+    for i, (name, _url) in enumerate(radios, 1):
+        click.echo(f"  {i:2}. {name}")
+
+    click.echo(f"\nTotal: {len(radios)} station(s)")
+    click.echo("Play with: music-cli radios play <number>")
+
+
+@radios_group.command("play")
+@click.argument("number", type=int)
+def radios_play(number):
+    """Play a radio station by its number."""
+    config = get_config()
+    station = config.get_radio_by_index(number)
+
+    if not station:
+        radios = config.get_radios()
+        if not radios:
+            click.echo("No radio stations configured.", err=True)
+        else:
+            click.echo(f"Invalid station number. Choose between 1 and {len(radios)}.", err=True)
+        sys.exit(1)
+
+    name, url = station
     client = ensure_daemon()
 
     try:
-        stations = client.list_radios()
+        response = client.play(mode="radio", source=url)
 
-        if not stations:
-            config = get_config()
-            click.echo(f"No stations configured. Add stations to: {config.radios_file}")
-            return
+        if "error" in response:
+            click.echo(f"Error: {response['error']}", err=True)
+            sys.exit(1)
 
-        click.echo("Available radio stations:")
-        for station in stations:
-            click.echo(f"  {station['index']}. {station['name']}")
+        click.echo(f"▶ Playing: {name}")
 
     except ConnectionError as e:
         click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@radios_group.command("add")
+def radios_add():
+    """Add a new radio station interactively."""
+    click.echo("Add a new radio station\n")
+
+    name = click.prompt("Station name")
+    if not name.strip():
+        click.echo("Error: Station name cannot be empty.", err=True)
+        sys.exit(1)
+
+    url = click.prompt("Stream URL")
+    if not url.strip():
+        click.echo("Error: Stream URL cannot be empty.", err=True)
+        sys.exit(1)
+
+    # Basic URL validation
+    if not (url.startswith("http://") or url.startswith("https://")):
+        click.echo("Warning: URL doesn't start with http:// or https://", err=True)
+        if not click.confirm("Add anyway?", default=False):
+            click.echo("Cancelled.")
+            return
+
+    config = get_config()
+    config.add_radio(name.strip(), url.strip())
+
+    radios = config.get_radios()
+    click.echo(f"\nAdded: {name}")
+    click.echo(f"Station #{len(radios)} in your list")
+    click.echo(f"Play with: music-cli radios play {len(radios)}")
+
+
+@radios_group.command("remove")
+@click.argument("number", type=int)
+def radios_remove(number):
+    """Remove a radio station by its number."""
+    config = get_config()
+    radios = config.get_radios()
+
+    if not radios:
+        click.echo("No radio stations to remove.", err=True)
+        sys.exit(1)
+
+    if not (1 <= number <= len(radios)):
+        click.echo(f"Invalid station number. Choose between 1 and {len(radios)}.", err=True)
+        sys.exit(1)
+
+    name, url = radios[number - 1]
+
+    click.echo(f"Station #{number}: {name}")
+    click.echo(f"URL: {url}")
+
+    if not click.confirm("Remove this station?", default=False):
+        click.echo("Cancelled.")
+        return
+
+    removed = config.remove_radio(number)
+    if removed:
+        click.echo(f"\nRemoved: {removed[0]}")
+    else:
+        click.echo("Error: Failed to remove station.", err=True)
         sys.exit(1)
 
 
@@ -356,11 +552,12 @@ def show_config():
     config = get_config()
 
     click.echo("Configuration files:")
-    click.echo(f"  Config:  {config.config_file}")
-    click.echo(f"  Radios:  {config.radios_file}")
-    click.echo(f"  History: {config.history_file}")
-    click.echo(f"  Socket:  {config.socket_path}")
-    click.echo(f"  PID:     {config.pid_file}")
+    click.echo(f"  Config:   {config.config_file}")
+    click.echo(f"  Radios:   {config.radios_file}")
+    click.echo(f"  History:  {config.history_file}")
+    click.echo(f"  AI Music: {config.ai_music_dir}")
+    click.echo(f"  Socket:   {config.socket_path}")
+    click.echo(f"  PID:      {config.pid_file}")
 
 
 @main.command("moods")
@@ -372,6 +569,67 @@ def list_moods():
     for mood in MoodContext.get_all_moods():
         click.echo(f"  - {mood}")
     click.echo("\nUse with: music-cli play --mood <mood>")
+
+
+@main.command("update-radios")
+def update_radios():
+    """Update radio stations list after version upgrade.
+
+    When a new version includes additional radio stations, this command
+    lets you choose how to handle the update:
+    - Merge: Add new stations to your existing list (recommended)
+    - Overwrite: Replace with new defaults (backs up your old file)
+    - Keep: Keep your current stations unchanged
+    """
+    config = get_config()
+
+    new_stations = config.get_new_default_stations()
+
+    if not new_stations:
+        click.echo("Your radio stations are up to date!")
+        installed_version = config.get_installed_version()
+        if installed_version != __version__:
+            config.update_version()
+            click.echo(f"Config version updated to {__version__}")
+        return
+
+    click.echo(f"Found {len(new_stations)} new radio station(s) available:\n")
+    for name, _url in new_stations[:10]:  # Show first 10
+        click.echo(f"  + {name}")
+    if len(new_stations) > 10:
+        click.echo(f"  ... and {len(new_stations) - 10} more\n")
+    else:
+        click.echo()
+
+    click.echo("How would you like to update your radio stations?\n")
+    click.echo("  [M] Merge   - Add new stations to your existing list (recommended)")
+    click.echo("  [O] Overwrite - Replace with new defaults (backs up old file)")
+    click.echo("  [K] Keep    - Keep your current stations unchanged\n")
+
+    choice = click.prompt(
+        "Your choice",
+        type=click.Choice(["M", "O", "K", "m", "o", "k"], case_sensitive=False),
+        default="M",
+    )
+
+    choice = choice.upper()
+
+    if choice == "M":
+        added = config.merge_radios()
+        click.echo(f"\nAdded {added} new station(s) to your radios.txt")
+        click.echo("Run 'music-cli radios' to see the full list")
+
+    elif choice == "O":
+        backup_path = config.backup_radios_path()
+        config.overwrite_radios()
+        click.echo("\nRadio stations replaced with new defaults")
+        click.echo(f"Your old stations backed up to: {backup_path}")
+
+    else:  # K
+        click.echo("\nKept your existing radio stations unchanged")
+
+    config.update_version()
+    click.echo(f"Config version updated to {__version__}")
 
 
 if __name__ == "__main__":

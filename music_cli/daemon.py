@@ -191,7 +191,8 @@ class MusicDaemon:
                         "error": "AI generation not available. Install with: pip install 'music-cli[ai]'"
                     }
 
-                generator = AIGenerator()
+                # Use persistent AI music directory from config
+                generator = AIGenerator(output_dir=self.config.ai_music_dir)
 
                 # Build prompt
                 temporal_prompt = self.temporal.get_music_prompt()
