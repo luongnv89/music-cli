@@ -41,8 +41,10 @@ choco install ffmpeg      # Windows (or: winget install ffmpeg)
 ### Optional: AI Music Generation
 
 ```bash
-pip install 'coder-music-cli[ai]'  # ~5GB (PyTorch + MusicGen via Transformers)
+pip install 'coder-music-cli[ai]'  # ~5GB (PyTorch + Transformers + scipy)
 ```
+
+Uses Meta's MusicGen-Small model via HuggingFace Transformers.
 
 ## Features
 
@@ -50,7 +52,7 @@ pip install 'coder-music-cli[ai]'  # ~5GB (PyTorch + MusicGen via Transformers)
 - **Multiple sources** - Local files, radio streams, AI generation
 - **Context-aware** - Selects music based on time of day and mood
 - **35+ Radio Stations** - Curated stations in English, French, Spanish, and Italian
-- **AI Music Generation** - Generate music with MusicGen (saved for replay)
+- **AI Music Generation** - Generate music with MusicGen-Small via Transformers
 - **Version-aware Updates** - Automatic notification when new stations are available
 - **Inspirational Quotes** - Random music quotes with every status check
 - **Simple config** - Human-readable text files
@@ -136,10 +138,10 @@ music-cli play -m history -i 3     # Replay item #3
 
 ## AI Music Generation
 
-Generate unique music with Meta's MusicGen model:
+Generate unique music with Meta's MusicGen model (`facebook/musicgen-small`) via HuggingFace Transformers:
 
 ```bash
-# Install AI dependencies
+# Install AI dependencies (~5GB: PyTorch + Transformers)
 pip install 'coder-music-cli[ai]'
 
 # Generate and manage AI music
@@ -163,14 +165,20 @@ music-cli ai remove 2                     # Delete track #2
 | `ai replay <num>` | Replay track by number (regenerates if file missing) |
 | `ai remove <num>` | Delete track and audio file |
 
-Features:
+### Features
+- **Model**: Meta's MusicGen-Small (~1.5GB download on first use)
 - **Context-aware** - Uses time of day, day of week, and session mood
 - **Custom prompts** - Generate exactly what you want with `-p`
 - **Seamless looping** - All tracks engineered for infinite playback
 - **Track management** - List, replay, and remove generated tracks
 - **Regeneration** - Missing files can be regenerated with original prompt
 - **Animated feedback** - "composing..." animation while generating
-- **Persistent storage** - Tracks saved to `~/.config/music-cli/ai_music/`
+- **Persistent storage** - Tracks saved to config directory
+
+### Requirements
+- ~5GB disk space (PyTorch + Transformers)
+- ~8GB RAM minimum for generation
+- First run downloads model (~1.5GB)
 
 ## Moods
 
