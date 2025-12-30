@@ -12,6 +12,8 @@ logger = logging.getLogger(__name__)
 # Constants
 SOCKET_BUFFER_SIZE = 4096
 MAX_RESPONSE_SIZE = 10 * 1024 * 1024  # 10MB limit
+DEFAULT_TIMEOUT = 10.0
+AI_TIMEOUT = 300.0  # 5 minutes for AI generation
 
 
 class DaemonClient:
@@ -21,12 +23,15 @@ class DaemonClient:
         self.config = get_config()
         self.socket_path = str(self.config.socket_path)
 
-    def send_command(self, command: str, args: dict | None = None) -> dict[str, Any]:
+    def send_command(
+        self, command: str, args: dict | None = None, timeout: float | None = None
+    ) -> dict[str, Any]:
         """Send a command to the daemon and get response.
 
         Args:
             command: Command name (play, stop, pause, resume, status, etc.)
             args: Command arguments
+            timeout: Socket timeout in seconds (default: 10s, AI commands: 300s)
 
         Returns:
             Response dictionary from daemon
@@ -37,6 +42,13 @@ class DaemonClient:
         if args is None:
             args = {}
 
+        # Use longer timeout for AI commands
+        if timeout is None:
+            if command == "play" and args.get("mode") == "ai":
+                timeout = AI_TIMEOUT
+            else:
+                timeout = DEFAULT_TIMEOUT
+
         request = {
             "command": command,
             "args": args,
@@ -44,7 +56,7 @@ class DaemonClient:
 
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         try:
-            sock.settimeout(10.0)
+            sock.settimeout(timeout)
             sock.connect(self.socket_path)
 
             sock.sendall(json.dumps(request).encode())

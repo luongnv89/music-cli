@@ -39,7 +39,8 @@ dependencies = [
 [project.optional-dependencies]
 ai = [
     "torch>=2.0",
-    "transformers>=4.30",
+    "transformers>=4.31",
+    "scipy>=1.10",
 ]
 ai-full = [
     "torch>=2.0",

@@ -1,4 +1,4 @@
-"""AI music generation using MusicGen (optional feature)."""
+"""AI music generation using MusicGen via HuggingFace Transformers (optional feature)."""
 
 import logging
 import tempfile
@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 # Flag to track if AI dependencies are available
 _AI_AVAILABLE: bool | None = None
 _musicgen_model = None
+_musicgen_processor = None
 
 
 def is_ai_available() -> bool:
@@ -22,10 +23,10 @@ def is_ai_available() -> bool:
 
     try:
         import torch  # noqa: F401
-        from audiocraft.models import MusicGen  # noqa: F401
+        from transformers import AutoProcessor, MusicgenForConditionalGeneration  # noqa: F401
 
         _AI_AVAILABLE = True
-        logger.info("AI music generation is available")
+        logger.info("AI music generation is available (using HuggingFace Transformers)")
     except ImportError as e:
         _AI_AVAILABLE = False
         logger.info(f"AI music generation not available: {e}")
@@ -34,26 +35,28 @@ def is_ai_available() -> bool:
 
 
 def _get_model():
-    """Lazy-load the MusicGen model."""
-    global _musicgen_model
+    """Lazy-load the MusicGen model via HuggingFace Transformers."""
+    global _musicgen_model, _musicgen_processor
 
     if not is_ai_available():
-        return None
+        return None, None
 
     if _musicgen_model is None:
         try:
-            from audiocraft.models import MusicGen
+            from transformers import AutoProcessor, MusicgenForConditionalGeneration
 
-            logger.info("Loading MusicGen model (this may take a moment)...")
-            # Use the small model for faster loading and lower memory usage
-            _musicgen_model = MusicGen.get_pretrained("facebook/musicgen-small")
-            _musicgen_model.set_generation_params(duration=30)  # 30 seconds default
+            model_name = "facebook/musicgen-small"
+            logger.info(f"Loading MusicGen model ({model_name}) - this may take a moment...")
+
+            _musicgen_processor = AutoProcessor.from_pretrained(model_name)
+            _musicgen_model = MusicgenForConditionalGeneration.from_pretrained(model_name)
+
             logger.info("MusicGen model loaded successfully")
         except Exception as e:
             logger.error(f"Failed to load MusicGen model: {e}")
-            return None
+            return None, None
 
-    return _musicgen_model
+    return _musicgen_model, _musicgen_processor
 
 
 class AIGenerator:
@@ -86,28 +89,45 @@ class AIGenerator:
 
         Args:
             prompt: Text description of the music to generate.
-            duration: Duration in seconds (5-300).
+            duration: Duration in seconds (5-60 for reasonable generation time).
             filename: Optional output filename.
 
         Returns:
             TrackInfo for the generated audio, or None if generation failed.
         """
-        model = _get_model()
-        if model is None:
+        model, processor = _get_model()
+        if model is None or processor is None:
             logger.warning("AI model not available")
             return None
 
         try:
             import scipy.io.wavfile
+            import torch
 
-            # Clamp duration
-            duration = max(5, min(300, duration))
-            model.set_generation_params(duration=duration)
+            # Clamp duration (keep reasonable for generation time)
+            duration = max(5, min(60, duration))
+
+            # Calculate max_new_tokens based on duration
+            # MusicGen generates at ~50 tokens per second of audio
+            tokens_per_second = 50
+            max_new_tokens = duration * tokens_per_second
 
             logger.info(f"Generating {duration}s of music: {prompt[:50]}...")
 
+            # Process the prompt
+            inputs = processor(
+                text=[prompt],
+                padding=True,
+                return_tensors="pt",
+            )
+
             # Generate audio
-            wav = model.generate([prompt])
+            with torch.no_grad():
+                audio_values = model.generate(
+                    **inputs,
+                    max_new_tokens=max_new_tokens,
+                    do_sample=True,
+                )
 
             # Generate filename if not provided
             if filename is None:
@@ -124,11 +144,15 @@ class AIGenerator:
             output_path = self.output_dir / filename
 
             # Get the audio tensor and sample rate
-            audio = wav[0].cpu().numpy()
-            sample_rate = model.sample_rate
+            # MusicGen uses 32kHz sample rate
+            sample_rate = model.config.audio_encoder.sampling_rate
+            audio = audio_values[0, 0].cpu().numpy()
+
+            # Normalize audio to int16 range for WAV
+            audio = (audio * 32767).astype("int16")
 
             # Save as WAV
-            scipy.io.wavfile.write(str(output_path), sample_rate, audio.T)
+            scipy.io.wavfile.write(str(output_path), sample_rate, audio)
 
             logger.info(f"Generated audio saved to: {output_path}")
 
@@ -145,6 +169,9 @@ class AIGenerator:
 
         except Exception as e:
             logger.error(f"Failed to generate music: {e}")
+            import traceback
+
+            traceback.print_exc()
             return None
 
     def generate_for_context(
@@ -208,12 +235,12 @@ def get_ai_install_instructions() -> str:
 AI music generation requires additional dependencies.
 Install them with:
 
-    pip install 'music-cli[ai]'
+    pip install 'coder-music-cli[ai]'
 
 Or install manually:
 
-    pip install torch transformers audiocraft
+    pip install torch transformers scipy
 
 Note: This requires significant disk space (~5GB) and RAM (~8GB minimum).
-The first generation will download the MusicGen model (~3GB).
+The first generation will download the MusicGen model (~1.5GB).
 """
