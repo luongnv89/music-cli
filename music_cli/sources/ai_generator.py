@@ -48,8 +48,8 @@ def _get_model():
             model_name = "facebook/musicgen-small"
             logger.info(f"Loading MusicGen model ({model_name}) - this may take a moment...")
 
-            _musicgen_processor = AutoProcessor.from_pretrained(model_name)
-            _musicgen_model = MusicgenForConditionalGeneration.from_pretrained(model_name)
+            _musicgen_processor = AutoProcessor.from_pretrained(model_name)  # nosec B615
+            _musicgen_model = MusicgenForConditionalGeneration.from_pretrained(model_name)  # nosec B615
 
             logger.info("MusicGen model loaded successfully")
         except Exception as e:

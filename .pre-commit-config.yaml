@@ -16,14 +16,7 @@ repos:
       - id: check-merge-conflict
       - id: detect-private-key
 
-  # Python formatting with Black
-  - repo: https://github.com/psf/black
-    rev: 24.3.0
-    hooks:
-      - id: black
-        language_version: python3
-
-  # Python linting with Ruff (fast, replaces flake8/isort/etc)
+  # Python linting and formatting with Ruff (fast, replaces black/flake8/isort/etc)
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.3.4
     hooks:
