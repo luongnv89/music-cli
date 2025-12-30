@@ -70,8 +70,13 @@ class Player(ABC):
         self._on_track_end = callback
 
     @abstractmethod
-    async def play(self, track: TrackInfo) -> bool:
-        """Start playing a track. Returns True if successful."""
+    async def play(self, track: TrackInfo, loop: bool = False) -> bool:
+        """Start playing a track. Returns True if successful.
+
+        Args:
+            track: Track information to play
+            loop: If True, loop the track indefinitely
+        """
         pass
 
     @abstractmethod

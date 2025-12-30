@@ -23,8 +23,13 @@ class FFplayPlayer(Player):
         if not shutil.which("ffplay"):
             logger.warning("ffplay not found in PATH. Please install FFmpeg.")
 
-    async def play(self, track: TrackInfo) -> bool:
-        """Start playing a track using ffplay."""
+    async def play(self, track: TrackInfo, loop: bool = False) -> bool:
+        """Start playing a track using ffplay.
+
+        Args:
+            track: Track information to play
+            loop: If True, loop the track indefinitely (useful for AI-generated short clips)
+        """
         # Stop any current playback
         await self.stop()
 
@@ -36,12 +41,17 @@ class FFplayPlayer(Player):
             cmd = [
                 "ffplay",
                 "-nodisp",  # No display window
-                "-autoexit",  # Exit when done (for files)
                 "-loglevel",
                 "quiet",  # Suppress output
                 "-volume",
                 str(self._volume),
             ]
+
+            # Loop mode for AI tracks or explicit loop request
+            if loop or track.source_type == "ai":
+                cmd.extend(["-loop", "0"])  # 0 = infinite loop
+            else:
+                cmd.append("-autoexit")  # Exit when done (for files)
 
             # For streams, add reconnect options
             if track.source_type == "radio":
