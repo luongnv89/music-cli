@@ -18,6 +18,26 @@ from .player.ffplay import check_ffplay_available
 
 logger = logging.getLogger(__name__)
 
+# Inspirational quotes about music and life
+INSPIRATIONAL_QUOTES = [
+    '"Music is the soundtrack of your life." - Dick Clark',
+    '"Where words fail, music speaks." - Hans Christian Andersen',
+    '"One good thing about music, when it hits you, you feel no pain." - Bob Marley',
+    '"Music gives a soul to the universe, wings to the mind, flight to the imagination." - Plato',
+    '"Without music, life would be a mistake." - Friedrich Nietzsche',
+    '"Music is the strongest form of magic." - Marilyn Manson',
+    '"Life is like a beautiful melody, only the lyrics are messed up." - Hans Christian Andersen',
+    '"Music expresses that which cannot be said and on which it is impossible to be silent." - Victor Hugo',
+    '"The only truth is music." - Jack Kerouac',
+    '"Music is the divine way to tell beautiful, poetic things to the heart." - Pablo Casals',
+]
+
+
+def get_random_quote() -> str:
+    """Get a random inspirational quote."""
+    import random
+    return random.choice(INSPIRATIONAL_QUOTES)  # noqa: S311
+
 # Track if we've already checked for updates this session
 _update_checked = False
 
@@ -288,6 +308,7 @@ def status():
         if time_period:
             click.echo(f"Context: {time_period} / {context.get('day_type', '')}")
 
+        click.echo(f"\n{get_random_quote()}")
         click.echo(f"\nVersion: {__version__}")
         click.echo(f"GitHub: {__github_url__}")
 
