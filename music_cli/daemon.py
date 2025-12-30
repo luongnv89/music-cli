@@ -11,6 +11,8 @@ from .config import get_config
 from .context.mood import Mood, MoodContext
 from .context.temporal import TemporalContext
 from .history import get_history
+from .platform import get_ipc_server, supports_unix_signals
+from .platform.ipc import IPCServer
 from .player.base import TrackInfo
 from .player.ffplay import FFplayPlayer
 from .sources.local import LocalSource
@@ -31,42 +33,39 @@ class MusicDaemon:
         self.temporal = TemporalContext()
         self.ai_tracks = get_ai_tracks()
 
-        self._server: asyncio.Server | None = None
+        # Platform-specific IPC server (Unix sockets or TCP)
+        self._ipc_server: IPCServer = get_ipc_server()
         self._running = False
         self._current_mood: Mood | None = None
         self._auto_play = False  # For infinite/context-aware mode
 
     async def start(self) -> None:
-        """Start the daemon server."""
-        socket_path = self.config.socket_path
+        """Start the daemon server.
 
-        # Clean up stale socket
-        if socket_path.exists():
-            socket_path.unlink()
+        Uses platform-appropriate IPC:
+        - Linux/macOS: Unix domain sockets
+        - Windows: TCP localhost
+        """
+        socket_path = self.config.socket_path
 
         self._running = True
 
-        # Set up signal handlers
-        loop = asyncio.get_event_loop()
-        for sig in (signal.SIGTERM, signal.SIGINT):
-            loop.add_signal_handler(sig, lambda: asyncio.create_task(self.stop()))
+        # Set up signal handlers (Unix only - not supported on Windows asyncio)
+        if supports_unix_signals():
+            loop = asyncio.get_event_loop()
+            for sig in (signal.SIGTERM, signal.SIGINT):
+                loop.add_signal_handler(sig, lambda: asyncio.create_task(self.stop()))
 
-        # Start Unix socket server
-        self._server = await asyncio.start_unix_server(
-            self._handle_client,
-            path=str(socket_path),
-        )
-
-        # Set socket permissions
-        socket_path.chmod(0o600)
+        # Start IPC server (platform-specific)
+        await self._ipc_server.start(self._handle_client, socket_path)
 
         # Write PID file
         self.config.pid_file.write_text(str(os.getpid()))
 
-        logger.info(f"Daemon started, listening on {socket_path}")
+        address_display = self._ipc_server.get_address_display(socket_path)
+        logger.info(f"Daemon started, listening on {address_display}")
 
-        async with self._server:
-            await self._server.serve_forever()
+        await self._ipc_server.serve_forever()
 
     async def stop(self) -> None:
         """Stop the daemon."""
@@ -75,15 +74,15 @@ class MusicDaemon:
 
         await self.player.stop()
 
-        if self._server:
-            self._server.close()
-            await self._server.wait_closed()
+        # Stop IPC server (handles socket cleanup on Unix)
+        await self._ipc_server.stop()
 
-        # Clean up files
-        if self.config.socket_path.exists():
-            self.config.socket_path.unlink()
+        # Clean up PID file
         if self.config.pid_file.exists():
-            self.config.pid_file.unlink()
+            try:
+                self.config.pid_file.unlink()
+            except OSError:
+                pass  # Best effort cleanup
 
         logger.info("Daemon stopped")
 
@@ -137,6 +136,7 @@ class MusicDaemon:
             "ai_play": self._cmd_ai_play,
             "ai_replay": self._cmd_ai_replay,
             "ai_remove": self._cmd_ai_remove,
+            "shutdown": self._cmd_shutdown,
         }
 
         handler = handlers.get(command)
@@ -538,6 +538,16 @@ class MusicDaemon:
         else:
             return {"error": "Failed to remove track"}
 
+    async def _cmd_shutdown(self, args: dict) -> dict:
+        """Shutdown the daemon gracefully.
+
+        Used on Windows where signal handlers aren't supported.
+        """
+        logger.info("Shutdown command received")
+        # Schedule stop in a separate task so we can respond first
+        asyncio.create_task(self.stop())
+        return {"status": "shutting_down"}
+
 
 def run_daemon() -> None:
     """Run the daemon (entry point)."""
@@ -556,6 +566,8 @@ def get_daemon_pid() -> int | None:
     Returns the PID if daemon is running, None otherwise.
     Also cleans up stale PID/socket files if the daemon is not running.
     """
+    from .platform import is_unix
+
     config = get_config()
 
     if not config.pid_file.exists():
@@ -565,12 +577,13 @@ def get_daemon_pid() -> int | None:
         pid = int(config.pid_file.read_text().strip())
         os.kill(pid, 0)  # Check if running
         return pid
-    except (ValueError, ProcessLookupError, PermissionError):
+    except (ValueError, ProcessLookupError, PermissionError, OSError):
         # PID file is stale, clean up
         try:
             if config.pid_file.exists():
                 config.pid_file.unlink()
-            if config.socket_path.exists():
+            # Only clean up socket file on Unix (Windows uses TCP)
+            if is_unix() and config.socket_path.exists():
                 config.socket_path.unlink()
         except OSError:
             pass  # Best effort cleanup

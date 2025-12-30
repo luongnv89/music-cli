@@ -14,6 +14,7 @@ from . import __github_url__, __version__
 from .client import DaemonClient
 from .config import get_config
 from .daemon import get_daemon_pid, is_daemon_running
+from .platform import is_windows
 from .player.ffplay import check_ffplay_available
 
 logger = logging.getLogger(__name__)
@@ -117,15 +118,35 @@ def ensure_daemon() -> DaemonClient:
 
 
 def start_daemon_background() -> None:
-    """Start the daemon in background."""
-    # Start daemon as subprocess
+    """Start the daemon in background.
+
+    Uses platform-appropriate process creation:
+    - Linux/macOS: start_new_session=True
+    - Windows: CREATE_NEW_PROCESS_GROUP flag
+    """
     python = sys.executable
-    subprocess.Popen(
-        [python, "-m", "music_cli.daemon"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        start_new_session=True,
-    )
+    cmd = [python, "-m", "music_cli.daemon"]
+
+    if is_windows():
+        # Windows: Use CREATE_NEW_PROCESS_GROUP to detach from console
+        # These are Windows API constants
+        create_new_process_group = 0x00000200
+        detached_process = 0x00000008
+        subprocess.Popen(
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            stdin=subprocess.DEVNULL,
+            creationflags=create_new_process_group | detached_process,
+        )
+    else:
+        # Unix: Use start_new_session to create a new session
+        subprocess.Popen(
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
 
 
 @click.group(invoke_without_command=True)
@@ -174,8 +195,13 @@ def play(mode, source, mood, auto, duration, index):
     """
     if not check_ffplay_available():
         click.echo("Error: ffplay not found. Please install FFmpeg.", err=True)
-        click.echo("  macOS: brew install ffmpeg", err=True)
-        click.echo("  Linux: apt install ffmpeg", err=True)
+        if is_windows():
+            click.echo("  Windows: choco install ffmpeg", err=True)
+            click.echo("       or: winget install ffmpeg", err=True)
+            click.echo("       or: scoop install ffmpeg", err=True)
+        else:
+            click.echo("  macOS: brew install ffmpeg", err=True)
+            click.echo("  Linux: apt install ffmpeg", err=True)
         sys.exit(1)
 
     client = ensure_daemon()
@@ -555,7 +581,7 @@ def daemon_control(action):
     elif action == "stop":
         pid = get_daemon_pid()
         if pid:
-            os.kill(pid, signal.SIGTERM)
+            _terminate_daemon(pid)
             click.echo("Daemon stopped")
         else:
             click.echo("Daemon is not running")
@@ -563,10 +589,44 @@ def daemon_control(action):
     elif action == "restart":
         pid = get_daemon_pid()
         if pid:
-            os.kill(pid, signal.SIGTERM)
+            _terminate_daemon(pid)
             time.sleep(0.5)
         start_daemon_background()
         click.echo("Daemon restarted")
+
+
+def _terminate_daemon(pid: int) -> None:
+    """Terminate the daemon process.
+
+    Uses platform-appropriate method:
+    - Unix: SIGTERM signal (allows graceful shutdown)
+    - Windows: Send stop command via IPC, then terminate
+    """
+    if is_windows():
+        # On Windows, try to send stop command via IPC for graceful shutdown
+        # TerminateProcess doesn't give the daemon a chance to cleanup
+        try:
+            from .client import DaemonClient
+
+            client = DaemonClient()
+            # Try to send stop command - this triggers graceful shutdown
+            client.send_command("shutdown", timeout=2.0)
+            # Wait a moment for cleanup
+            time.sleep(0.3)
+        except Exception:  # noqa: S110  # nosec B110
+            pass  # If IPC fails, fall through to forceful termination
+
+        # Force terminate if still running
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except (ProcessLookupError, OSError):
+            pass  # Process already stopped
+    else:
+        # Unix: SIGTERM triggers graceful shutdown via signal handler
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except (ProcessLookupError, OSError):
+            pass  # Process already stopped
 
 
 @main.command("config")

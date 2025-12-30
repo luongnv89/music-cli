@@ -15,6 +15,7 @@ else:
 import tomli_w
 
 from . import __version__
+from .platform import get_path_provider
 
 logger = logging.getLogger(__name__)
 
@@ -120,16 +121,24 @@ Radio Capital|https://icecast.unitedradio.it/Capital.mp3
 """
 
     def __init__(self, config_dir: Path | None = None):
-        """Initialize config with optional custom directory."""
+        """Initialize config with optional custom directory.
+
+        Uses platform-appropriate paths:
+        - Linux/macOS: ~/.config/music-cli/
+        - Windows: %LOCALAPPDATA%\\music-cli\\
+        """
+        # Get platform-specific path provider
+        self._path_provider = get_path_provider()
+
         if config_dir is None:
-            config_dir = Path("~/.config/music-cli").expanduser()
+            config_dir = self._path_provider.get_config_dir()
         self.config_dir = config_dir
         self.config_file = self.config_dir / "config.toml"
         self.radios_file = self.config_dir / "radios.txt"
-        self.history_file = self.config_dir / "history.jsonl"
-        self.socket_path = self.config_dir / "music-cli.sock"
-        self.pid_file = self.config_dir / "music-cli.pid"
-        self.ai_music_dir = self.config_dir / "ai_music"
+        self.history_file = self._path_provider.get_history_file(self.config_dir)
+        self.socket_path = self._path_provider.get_socket_path(self.config_dir)
+        self.pid_file = self._path_provider.get_pid_file(self.config_dir)
+        self.ai_music_dir = self._path_provider.get_ai_music_dir(self.config_dir)
         self.ai_tracks_file = self.config_dir / "ai_tracks.json"
         self._config: dict[str, Any] = {}
         self._ensure_config_dir()

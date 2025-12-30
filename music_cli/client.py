@@ -2,10 +2,11 @@
 
 import json
 import logging
-import socket
 from typing import Any
 
 from .config import get_config
+from .platform import get_ipc_client
+from .platform.ipc import IPCClient
 
 logger = logging.getLogger(__name__)
 
@@ -17,11 +18,18 @@ AI_TIMEOUT = 300.0  # 5 minutes for AI generation
 
 
 class DaemonClient:
-    """Client for sending commands to the daemon."""
+    """Client for sending commands to the daemon.
+
+    Uses platform-appropriate IPC:
+    - Linux/macOS: Unix domain sockets
+    - Windows: TCP localhost
+    """
 
     def __init__(self):
         self.config = get_config()
-        self.socket_path = str(self.config.socket_path)
+        self.socket_path = self.config.socket_path
+        # Platform-specific IPC client (Unix sockets or TCP)
+        self._ipc_client: IPCClient = get_ipc_client()
 
     def send_command(
         self, command: str, args: dict | None = None, timeout: float | None = None
@@ -46,6 +54,8 @@ class DaemonClient:
         if timeout is None:
             if command == "play" and args.get("mode") == "ai":
                 timeout = AI_TIMEOUT
+            elif command == "ai_play":
+                timeout = AI_TIMEOUT
             else:
                 timeout = DEFAULT_TIMEOUT
 
@@ -54,11 +64,9 @@ class DaemonClient:
             "args": args,
         }
 
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        # Use platform-specific IPC client
+        sock = self._ipc_client.connect(self.socket_path, timeout)
         try:
-            sock.settimeout(timeout)
-            sock.connect(self.socket_path)
-
             sock.sendall(json.dumps(request).encode())
 
             # Receive response with size limit
@@ -78,12 +86,6 @@ class DaemonClient:
             else:
                 return {"error": "Empty response from daemon"}
 
-        except FileNotFoundError as e:
-            raise ConnectionError("Daemon not running (socket not found)") from e
-        except ConnectionRefusedError as e:
-            raise ConnectionError("Daemon not running (connection refused)") from e
-        except socket.timeout as e:
-            raise ConnectionError("Daemon not responding (timeout)") from e
         except json.JSONDecodeError as e:
             logger.warning(f"Invalid JSON response from daemon: {e}")
             return {"error": "Invalid response from daemon"}

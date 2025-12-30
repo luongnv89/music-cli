@@ -3,21 +3,30 @@
 import asyncio
 import logging
 import shutil
-import signal
 
+from ..platform import get_player_controller, is_windows
+from ..platform.player_control import PlayerController
 from .base import Player, PlayerState, TrackInfo
 
 logger = logging.getLogger(__name__)
 
 
 class FFplayPlayer(Player):
-    """Audio player using ffplay (part of FFmpeg)."""
+    """Audio player using ffplay (part of FFmpeg).
+
+    Uses platform-appropriate pause/resume:
+    - Linux/macOS: SIGSTOP/SIGCONT signals
+    - Windows: stdin 'p' command
+    """
 
     def __init__(self):
         super().__init__()
         self._process: asyncio.subprocess.Process | None = None
         self._monitor_task: asyncio.Task | None = None
         self._paused = False
+        # Platform-specific player controller for pause/resume
+        self._controller: PlayerController = get_player_controller()
+        self._is_windows = is_windows()
 
         # Verify ffplay is available
         if not shutil.which("ffplay"):
@@ -70,15 +79,21 @@ class FFplayPlayer(Player):
 
             logger.info(f"Starting playback: {track.source}")
 
+            # Windows needs stdin=PIPE for pause/resume via 'p' command
+            # Unix uses SIGSTOP/SIGCONT so stdin can be DEVNULL
+            stdin_mode = asyncio.subprocess.PIPE if self._is_windows else asyncio.subprocess.DEVNULL
+
             self._process = await asyncio.create_subprocess_exec(
                 *cmd,
-                stdin=asyncio.subprocess.DEVNULL,
+                stdin=stdin_mode,
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.DEVNULL,
             )
 
             self._state = PlayerState.PLAYING
             self._paused = False
+            # Reset controller state for new playback
+            self._controller.reset()
 
             # Start monitoring for process end
             self._monitor_task = asyncio.create_task(self._monitor_playback())
@@ -138,24 +153,30 @@ class FFplayPlayer(Player):
         self._paused = False
 
     async def pause(self) -> None:
-        """Pause playback by sending SIGSTOP to ffplay."""
+        """Pause playback.
+
+        Uses platform-appropriate method:
+        - Linux/macOS: SIGSTOP signal
+        - Windows: stdin 'p' command
+        """
         if self._process and self._state == PlayerState.PLAYING:
-            try:
-                self._process.send_signal(signal.SIGSTOP)
+            success = await self._controller.pause(self._process)
+            if success:
                 self._state = PlayerState.PAUSED
                 self._paused = True
-            except ProcessLookupError:
-                pass
 
     async def resume(self) -> None:
-        """Resume playback by sending SIGCONT to ffplay."""
+        """Resume playback.
+
+        Uses platform-appropriate method:
+        - Linux/macOS: SIGCONT signal
+        - Windows: stdin 'p' command (toggle)
+        """
         if self._process and self._state == PlayerState.PAUSED:
-            try:
-                self._process.send_signal(signal.SIGCONT)
+            success = await self._controller.resume(self._process)
+            if success:
                 self._state = PlayerState.PLAYING
                 self._paused = False
-            except ProcessLookupError:
-                pass
 
     async def set_volume(self, volume: int) -> None:
         """Set volume. Note: ffplay doesn't support runtime volume changes.
