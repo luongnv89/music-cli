@@ -33,8 +33,9 @@ pip install coder-music-cli
 uv pip install coder-music-cli
 
 # Install FFmpeg (required)
-brew install ffmpeg      # macOS
-sudo apt install ffmpeg  # Ubuntu/Debian
+brew install ffmpeg       # macOS
+sudo apt install ffmpeg   # Ubuntu/Debian
+choco install ffmpeg      # Windows (or: winget install ffmpeg)
 ```
 
 ### Optional: AI Music Generation
@@ -177,7 +178,9 @@ Features:
 
 ## Configuration
 
-Files in `~/.config/music-cli/`:
+Configuration files location:
+- **Linux/macOS**: `~/.config/music-cli/`
+- **Windows**: `%LOCALAPPDATA%\music-cli\`
 
 | File | Purpose |
 |------|---------|
@@ -241,8 +244,17 @@ GitHub: https://github.com/luongnv89/music-cli
 
 - Python 3.9+
 - FFmpeg
+- **Supported Platforms**: Linux, macOS, Windows 10+
 
 ## Changelog
+
+### v0.4.1
+- Add Windows 10+ support
+  - Platform abstraction layer for cross-platform compatibility
+  - TCP localhost IPC on Windows (Unix sockets on Linux/macOS)
+  - stdin-based pause/resume on Windows (signals on Linux/macOS)
+  - Windows-specific config directory (`%LOCALAPPDATA%\music-cli\`)
+- Add Windows to CI test matrix
 
 ### v0.4.0
 - Add `music-cli ai` command suite for AI track management

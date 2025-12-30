@@ -22,6 +22,7 @@ music-cli stop
 ### Requirements
 - Python 3.9+
 - FFmpeg
+- **Supported Platforms**: Linux, macOS, Windows 10+
 
 ### Install FFmpeg
 
@@ -38,6 +39,15 @@ sudo apt install ffmpeg
 **Arch Linux:**
 ```bash
 sudo pacman -S ffmpeg
+```
+
+**Windows:**
+```bash
+choco install ffmpeg
+# or
+winget install ffmpeg
+# or
+scoop install ffmpeg
 ```
 
 ### Install music-cli
@@ -172,7 +182,10 @@ music-cli play -m ai --mood energetic
 
 ## Configuration
 
-All config files are in `~/.config/music-cli/`:
+All config files are stored in a platform-specific directory:
+
+- **Linux/macOS**: `~/.config/music-cli/`
+- **Windows**: `%LOCALAPPDATA%\music-cli\`
 
 ### config.toml
 
@@ -280,14 +293,19 @@ music-cli daemon status
 # Restart if stuck
 music-cli daemon restart
 
-# Manual cleanup
+# Manual cleanup (Linux/macOS)
 rm ~/.config/music-cli/music-cli.sock
 rm ~/.config/music-cli/music-cli.pid
+
+# Manual cleanup (Windows - PowerShell)
+Remove-Item "$env:LOCALAPPDATA\music-cli\music-cli.pid"
 ```
 
 ### No Sound
 
-1. Check FFmpeg: `which ffplay`
+1. Check FFmpeg:
+   - Linux/macOS: `which ffplay`
+   - Windows: `where ffplay`
 2. Test manually: `ffplay -nodisp -autoexit /path/to/file.mp3`
 3. Check volume: `music-cli volume`
 

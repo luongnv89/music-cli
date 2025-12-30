@@ -33,7 +33,7 @@ graph TB
         MG[MusicGen Model]
     end
 
-    CLI -->|Unix Socket| D
+    CLI -->|IPC| D
     D --> P
     D --> H
     D --> L
@@ -53,13 +53,14 @@ graph TB
 | Component | Module | Responsibility |
 |-----------|--------|----------------|
 | CLI | `cli.py` | User commands, daemon lifecycle |
-| Client | `client.py` | Socket communication with daemon |
+| Client | `client.py` | IPC communication with daemon |
 | Daemon | `daemon.py` | Background process, command routing |
 | Player | `player/` | Audio playback via ffplay |
 | Sources | `sources/` | Music content providers |
 | Context | `context/` | Smart music selection |
 | History | `history.py` | Playback logging |
 | Config | `config.py` | Settings management |
+| Platform | `platform/` | Cross-platform abstractions |
 
 ### Daemon Architecture
 
@@ -137,7 +138,7 @@ flowchart TD
 
 ## IPC Protocol
 
-Communication uses JSON over Unix sockets:
+Communication uses JSON over IPC (Unix sockets on Linux/macOS, TCP localhost on Windows):
 
 ### Request Format
 ```json
@@ -167,12 +168,17 @@ Communication uses JSON over Unix sockets:
 
 ## File Structure
 
+**Linux/macOS:** `~/.config/music-cli/`
+**Windows:** `%LOCALAPPDATA%\music-cli\`
+
 ```
-~/.config/music-cli/
+<config-dir>/
 ├── config.toml      # User settings
 ├── radios.txt       # Radio station URLs
 ├── history.jsonl    # Playback history
-├── music-cli.sock   # Unix socket (runtime)
+├── ai_tracks.json   # AI track metadata
+├── ai_music/        # AI-generated audio files
+├── music-cli.sock   # Unix socket (Linux/macOS only)
 └── music-cli.pid    # Daemon PID (runtime)
 ```
 
@@ -192,8 +198,31 @@ Communication uses JSON over Unix sockets:
 
 | Decision | Rationale |
 |----------|-----------|
-| Daemon + Socket | Persistent playback, fast command response |
+| Daemon + IPC | Persistent playback, fast command response |
 | ffplay backend | Lightweight, supports streaming, widely available |
 | JSON-lines history | Human-readable, easy to parse/grep |
 | TOML config | Clean syntax, Python 3.11+ native support |
 | Optional AI | Graceful degradation, large dependency (~5GB) |
+| Platform abstraction | Clean cross-platform support without code duplication |
+
+## Platform Support
+
+music-cli supports Linux, macOS, and Windows 10+ through a platform abstraction layer:
+
+| Feature | Linux/macOS | Windows |
+|---------|-------------|---------|
+| **IPC** | Unix sockets | TCP localhost (port 44556) |
+| **Pause/Resume** | SIGSTOP/SIGCONT signals | stdin 'p' command to ffplay |
+| **Config Dir** | `~/.config/music-cli/` | `%LOCALAPPDATA%\music-cli\` |
+| **Daemon Spawn** | `start_new_session=True` | `CREATE_NEW_PROCESS_GROUP` |
+| **Shutdown** | SIGTERM signal | IPC shutdown command |
+
+### Platform Module Structure
+
+```
+music_cli/platform/
+├── __init__.py         # Platform detection, factory functions
+├── ipc.py              # IPC server/client abstractions
+├── paths.py            # Config directory providers
+└── player_control.py   # Pause/resume controllers
+```
