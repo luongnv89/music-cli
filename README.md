@@ -10,6 +10,7 @@ A command-line music player for coders. Background daemon with radio streaming, 
 music-cli play --mood focus    # Start focus music
 music-cli pause                # Pause for meeting
 music-cli resume               # Back to coding
+music-cli status               # Check what's playing + inspirational quote
 ```
 
 ## Installation
@@ -29,7 +30,7 @@ sudo apt install ffmpeg  # Ubuntu/Debian
 ### Optional: AI Music Generation
 
 ```bash
-pip install 'coder-music-cli[ai]'  # ~5GB (PyTorch + MusicGen)
+pip install 'coder-music-cli[ai]'  # ~5GB (PyTorch + MusicGen via Transformers)
 ```
 
 ## Features
@@ -37,6 +38,10 @@ pip install 'coder-music-cli[ai]'  # ~5GB (PyTorch + MusicGen)
 - **Daemon-based** - Persistent background playback
 - **Multiple sources** - Local files, radio streams, AI generation
 - **Context-aware** - Selects music based on time of day and mood
+- **35+ Radio Stations** - Curated stations in English, French, Spanish, and Italian
+- **AI Music Generation** - Generate music with MusicGen (saved for replay)
+- **Version-aware Updates** - Automatic notification when new stations are available
+- **Inspirational Quotes** - Random music quotes with every status check
 - **Simple config** - Human-readable text files
 
 ## Quick Start
@@ -49,6 +54,11 @@ music-cli play -m local --auto    # Shuffle local library
 
 # Control
 music-cli pause | resume | stop | status
+
+# Manage radio stations
+music-cli radios                  # List all stations
+music-cli radios play 5           # Play station #5
+music-cli radios add              # Add new station
 ```
 
 ## Commands
@@ -57,13 +67,41 @@ music-cli pause | resume | stop | status
 |---------|-------------|
 | `play` | Start playing (radio/local/ai/history) |
 | `stop` / `pause` / `resume` | Playback control |
-| `status` | Current track and state |
+| `status` | Current track, state, and inspirational quote |
 | `next` | Skip track (auto-play mode) |
 | `volume [0-100]` | Get/set volume |
-| `radios` | List stations |
+| `radios` | Manage radio stations (list/play/add/remove) |
 | `history` | Playback log |
 | `moods` | Available mood tags |
+| `config` | Show configuration file locations |
+| `update-radios` | Update stations after version upgrade |
 | `daemon start\|stop\|status` | Daemon control |
+
+## Radio Station Management
+
+```bash
+# List all stations with numbers
+music-cli radios
+music-cli radios list
+
+# Play by station number
+music-cli radios play 5
+
+# Add a new station interactively
+music-cli radios add
+
+# Remove a station
+music-cli radios remove 10
+```
+
+### Pre-configured Stations
+
+35 stations across 4 languages:
+
+- **English**: ChillHop, SomaFM (Groove Salad, Drone Zone, DEF CON, etc.), BBC Radio 3
+- **French**: FIP Radio, France Inter, France Musique, Mouv
+- **Spanish**: Salsa Radio, Tropical 100, Los 40 Principales, Cadena SER
+- **Italian**: Radio Italia, RTL 102.5, Radio 105, Virgin Radio Italy
 
 ## Play Modes
 
@@ -84,6 +122,25 @@ music-cli play -m ai --mood happy -d 60
 music-cli play -m history -i 3     # Replay item #3
 ```
 
+## AI Music Generation
+
+Generate unique music with Meta's MusicGen model:
+
+```bash
+# Install AI dependencies
+pip install 'coder-music-cli[ai]'
+
+# Generate music
+music-cli play -m ai --mood focus -d 30   # 30-second focus track
+music-cli play -m ai --mood energetic     # Energetic music
+```
+
+Features:
+- **Animated feedback** - "composing..." animation while generating
+- **Persistent storage** - Generated tracks saved to `~/.config/music-cli/ai_music/`
+- **Replay support** - AI tracks appear in history for replay
+- **Auto-loop** - Generated tracks loop automatically
+
 ## Moods
 
 `focus` `happy` `sad` `excited` `relaxed` `energetic` `melancholic` `peaceful`
@@ -94,14 +151,51 @@ Files in `~/.config/music-cli/`:
 
 | File | Purpose |
 |------|---------|
-| `config.toml` | Settings |
-| `radios.txt` | Station URLs |
+| `config.toml` | Settings (volume, mood mappings, version) |
+| `radios.txt` | Station URLs (name\|url format) |
 | `history.jsonl` | Play history |
+| `ai_music/` | AI-generated tracks |
 
-Add stations to `radios.txt`:
+### Version Updates
+
+When you update music-cli, you'll be notified if new radio stations are available:
+
+```bash
+# Check and update stations
+music-cli update-radios
+
+# Options:
+# [M] Merge   - Add new stations to your list (recommended)
+# [O] Overwrite - Replace with new defaults (backs up old file)
+# [K] Keep    - Keep your current stations unchanged
 ```
+
+### Add Custom Stations
+
+```bash
+# Interactive
+music-cli radios add
+
+# Or edit directly: ~/.config/music-cli/radios.txt
 ChillHop|https://streams.example.com/chillhop.mp3
 Jazz FM|https://streams.example.com/jazz.mp3
+```
+
+## Status & Quotes
+
+The `status` command shows playback info plus a random inspirational quote:
+
+```bash
+$ music-cli status
+Status: ▶ playing
+Track: Groove Salad [radio]
+Volume: 80%
+Context: morning / weekday
+
+"Music gives a soul to the universe, wings to the mind, flight to the imagination." - Plato
+
+Version: 0.3.0
+GitHub: https://github.com/luongnv89/music-cli
 ```
 
 ## Documentation
@@ -116,6 +210,31 @@ Jazz FM|https://streams.example.com/jazz.mp3
 
 - Python 3.9+
 - FFmpeg
+
+## Changelog
+
+### v0.3.0
+- Add radio station management (list/play/add/remove by number)
+- Add 35 curated radio stations (English, French, Spanish, Italian)
+- Add version-aware config with `update-radios` command
+- Add inspirational quotes to status command
+- Add "composing..." animation for AI generation
+- Save AI-generated music to persistent directory for replay
+- Show GitHub link in status output
+- Remove audiocraft dependency (use transformers only)
+
+### v0.2.0
+- Switch to HuggingFace Transformers for AI music generation
+- Auto-loop AI-generated tracks
+- Pin transformers<4.51 for MusicGen compatibility
+- CI/CD improvements
+
+### v0.1.0
+- Initial release
+- Daemon-based playback
+- Radio streaming, local files, AI generation
+- Context-aware music selection
+- Mood support
 
 ## License
 
