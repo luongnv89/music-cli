@@ -71,6 +71,7 @@ music-cli radios add              # Add new station
 | `next` | Skip track (auto-play mode) |
 | `volume [0-100]` | Get/set volume |
 | `radios` | Manage radio stations (list/play/add/remove) |
+| `ai` | Manage AI-generated tracks (list/play/replay/remove) |
 | `history` | Playback log |
 | `moods` | Available mood tags |
 | `config` | Show configuration file locations |
@@ -130,16 +131,35 @@ Generate unique music with Meta's MusicGen model:
 # Install AI dependencies
 pip install 'coder-music-cli[ai]'
 
-# Generate music
-music-cli play -m ai --mood focus -d 30   # 30-second focus track
-music-cli play -m ai --mood energetic     # Energetic music
+# Generate and manage AI music
+music-cli ai play                         # Context-aware generation
+music-cli ai play -p "jazz piano"         # Custom prompt
+music-cli ai play --mood focus -d 30      # 30-second focus track
+music-cli ai list                         # List all generated tracks
+music-cli ai replay 1                     # Replay track #1
+music-cli ai remove 2                     # Delete track #2
 ```
 
+### AI Command Suite
+
+| Command | Description |
+|---------|-------------|
+| `ai list` | Show all AI-generated tracks with prompts |
+| `ai play` | Generate music from current context |
+| `ai play -p "prompt"` | Generate with custom prompt |
+| `ai play --mood focus` | Generate with specific mood |
+| `ai play -d 30` | Generate 30-second track (default: 5s) |
+| `ai replay <num>` | Replay track by number (regenerates if file missing) |
+| `ai remove <num>` | Delete track and audio file |
+
 Features:
+- **Context-aware** - Uses time of day, day of week, and session mood
+- **Custom prompts** - Generate exactly what you want with `-p`
+- **Seamless looping** - All tracks engineered for infinite playback
+- **Track management** - List, replay, and remove generated tracks
+- **Regeneration** - Missing files can be regenerated with original prompt
 - **Animated feedback** - "composing..." animation while generating
-- **Persistent storage** - Generated tracks saved to `~/.config/music-cli/ai_music/`
-- **Replay support** - AI tracks appear in history for replay
-- **Auto-loop** - Generated tracks loop automatically
+- **Persistent storage** - Tracks saved to `~/.config/music-cli/ai_music/`
 
 ## Moods
 
@@ -154,7 +174,8 @@ Files in `~/.config/music-cli/`:
 | `config.toml` | Settings (volume, mood mappings, version) |
 | `radios.txt` | Station URLs (name\|url format) |
 | `history.jsonl` | Play history |
-| `ai_music/` | AI-generated tracks |
+| `ai_tracks.json` | AI track metadata (prompts, durations) |
+| `ai_music/` | AI-generated audio files |
 
 ### Version Updates
 
@@ -212,6 +233,16 @@ GitHub: https://github.com/luongnv89/music-cli
 - FFmpeg
 
 ## Changelog
+
+### v0.4.0
+- Add `music-cli ai` command suite for AI track management
+  - `ai list` - Display all AI tracks with prompts
+  - `ai play [-p "prompt"]` - Generate with context or custom prompt
+  - `ai replay <num>` - Replay track (regenerates if missing)
+  - `ai remove <num>` - Delete track and audio file
+- Add seamless looping via prompt engineering
+- Add context-aware AI generation (time of day, day of week, mood)
+- Default AI duration reduced to 5s for faster generation
 
 ### v0.3.0
 - Add radio station management (list/play/add/remove by number)
