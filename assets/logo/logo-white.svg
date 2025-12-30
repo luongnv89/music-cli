@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 64" fill="none">
+  <!-- Full logo: White version for dark backgrounds -->
+
+  <!-- Logo mark -->
+  <g>
+    <path
+      d="M8 16 L24 32 L8 48"
+      stroke="white"
+      stroke-width="5"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      fill="none"
+    />
+    <path d="M32 20 Q44 32 32 44" stroke="white" stroke-width="4" stroke-linecap="round" fill="none"/>
+    <path d="M40 14 Q56 32 40 50" stroke="white" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.7"/>
+    <path d="M48 8 Q68 32 48 56" stroke="white" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.4"/>
+  </g>
+
+  <!-- Wordmark -->
+  <text x="80" y="42" font-family="'SF Mono', 'JetBrains Mono', 'Fira Code', monospace" font-size="28" font-weight="600" fill="white">
+    music<tspan fill="#A5B4FC">-cli</tspan>
+  </text>
+</svg>

@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!--
+    music-cli logo: Terminal chevron that becomes sound waves
+    Concept: The > prompt emanates musical sound waves
+  -->
+
+  <!-- Terminal chevron/prompt forming the source -->
+  <path
+    d="M8 16 L24 32 L8 48"
+    stroke="#6366F1"
+    stroke-width="5"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    fill="none"
+  />
+
+  <!-- Sound waves emanating from the chevron -->
+  <!-- Wave 1 (closest) -->
+  <path
+    d="M32 20 Q44 32 32 44"
+    stroke="#6366F1"
+    stroke-width="4"
+    stroke-linecap="round"
+    fill="none"
+  />
+
+  <!-- Wave 2 (middle) -->
+  <path
+    d="M40 14 Q56 32 40 50"
+    stroke="#6366F1"
+    stroke-width="4"
+    stroke-linecap="round"
+    fill="none"
+    opacity="0.7"
+  />
+
+  <!-- Wave 3 (furthest) -->
+  <path
+    d="M48 8 Q68 32 48 56"
+    stroke="#6366F1"
+    stroke-width="4"
+    stroke-linecap="round"
+    fill="none"
+    opacity="0.4"
+  />
+</svg>

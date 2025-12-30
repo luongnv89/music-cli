@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>music-cli Logo Concepts</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --indigo: #6366F1;
+      --indigo-light: #A5B4FC;
+      --indigo-dark: #4F46E5;
+      --zinc-900: #18181B;
+      --zinc-800: #27272A;
+      --zinc-100: #F4F4F5;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Space Grotesk', sans-serif;
+      background: var(--zinc-900);
+      color: var(--zinc-100);
+      min-height: 100vh;
+      padding: 4rem 2rem;
+    }
+
+    h1 {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 2.5rem;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 1rem;
+      background: linear-gradient(135deg, var(--indigo-light), var(--indigo));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #71717A;
+      margin-bottom: 4rem;
+      font-size: 1.1rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 3rem;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: var(--zinc-800);
+      border-radius: 1.5rem;
+      padding: 2rem;
+      border: 1px solid #3F3F46;
+      transition: all 0.3s ease;
+    }
+
+    .card:hover {
+      border-color: var(--indigo);
+      transform: translateY(-4px);
+      box-shadow: 0 20px 40px rgba(99, 102, 241, 0.15);
+    }
+
+    .card h2 {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1rem;
+      color: var(--indigo-light);
+      margin-bottom: 0.5rem;
+    }
+
+    .card p {
+      font-size: 0.875rem;
+      color: #A1A1AA;
+      margin-bottom: 2rem;
+      line-height: 1.6;
+    }
+
+    .logo-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 2rem;
+      flex-wrap: wrap;
+    }
+
+    .logo-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .logo-box span {
+      font-size: 0.7rem;
+      color: #71717A;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .light-bg {
+      background: white;
+      border-radius: 1rem;
+      padding: 1.5rem;
+    }
+
+    .dark-bg {
+      background: var(--zinc-900);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      border: 1px solid #3F3F46;
+    }
+
+    .logo-box img, .logo-box svg {
+      width: 80px;
+      height: 80px;
+    }
+
+    .sizes {
+      display: flex;
+      align-items: flex-end;
+      gap: 1rem;
+      justify-content: center;
+      margin-top: 1.5rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid #3F3F46;
+    }
+
+    .sizes .size {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .sizes .size span {
+      font-size: 0.6rem;
+      color: #52525B;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .size-16 { width: 16px; height: 16px; }
+    .size-32 { width: 32px; height: 32px; }
+    .size-48 { width: 48px; height: 48px; }
+    .size-64 { width: 64px; height: 64px; }
+
+    .recommendation {
+      background: linear-gradient(135deg, var(--indigo-dark), var(--indigo));
+      border: none;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .recommendation::before {
+      content: '★ RECOMMENDED';
+      position: absolute;
+      top: 1rem;
+      right: -2rem;
+      background: #FCD34D;
+      color: var(--zinc-900);
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 0.25rem 2.5rem;
+      transform: rotate(45deg);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .recommendation h2 {
+      color: white;
+    }
+
+    .recommendation p {
+      color: rgba(255,255,255,0.8);
+    }
+
+    footer {
+      text-align: center;
+      margin-top: 4rem;
+      padding-top: 2rem;
+      border-top: 1px solid #3F3F46;
+      color: #52525B;
+      font-size: 0.875rem;
+    }
+
+    footer code {
+      background: var(--zinc-800);
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.25rem;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--indigo-light);
+    }
+  </style>
+</head>
+<body>
+  <h1>&gt; music-cli</h1>
+  <p class="subtitle">Logo Design Concepts — Terminal meets Music</p>
+
+  <div class="grid">
+    <!-- Version 2: Sound Waves -->
+    <div class="card recommendation">
+      <h2>v2: Sound Wave Prompt</h2>
+      <p>The terminal chevron <code>&gt;</code> emanates sound waves. Your commands become music.</p>
+      <div class="logo-container">
+        <div class="logo-box">
+          <div class="light-bg">
+            <img src="logo-mark-v2.svg" alt="Logo v2 on light">
+          </div>
+          <span>light</span>
+        </div>
+        <div class="logo-box">
+          <div class="dark-bg">
+            <img src="logo-mark-v2.svg" alt="Logo v2 on dark">
+          </div>
+          <span>dark</span>
+        </div>
+      </div>
+      <div class="sizes">
+        <div class="size"><img src="logo-mark-v2.svg" class="size-16"><span>16px</span></div>
+        <div class="size"><img src="logo-mark-v2.svg" class="size-32"><span>32px</span></div>
+        <div class="size"><img src="logo-mark-v2.svg" class="size-48"><span>48px</span></div>
+        <div class="size"><img src="logo-mark-v2.svg" class="size-64"><span>64px</span></div>
+      </div>
+    </div>
+
+    <!-- Version 3: Brackets + Play -->
+    <div class="card">
+      <h2>v3: Bracket Play</h2>
+      <p>Square brackets <code>[ ]</code> frame a play button. Code syntax meets media controls.</p>
+      <div class="logo-container">
+        <div class="logo-box">
+          <div class="light-bg">
+            <img src="logo-mark-v3.svg" alt="Logo v3 on light">
+          </div>
+          <span>light</span>
+        </div>
+        <div class="logo-box">
+          <div class="dark-bg">
+            <img src="logo-mark-v3.svg" alt="Logo v3 on dark">
+          </div>
+          <span>dark</span>
+        </div>
+      </div>
+      <div class="sizes">
+        <div class="size"><img src="logo-mark-v3.svg" class="size-16"><span>16px</span></div>
+        <div class="size"><img src="logo-mark-v3.svg" class="size-32"><span>32px</span></div>
+        <div class="size"><img src="logo-mark-v3.svg" class="size-48"><span>48px</span></div>
+        <div class="size"><img src="logo-mark-v3.svg" class="size-64"><span>64px</span></div>
+      </div>
+    </div>
+
+    <!-- Version 4: Prompt + Equalizer -->
+    <div class="card">
+      <h2>v4: Prompt Equalizer</h2>
+      <p>Terminal prompt <code>&gt;</code> followed by equalizer bars. Command output as music.</p>
+      <div class="logo-container">
+        <div class="logo-box">
+          <div class="light-bg">
+            <img src="logo-mark-v4.svg" alt="Logo v4 on light">
+          </div>
+          <span>light</span>
+        </div>
+        <div class="logo-box">
+          <div class="dark-bg">
+            <img src="logo-mark-v4.svg" alt="Logo v4 on dark">
+          </div>
+          <span>dark</span>
+        </div>
+      </div>
+      <div class="sizes">
+        <div class="size"><img src="logo-mark-v4.svg" class="size-16"><span>16px</span></div>
+        <div class="size"><img src="logo-mark-v4.svg" class="size-32"><span>32px</span></div>
+        <div class="size"><img src="logo-mark-v4.svg" class="size-48"><span>48px</span></div>
+        <div class="size"><img src="logo-mark-v4.svg" class="size-64"><span>64px</span></div>
+      </div>
+    </div>
+
+    <!-- Version 1: Original -->
+    <div class="card">
+      <h2>v1: Original</h2>
+      <p>Cursor bar with equalizer visualization. Simple and direct.</p>
+      <div class="logo-container">
+        <div class="logo-box">
+          <div class="light-bg">
+            <img src="logo-mark.svg" alt="Logo v1 on light">
+          </div>
+          <span>light</span>
+        </div>
+        <div class="logo-box">
+          <div class="dark-bg">
+            <img src="logo-mark.svg" alt="Logo v1 on dark">
+          </div>
+          <span>dark</span>
+        </div>
+      </div>
+      <div class="sizes">
+        <div class="size"><img src="logo-mark.svg" class="size-16"><span>16px</span></div>
+        <div class="size"><img src="logo-mark.svg" class="size-32"><span>32px</span></div>
+        <div class="size"><img src="logo-mark.svg" class="size-48"><span>48px</span></div>
+        <div class="size"><img src="logo-mark.svg" class="size-64"><span>64px</span></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p>Brand color: <code>#6366F1</code> (Indigo 500)</p>
+  </footer>
+</body>
+</html>

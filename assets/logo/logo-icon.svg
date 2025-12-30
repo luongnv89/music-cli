@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- App icon: Square with rounded corners -->
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="#6366F1"/>
+
+  <!-- Logo mark (white on indigo) -->
+  <g transform="translate(96, 96) scale(5)">
+    <!-- Terminal chevron -->
+    <path
+      d="M8 16 L24 32 L8 48"
+      stroke="white"
+      stroke-width="5"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      fill="none"
+    />
+    <!-- Sound waves -->
+    <path d="M32 20 Q44 32 32 44" stroke="white" stroke-width="4" stroke-linecap="round" fill="none"/>
+    <path d="M40 14 Q56 32 40 50" stroke="white" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.8"/>
+    <path d="M48 8 Q68 32 48 56" stroke="white" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.5"/>
+  </g>
+</svg>
