@@ -135,10 +135,10 @@ music-cli play -m local --auto
 
 ### AI Mode
 
-Generate music with MusicGen (requires `[ai]` extras):
+Generate audio with AI models (requires `[ai]` extras):
 
 ```bash
-# Context-aware generation
+# Context-aware generation (default: musicgen-small)
 music-cli play -m ai
 
 # With mood
@@ -147,6 +147,8 @@ music-cli play -m ai --mood happy
 # Custom duration (seconds)
 music-cli play -m ai --mood focus -d 60
 ```
+
+For the full AI command suite, see [AI Music Generation](#ai-music-generation).
 
 ### History Mode
 
@@ -211,6 +213,17 @@ morning = "https://streams.example.com/morning.mp3"
 afternoon = "https://streams.example.com/afternoon.mp3"
 evening = "https://streams.example.com/evening.mp3"
 night = "https://streams.example.com/night.mp3"
+
+[ai]
+default_model = "musicgen-small"
+
+[ai.cache]
+max_models = 2  # Max models to keep in memory (LRU eviction)
+
+# Optional: customize model parameters
+[ai.models.audioldm-s-full-v2.extra_params]
+num_inference_steps = 10
+guidance_scale = 2.5
 ```
 
 ### radios.txt
@@ -273,14 +286,39 @@ music-cli history
 ### AI Music Generation
 
 ```bash
-# Install AI dependencies
-pip install 'music-cli[ai]'
+# Install AI dependencies (~5GB: PyTorch + Transformers + Diffusers)
+pip install 'coder-music-cli[ai]'
 
-# Generate 2-minute focus track
-music-cli play -m ai --mood focus -d 120
+# List available models
+music-cli ai models
 
-# First run downloads model (~3GB)
+# Generate with default model (musicgen-small)
+music-cli ai play --mood focus -d 30
+
+# Generate with specific model
+music-cli ai play -m audioldm-s-full-v2 -p "forest ambience with birds"
+music-cli ai play -m bark-small -p "Hello, welcome to the coding session"
+
+# Manage generated tracks
+music-cli ai list       # List all tracks
+music-cli ai replay 1   # Replay track #1
+music-cli ai remove 2   # Delete track #2
+
+# First run downloads model (size varies by model)
 ```
+
+#### Available AI Models
+
+| Model ID | Type | Best For |
+|----------|------|----------|
+| `musicgen-small` | MusicGen | Music generation (default) |
+| `musicgen-medium` | MusicGen | Higher quality music |
+| `musicgen-large` | MusicGen | Best quality music |
+| `musicgen-melody` | MusicGen | Melody-conditioned music |
+| `audioldm-s-full-v2` | AudioLDM | Sound effects, ambient audio |
+| `audioldm-l-full` | AudioLDM | High-quality audio generation |
+| `bark` | Bark | Speech synthesis, audio with voice |
+| `bark-small` | Bark | Faster speech synthesis |
 
 ## Troubleshooting
 
@@ -318,14 +356,25 @@ Remove-Item "$env:LOCALAPPDATA\music-cli\music-cli.pid"
 ### AI Mode Not Working
 
 ```bash
-# Check if installed
-python -c "import audiocraft" 2>&1
+# Check if AI dependencies are installed
+python -c "import transformers; import torch; print('AI ready!')"
 
 # Install if missing
-pip install 'music-cli[ai]'
+pip install 'coder-music-cli[ai]'
 
-# First run downloads model (~3GB)
+# Check available models
+music-cli ai models
+
+# First run downloads model (size varies by model)
+# musicgen-small: ~1.5GB
+# audioldm-s-full-v2: ~1GB
+# bark-small: ~1.5GB
 ```
+
+**Memory Issues:**
+- Minimum 8GB RAM for smaller models
+- 16GB recommended for larger models (musicgen-large, bark)
+- LRU cache limits memory usage (default: 2 models in memory)
 
 ## Tips
 

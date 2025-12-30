@@ -343,6 +343,7 @@ class MusicDaemon:
                     "prompt": t.prompt,
                     "duration": t.duration,
                     "timestamp": t.timestamp,
+                    "model": t.model,
                     "file_exists": t.file_exists(),
                 }
                 for i, t in enumerate(tracks)
@@ -356,6 +357,7 @@ class MusicDaemon:
             prompt: Custom prompt (optional). If not provided, uses context.
             duration: Duration in seconds (default: 30).
             mood: Mood to use for context-based generation.
+            model: Model ID to use (optional). If not provided, uses default.
         """
         try:
             from .sources.ai_generator import AIGenerator, is_ai_available
@@ -369,6 +371,12 @@ class MusicDaemon:
             custom_prompt = args.get("prompt")
             duration = args.get("duration", 5)
             mood = args.get("mood")
+            model_id = args.get("model")
+
+            # Validate model if specified
+            if model_id and not self.config.validate_ai_model(model_id):
+                available = ", ".join(self.config.list_ai_models(enabled_only=True))
+                return {"error": f"Unknown or disabled model: '{model_id}'. Available: {available}"}
 
             # Update mood if provided
             if mood:
@@ -393,18 +401,20 @@ class MusicDaemon:
 
                 prompt = ", ".join(prompts) if prompts else "ambient background music"
 
-            # Generate the track
-            generator = AIGenerator(output_dir=self.config.ai_music_dir)
-            track = generator.generate(prompt, duration)
+            # Generate the track with specified model
+            generator = AIGenerator(output_dir=self.config.ai_music_dir, config=self.config)
+            track = generator.generate(prompt, duration, model_id=model_id)
 
             if not track:
                 return {"error": "Failed to generate AI music"}
 
-            # Save to AI tracks (store original prompt, not the enhanced one)
+            # Save to AI tracks with model info
+            model_used = track.metadata.get("model", "musicgen-small")
             self.ai_tracks.add_track(
                 prompt=prompt,
                 file_path=track.source,
                 duration=duration,
+                model=model_used,
             )
 
             # Log to history
@@ -469,8 +479,15 @@ class MusicDaemon:
                         "error": "AI generation not available. Install with: pip install 'coder-music-cli[ai]'"
                     }
 
-                generator = AIGenerator(output_dir=self.config.ai_music_dir)
-                track = generator.generate(track_entry.prompt, track_entry.duration)
+                # Always use the stored model for regeneration to maintain consistency
+                model_id = track_entry.model
+
+                generator = AIGenerator(output_dir=self.config.ai_music_dir, config=self.config)
+                track = generator.generate(
+                    track_entry.prompt,
+                    track_entry.duration,
+                    model_id=model_id,
+                )
 
                 if not track:
                     return {"error": "Failed to regenerate AI music"}

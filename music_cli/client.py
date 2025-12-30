@@ -179,6 +179,7 @@ class DaemonClient:
         prompt: str | None = None,
         duration: int = 5,
         mood: str | None = None,
+        model: str | None = None,
     ) -> dict:
         """Generate and play AI music.
 
@@ -186,6 +187,7 @@ class DaemonClient:
             prompt: Custom prompt for generation (optional).
             duration: Duration in seconds.
             mood: Mood for context-based generation.
+            model: Model ID to use (e.g., 'musicgen-small'). If None, uses default.
 
         Returns:
             Response dict with track info or error.
@@ -195,6 +197,8 @@ class DaemonClient:
             args["prompt"] = prompt
         if mood:
             args["mood"] = mood
+        if model:
+            args["model"] = model
         return self.send_command("ai_play", args, timeout=AI_TIMEOUT)
 
     def ai_replay(self, index: int, regenerate: bool = False) -> dict:

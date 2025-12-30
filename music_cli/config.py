@@ -37,6 +37,97 @@ class Config:
             "enabled": True,
             "use_ai": False,  # Requires optional AI dependencies
         },
+        "ai": {
+            "default_model": "musicgen-small",
+            "cache": {
+                "max_models": 2,
+            },
+            "models": {
+                # MusicGen models (Meta) - Music generation
+                "musicgen-small": {
+                    "hf_model_id": "facebook/musicgen-small",
+                    "model_type": "musicgen",
+                    "default_duration": 30,
+                    "max_duration": 60,
+                    "min_duration": 5,
+                    "tokens_per_second": 50,
+                    "enabled": True,
+                },
+                "musicgen-medium": {
+                    "hf_model_id": "facebook/musicgen-medium",
+                    "model_type": "musicgen",
+                    "default_duration": 30,
+                    "max_duration": 60,
+                    "min_duration": 5,
+                    "tokens_per_second": 50,
+                    "enabled": True,
+                },
+                "musicgen-large": {
+                    "hf_model_id": "facebook/musicgen-large",
+                    "model_type": "musicgen",
+                    "default_duration": 20,
+                    "max_duration": 45,
+                    "min_duration": 5,
+                    "tokens_per_second": 50,
+                    "enabled": True,
+                },
+                "musicgen-melody": {
+                    "hf_model_id": "facebook/musicgen-melody",
+                    "model_type": "musicgen",
+                    "default_duration": 30,
+                    "max_duration": 60,
+                    "min_duration": 5,
+                    "tokens_per_second": 50,
+                    "enabled": True,
+                },
+                # AudioLDM models (CVSSP) - General audio/sound effects
+                "audioldm-s-full-v2": {
+                    "hf_model_id": "cvssp/audioldm-s-full-v2",
+                    "model_type": "audioldm",
+                    "default_duration": 10,
+                    "max_duration": 30,
+                    "min_duration": 2,
+                    "tokens_per_second": 50,
+                    "enabled": True,
+                    "extra_params": {
+                        "num_inference_steps": 10,
+                        "guidance_scale": 2.5,
+                    },
+                },
+                "audioldm-l-full": {
+                    "hf_model_id": "cvssp/audioldm-l-full",
+                    "model_type": "audioldm",
+                    "default_duration": 10,
+                    "max_duration": 30,
+                    "min_duration": 2,
+                    "tokens_per_second": 50,
+                    "enabled": True,
+                    "extra_params": {
+                        "num_inference_steps": 10,
+                        "guidance_scale": 2.5,
+                    },
+                },
+                # Bark models (Suno) - Speech and audio synthesis
+                "bark": {
+                    "hf_model_id": "suno/bark",
+                    "model_type": "bark",
+                    "default_duration": 10,
+                    "max_duration": 15,
+                    "min_duration": 2,
+                    "tokens_per_second": 50,
+                    "enabled": True,
+                },
+                "bark-small": {
+                    "hf_model_id": "suno/bark-small",
+                    "model_type": "bark",
+                    "default_duration": 10,
+                    "max_duration": 15,
+                    "min_duration": 2,
+                    "tokens_per_second": 50,
+                    "enabled": True,
+                },
+            },
+        },
         "mood_radio_map": {
             "focus": "https://streams.ilovemusic.de/iloveradio17.mp3",
             "happy": "https://streams.ilovemusic.de/iloveradio1.mp3",
@@ -374,6 +465,82 @@ Radio Capital|https://icecast.unitedradio.it/Capital.mp3
     def backup_radios_path(self) -> Path:
         """Get the path where radios backup would be stored."""
         return self.radios_file.with_suffix(".txt.backup")
+
+    # AI Models Configuration Methods
+
+    def get_ai_models_config(self):
+        """Get AI models configuration.
+
+        Returns:
+            AIModelsConfig instance with all model configurations.
+        """
+        from .sources.ai_models import AIModelsConfig
+
+        ai_config = self.get("ai", {})
+        return AIModelsConfig.from_dict(ai_config)
+
+    def get_ai_model_config(self, model_id: str | None = None) -> dict[str, Any] | None:
+        """Get configuration for a specific AI model.
+
+        Args:
+            model_id: Model ID (e.g., 'musicgen-small').
+                     If None, returns default model config.
+
+        Returns:
+            Model config dict or None if not found.
+        """
+        if model_id is None:
+            model_id = self.get_default_ai_model()
+
+        models = self.get("ai.models", {})
+        return models.get(model_id)
+
+    def get_default_ai_model(self) -> str:
+        """Get the default AI model ID."""
+        return self.get("ai.default_model", "musicgen-small")
+
+    def set_default_ai_model(self, model_id: str) -> None:
+        """Set the default AI model.
+
+        Args:
+            model_id: Model ID to set as default.
+        """
+        self.set("ai.default_model", model_id)
+
+    def list_ai_models(self, enabled_only: bool = False) -> list[str]:
+        """Get list of available AI model IDs.
+
+        Args:
+            enabled_only: If True, only return enabled models.
+
+        Returns:
+            List of model IDs.
+        """
+        models = self.get("ai.models", {})
+        if enabled_only:
+            return [mid for mid, m in models.items() if m.get("enabled", True)]
+        return list(models.keys())
+
+    def validate_ai_model(self, model_id: str) -> bool:
+        """Check if a model ID is configured and enabled.
+
+        Args:
+            model_id: Model ID to validate.
+
+        Returns:
+            True if model exists and is enabled.
+        """
+        models = self.get("ai.models", {})
+        model = models.get(model_id)
+        return model is not None and model.get("enabled", True)
+
+    def get_ai_cache_max_models(self) -> int:
+        """Get the maximum number of AI models to keep in memory.
+
+        Returns:
+            Max models for the LRU cache (default: 2).
+        """
+        return self.get("ai.cache.max_models", 2)
 
 
 # Global config instance

@@ -696,15 +696,16 @@ def ai_list():
         click.echo("AI-generated tracks:\n")
         for track in tracks:
             idx = track.get("index", "?")
-            prompt = track.get("prompt", "Unknown")[:50]
-            if len(track.get("prompt", "")) > 50:
+            prompt = track.get("prompt", "Unknown")[:40]
+            if len(track.get("prompt", "")) > 40:
                 prompt += "..."
             duration = track.get("duration", "?")
             timestamp = track.get("timestamp", "")[:16]
             exists = track.get("file_exists", True)
+            model = track.get("model", "musicgen-small")
             status = "" if exists else " [missing]"
 
-            click.echo(f"  {idx:2}. [{timestamp}] {prompt} ({duration}s){status}")
+            click.echo(f"  {idx:2}. [{timestamp}] {prompt} ({duration}s) [{model}]{status}")
 
         click.echo(f"\nTotal: {len(tracks)} track(s)")
         click.echo("Replay with: music-cli ai replay <number>")
@@ -722,7 +723,12 @@ def ai_list():
     help="Mood for context-aware generation",
 )
 @click.option("--duration", "-d", default=5, help="Duration in seconds (5-60)")
-def ai_play(prompt, mood, duration):
+@click.option(
+    "--model",
+    "-m",
+    help="Model to use (e.g., musicgen-small, musicgen-medium). See 'music-cli ai models'",
+)
+def ai_play(prompt, mood, duration, model):
     """Generate and play AI music.
 
     \b
@@ -733,19 +739,30 @@ def ai_play(prompt, mood, duration):
 
     \b
     Examples:
-      music-cli ai play                     # Context-aware generation
-      music-cli ai play -p "jazz piano"     # Custom prompt
-      music-cli ai play --mood focus        # With mood
-      music-cli ai play -d 60               # 60 second track
+      music-cli ai play                           # Context-aware generation
+      music-cli ai play -p "jazz piano"           # Custom prompt
+      music-cli ai play --mood focus              # With mood
+      music-cli ai play -d 60                     # 60 second track
+      music-cli ai play -m musicgen-medium        # Use specific model
     """
     client = ensure_daemon()
+
+    # Validate model if specified
+    if model:
+        config = get_config()
+        if not config.validate_ai_model(model):
+            available = ", ".join(config.list_ai_models(enabled_only=True))
+            click.echo(f"Error: Unknown or disabled model '{model}'", err=True)
+            click.echo(f"Available models: {available}", err=True)
+            click.echo("See all models with: music-cli ai models", err=True)
+            sys.exit(1)
 
     # Show animation during generation
     animation = ComposingAnimation()
     animation.start()
 
     try:
-        response = client.ai_play(prompt=prompt, duration=duration, mood=mood)
+        response = client.ai_play(prompt=prompt, duration=duration, mood=mood, model=model)
 
         animation.stop()
 
@@ -756,8 +773,10 @@ def ai_play(prompt, mood, duration):
         track = response.get("track", {})
         title = track.get("title", "Unknown")
         used_prompt = response.get("prompt", prompt or "context-aware")
+        model_used = track.get("metadata", {}).get("model", "unknown")
 
         click.echo(f"Playing: {title}")
+        click.echo(f"Model: {model_used}")
         click.echo(f"Prompt: {used_prompt[:60]}{'...' if len(used_prompt) > 60 else ''}")
 
         # Suggest longer duration if using default
@@ -824,6 +843,57 @@ def ai_replay(index):
     except ConnectionError as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
+
+
+@ai_group.command("models")
+def ai_models_cmd():
+    """List available AI models and their configurations."""
+    config = get_config()
+
+    models = config.get("ai.models", {})
+    default_model = config.get_default_ai_model()
+
+    if not models:
+        click.echo("No AI models configured.")
+        click.echo("Add models to config.toml under [ai.models]")
+        return
+
+    click.echo("Available AI models:\n")
+
+    # Group models by type
+    model_types = {}
+    for model_id in sorted(models.keys()):
+        model_info = models[model_id]
+        model_type = model_info.get("model_type", "unknown")
+        if model_type not in model_types:
+            model_types[model_type] = []
+        model_types[model_type].append((model_id, model_info))
+
+    type_descriptions = {
+        "musicgen": "MusicGen (Meta) - Music generation",
+        "audioldm": "AudioLDM (CVSSP) - Sound effects & ambient audio",
+        "bark": "Bark (Suno) - Speech synthesis & audio",
+    }
+
+    for model_type in ["musicgen", "audioldm", "bark"]:
+        if model_type not in model_types:
+            continue
+
+        click.echo(f"  {type_descriptions.get(model_type, model_type)}:")
+
+        for model_id, model_info in model_types[model_type]:
+            is_default = " (default)" if model_id == default_model else ""
+            enabled = model_info.get("enabled", True)
+            status = "" if enabled else " [disabled]"
+            duration = f"{model_info.get('default_duration', 30)}s"
+
+            click.echo(f"    - {model_id}{is_default}{status} (default: {duration})")
+
+        click.echo()
+
+    click.echo(f"Current default: {default_model}")
+    click.echo("\nUse with: music-cli ai play -m <model_id>")
+    click.echo("Configure in: ~/.config/music-cli/config.toml")
 
 
 @ai_group.command("remove")

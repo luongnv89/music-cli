@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "coder-music-cli"
-version = "0.4.1"
+version = "0.5.0"
 description = "A command-line music application for coders with daemon support, radio streaming, and AI-generated music"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -41,7 +41,10 @@ dependencies = [
 ai = [
     "torch>=2.0",
     "transformers>=4.31,<4.51",
+    "diffusers>=0.15.0",
     "scipy>=1.10",
+    "tqdm>=4.64",
+    "accelerate>=0.20",
 ]
 dev = [
     "pytest>=7.0",

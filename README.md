@@ -41,10 +41,10 @@ choco install ffmpeg      # Windows (or: winget install ffmpeg)
 ### Optional: AI Music Generation
 
 ```bash
-pip install 'coder-music-cli[ai]'  # ~5GB (PyTorch + Transformers + scipy)
+pip install 'coder-music-cli[ai]'  # ~5GB (PyTorch + Transformers + Diffusers)
 ```
 
-Uses Meta's MusicGen-Small model via HuggingFace Transformers.
+Supports multiple AI models via HuggingFace: MusicGen, AudioLDM, and Bark.
 
 ## Features
 
@@ -52,7 +52,7 @@ Uses Meta's MusicGen-Small model via HuggingFace Transformers.
 - **Multiple sources** - Local files, radio streams, AI generation
 - **Context-aware** - Selects music based on time of day and mood
 - **35+ Radio Stations** - Curated stations in English, French, Spanish, and Italian
-- **AI Music Generation** - Generate music with MusicGen-Small via Transformers
+- **AI Music Generation** - Generate music with MusicGen, AudioLDM, or Bark models
 - **Version-aware Updates** - Automatic notification when new stations are available
 - **Inspirational Quotes** - Random music quotes with every status check
 - **Simple config** - Human-readable text files
@@ -138,27 +138,45 @@ music-cli play -m history -i 3     # Replay item #3
 
 ## AI Music Generation
 
-Generate unique music with Meta's MusicGen model (`facebook/musicgen-small`) via HuggingFace Transformers:
+Generate unique audio with multiple AI models via HuggingFace:
 
 ```bash
-# Install AI dependencies (~5GB: PyTorch + Transformers)
+# Install AI dependencies (~5GB: PyTorch + Transformers + Diffusers)
 pip install 'coder-music-cli[ai]'
 
 # Generate and manage AI music
-music-cli ai play                         # Context-aware generation
-music-cli ai play -p "jazz piano"         # Custom prompt
-music-cli ai play --mood focus -d 30      # 30-second focus track
-music-cli ai list                         # List all generated tracks
-music-cli ai replay 1                     # Replay track #1
-music-cli ai remove 2                     # Delete track #2
+music-cli ai play                              # Context-aware (default: musicgen-small)
+music-cli ai play -p "jazz piano"              # Custom prompt
+music-cli ai play -m audioldm-s-full-v2        # Use AudioLDM model
+music-cli ai play -m bark-small -p "Hello!"    # Use Bark for speech
+music-cli ai play --mood focus -d 30           # 30-second focus track
+music-cli ai models                            # List available models
+music-cli ai list                              # List all generated tracks
+music-cli ai replay 1                          # Replay track #1
+music-cli ai remove 2                          # Delete track #2
 ```
+
+### Available AI Models
+
+| Model ID | Type | Best For | Size |
+|----------|------|----------|------|
+| `musicgen-small` | MusicGen | Music generation (default) | ~1.5GB |
+| `musicgen-medium` | MusicGen | Higher quality music | ~3GB |
+| `musicgen-large` | MusicGen | Best quality music | ~6GB |
+| `musicgen-melody` | MusicGen | Melody-conditioned music | ~3GB |
+| `audioldm-s-full-v2` | AudioLDM | Sound effects, ambient audio | ~1GB |
+| `audioldm-l-full` | AudioLDM | High-quality audio generation | ~2GB |
+| `bark` | Bark | Speech synthesis, audio with voice | ~5GB |
+| `bark-small` | Bark | Faster speech synthesis | ~1.5GB |
 
 ### AI Command Suite
 
 | Command | Description |
 |---------|-------------|
+| `ai models` | List all available AI models |
 | `ai list` | Show all AI-generated tracks with prompts |
 | `ai play` | Generate music from current context |
+| `ai play -m <model>` | Generate with specific model |
 | `ai play -p "prompt"` | Generate with custom prompt |
 | `ai play --mood focus` | Generate with specific mood |
 | `ai play -d 30` | Generate 30-second track (default: 5s) |
@@ -166,7 +184,10 @@ music-cli ai remove 2                     # Delete track #2
 | `ai remove <num>` | Delete track and audio file |
 
 ### Features
-- **Model**: Meta's MusicGen-Small (~1.5GB download on first use)
+- **Multiple models** - MusicGen, AudioLDM, and Bark model families
+- **Smart caching** - LRU cache keeps up to 2 models in memory (configurable)
+- **Download progress** - Progress bar shown during model downloads
+- **GPU memory management** - Automatic cleanup when switching models
 - **Context-aware** - Uses time of day, day of week, and session mood
 - **Custom prompts** - Generate exactly what you want with `-p`
 - **Seamless looping** - All tracks engineered for infinite playback
@@ -176,9 +197,25 @@ music-cli ai remove 2                     # Delete track #2
 - **Persistent storage** - Tracks saved to config directory
 
 ### Requirements
-- ~5GB disk space (PyTorch + Transformers)
-- ~8GB RAM minimum for generation
-- First run downloads model (~1.5GB)
+- ~5GB disk space minimum (PyTorch + Transformers + Diffusers)
+- ~8GB RAM minimum for generation (16GB recommended for larger models)
+- Models are downloaded on first use
+
+### Configuration
+
+Configure AI settings in `~/.config/music-cli/config.toml`:
+
+```toml
+[ai]
+default_model = "musicgen-small"  # Default model for generation
+
+[ai.cache]
+max_models = 2  # Max models to keep in memory (LRU eviction)
+
+[ai.models.audioldm-s-full-v2.extra_params]
+num_inference_steps = 10  # More = better quality, slower
+guidance_scale = 2.5      # How closely to follow prompt
+```
 
 ## Moods
 
@@ -255,6 +292,17 @@ GitHub: https://github.com/luongnv89/music-cli
 - **Supported Platforms**: Linux, macOS, Windows 10+
 
 ## Changelog
+
+### v0.5.0
+- Add multiple AI model support:
+  - **AudioLDM models**: `audioldm-s-full-v2`, `audioldm-l-full` for sound effects and ambient audio
+  - **Bark models**: `bark`, `bark-small` for speech synthesis
+  - **MusicGen models**: All existing models continue to work
+- Add `ai models` command to list all available AI models
+- Add LRU cache for AI models with configurable size (default: 2 models)
+- Add download progress bar during model downloads
+- Add GPU memory management with automatic cleanup on model eviction
+- Default model: `musicgen-small`
 
 ### v0.4.1
 - Add Windows 10+ support
