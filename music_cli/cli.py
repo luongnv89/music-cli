@@ -36,7 +36,9 @@ INSPIRATIONAL_QUOTES = [
 def get_random_quote() -> str:
     """Get a random inspirational quote."""
     import random
+
     return random.choice(INSPIRATIONAL_QUOTES)  # noqa: S311
+
 
 # Track if we've already checked for updates this session
 _update_checked = False
