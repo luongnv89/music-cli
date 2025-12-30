@@ -575,12 +575,13 @@ def show_config():
     config = get_config()
 
     click.echo("Configuration files:")
-    click.echo(f"  Config:   {config.config_file}")
-    click.echo(f"  Radios:   {config.radios_file}")
-    click.echo(f"  History:  {config.history_file}")
-    click.echo(f"  AI Music: {config.ai_music_dir}")
-    click.echo(f"  Socket:   {config.socket_path}")
-    click.echo(f"  PID:      {config.pid_file}")
+    click.echo(f"  Config:    {config.config_file}")
+    click.echo(f"  Radios:    {config.radios_file}")
+    click.echo(f"  History:   {config.history_file}")
+    click.echo(f"  AI Tracks: {config.ai_tracks_file}")
+    click.echo(f"  AI Music:  {config.ai_music_dir}")
+    click.echo(f"  Socket:    {config.socket_path}")
+    click.echo(f"  PID:       {config.pid_file}")
 
 
 @main.command("moods")
@@ -592,6 +593,218 @@ def list_moods():
     for mood in MoodContext.get_all_moods():
         click.echo(f"  - {mood}")
     click.echo("\nUse with: music-cli play --mood <mood>")
+
+
+@main.group("ai", invoke_without_command=True)
+@click.pass_context
+def ai_group(ctx):
+    """Manage AI-generated music tracks.
+
+    \b
+    Commands:
+      list          - Show all AI-generated tracks (default)
+      play          - Generate and play AI music
+      replay <num>  - Replay a track by number
+      remove <num>  - Remove a track by number
+
+    \b
+    Examples:
+      music-cli ai                    # List all AI tracks
+      music-cli ai list               # List all AI tracks
+      music-cli ai play               # Generate music from current context
+      music-cli ai play -p "jazz"     # Generate with custom prompt
+      music-cli ai replay 3           # Replay track #3
+      music-cli ai remove 2           # Remove track #2
+    """
+    if ctx.invoked_subcommand is None:
+        ctx.invoke(ai_list)
+
+
+@ai_group.command("list")
+def ai_list():
+    """List all AI-generated tracks."""
+    client = ensure_daemon()
+
+    try:
+        tracks = client.ai_list()
+
+        if not tracks:
+            click.echo("No AI-generated tracks yet.")
+            click.echo("Generate one with: music-cli ai play")
+            return
+
+        click.echo("AI-generated tracks:\n")
+        for track in tracks:
+            idx = track.get("index", "?")
+            prompt = track.get("prompt", "Unknown")[:50]
+            if len(track.get("prompt", "")) > 50:
+                prompt += "..."
+            duration = track.get("duration", "?")
+            timestamp = track.get("timestamp", "")[:16]
+            exists = track.get("file_exists", True)
+            status = "" if exists else " [missing]"
+
+            click.echo(f"  {idx:2}. [{timestamp}] {prompt} ({duration}s){status}")
+
+        click.echo(f"\nTotal: {len(tracks)} track(s)")
+        click.echo("Replay with: music-cli ai replay <number>")
+
+    except ConnectionError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@ai_group.command("play")
+@click.option("-p", "--prompt", help="Custom prompt for AI music generation")
+@click.option(
+    "--mood",
+    type=click.Choice(["happy", "sad", "excited", "focus", "relaxed", "energetic"]),
+    help="Mood for context-aware generation",
+)
+@click.option("--duration", "-d", default=5, help="Duration in seconds (5-60)")
+def ai_play(prompt, mood, duration):
+    """Generate and play AI music.
+
+    \b
+    Without options, generates music based on current context:
+    - Time of day (morning, afternoon, evening, night)
+    - Day of week (weekday vs weekend)
+    - Current session mood (if set)
+
+    \b
+    Examples:
+      music-cli ai play                     # Context-aware generation
+      music-cli ai play -p "jazz piano"     # Custom prompt
+      music-cli ai play --mood focus        # With mood
+      music-cli ai play -d 60               # 60 second track
+    """
+    client = ensure_daemon()
+
+    # Show animation during generation
+    animation = ComposingAnimation()
+    animation.start()
+
+    try:
+        response = client.ai_play(prompt=prompt, duration=duration, mood=mood)
+
+        animation.stop()
+
+        if "error" in response:
+            click.echo(f"Error: {response['error']}", err=True)
+            sys.exit(1)
+
+        track = response.get("track", {})
+        title = track.get("title", "Unknown")
+        used_prompt = response.get("prompt", prompt or "context-aware")
+
+        click.echo(f"Playing: {title}")
+        click.echo(f"Prompt: {used_prompt[:60]}{'...' if len(used_prompt) > 60 else ''}")
+
+        # Suggest longer duration if using default
+        if duration == 5:
+            click.echo("\nTip: For longer tracks, use -d option (e.g., music-cli ai play -d 30)")
+
+    except ConnectionError as e:
+        animation.stop()
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@ai_group.command("replay")
+@click.argument("index", type=int)
+def ai_replay(index):
+    """Replay an AI track by its number.
+
+    If the audio file is missing, you'll be offered to regenerate it
+    using the original prompt.
+    """
+    client = ensure_daemon()
+
+    try:
+        response = client.ai_replay(index)
+
+        if response.get("status") == "file_missing":
+            # File is missing, offer regeneration
+            prompt = response.get("prompt", "Unknown")
+            click.echo(f"Audio file not found for track #{index}")
+            click.echo(f"Original prompt: {prompt[:60]}...")
+
+            if click.confirm("Regenerate with the same prompt?", default=True):
+                # Show animation during regeneration
+                animation = ComposingAnimation()
+                animation.start()
+
+                response = client.ai_replay(index, regenerate=True)
+
+                animation.stop()
+
+                if "error" in response:
+                    click.echo(f"Error: {response['error']}", err=True)
+                    sys.exit(1)
+
+                click.echo("Regenerated and playing!")
+            else:
+                click.echo("Cancelled.")
+                return
+
+        elif "error" in response:
+            click.echo(f"Error: {response['error']}", err=True)
+            sys.exit(1)
+
+        else:
+            track = response.get("track", {})
+            title = track.get("title", "Unknown")
+            regenerated = response.get("regenerated", False)
+
+            if regenerated:
+                click.echo(f"Regenerated: {title}")
+            else:
+                click.echo(f"Playing: {title}")
+
+    except ConnectionError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@ai_group.command("remove")
+@click.argument("index", type=int)
+def ai_remove(index):
+    """Remove an AI track and its audio file."""
+    client = ensure_daemon()
+
+    try:
+        # First get the track info to show confirmation
+        tracks = client.ai_list()
+        track = next((t for t in tracks if t.get("index") == index), None)
+
+        if not track:
+            if not tracks:
+                click.echo("No AI tracks to remove.", err=True)
+            else:
+                click.echo(
+                    f"Invalid track number. Choose between 1 and {len(tracks)}.",
+                    err=True,
+                )
+            sys.exit(1)
+
+        prompt = track.get("prompt", "Unknown")
+        click.echo(f"Track #{index}: {prompt[:60]}...")
+
+        if not click.confirm("Remove this track and its audio file?", default=False):
+            click.echo("Cancelled.")
+            return
+
+        response = client.ai_remove(index)
+
+        if "error" in response:
+            click.echo(f"Error: {response['error']}", err=True)
+            sys.exit(1)
+
+        click.echo(f"Removed: {response.get('prompt', 'Unknown')[:50]}...")
+
+    except ConnectionError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
 
 
 @main.command("update-radios")

@@ -8,6 +8,11 @@ from ..player.base import TrackInfo
 
 logger = logging.getLogger(__name__)
 
+# Looping instruction appended to all AI prompts for seamless playback
+LOOP_INSTRUCTION = (
+    "seamlessly looping, smooth transitions, perfect for continuous playback, no abrupt endings"
+)
+
 # Flag to track if AI dependencies are available
 _AI_AVAILABLE: bool | None = None
 _musicgen_model = None
@@ -84,6 +89,7 @@ class AIGenerator:
         prompt: str,
         duration: int = 30,
         filename: str | None = None,
+        add_looping: bool = True,
     ) -> TrackInfo | None:
         """Generate music from a text prompt.
 
@@ -91,6 +97,7 @@ class AIGenerator:
             prompt: Text description of the music to generate.
             duration: Duration in seconds (5-60 for reasonable generation time).
             filename: Optional output filename.
+            add_looping: If True, append looping instructions to prompt.
 
         Returns:
             TrackInfo for the generated audio, or None if generation failed.
@@ -112,11 +119,16 @@ class AIGenerator:
             tokens_per_second = 50
             max_new_tokens = duration * tokens_per_second
 
-            logger.info(f"Generating {duration}s of music: {prompt[:50]}...")
+            # Enhance prompt with looping instructions for seamless playback
+            enhanced_prompt = prompt
+            if add_looping:
+                enhanced_prompt = f"{prompt}, {LOOP_INSTRUCTION}"
+
+            logger.info(f"Generating {duration}s of music: {enhanced_prompt[:50]}...")
 
             # Process the prompt
             inputs = processor(
-                text=[prompt],
+                text=[enhanced_prompt],
                 padding=True,
                 return_tensors="pt",
             )

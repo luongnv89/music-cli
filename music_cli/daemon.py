@@ -6,6 +6,7 @@ import logging
 import os
 import signal
 
+from .ai_tracks import get_ai_tracks
 from .config import get_config
 from .context.mood import Mood, MoodContext
 from .context.temporal import TemporalContext
@@ -28,6 +29,7 @@ class MusicDaemon:
         self.radio_source = RadioSource()
         self.history = get_history()
         self.temporal = TemporalContext()
+        self.ai_tracks = get_ai_tracks()
 
         self._server: asyncio.Server | None = None
         self._running = False
@@ -131,6 +133,10 @@ class MusicDaemon:
             "list_radios": self._cmd_list_radios,
             "list_history": self._cmd_list_history,
             "ping": self._cmd_ping,
+            "ai_list": self._cmd_ai_list,
+            "ai_play": self._cmd_ai_play,
+            "ai_replay": self._cmd_ai_replay,
+            "ai_remove": self._cmd_ai_remove,
         }
 
         handler = handlers.get(command)
@@ -326,6 +332,211 @@ class MusicDaemon:
         limit = args.get("limit", 20)
         entries = self.history.get_all(limit=limit)
         return {"history": [{"index": i + 1, **e.to_dict()} for i, e in enumerate(entries)]}
+
+    async def _cmd_ai_list(self, args: dict) -> dict:
+        """List all AI-generated tracks."""
+        tracks = self.ai_tracks.get_all()
+        return {
+            "tracks": [
+                {
+                    "index": i + 1,
+                    "prompt": t.prompt,
+                    "duration": t.duration,
+                    "timestamp": t.timestamp,
+                    "file_exists": t.file_exists(),
+                }
+                for i, t in enumerate(tracks)
+            ]
+        }
+
+    async def _cmd_ai_play(self, args: dict) -> dict:
+        """Generate and play AI music.
+
+        Args (from args dict):
+            prompt: Custom prompt (optional). If not provided, uses context.
+            duration: Duration in seconds (default: 30).
+            mood: Mood to use for context-based generation.
+        """
+        try:
+            from .sources.ai_generator import AIGenerator, is_ai_available
+
+            if not is_ai_available():
+                return {
+                    "error": "AI generation not available. Install with: pip install 'coder-music-cli[ai]'"
+                }
+
+            # Get parameters
+            custom_prompt = args.get("prompt")
+            duration = args.get("duration", 5)
+            mood = args.get("mood")
+
+            # Update mood if provided
+            if mood:
+                self._current_mood = MoodContext.parse_mood(mood)
+
+            # Build prompt
+            if custom_prompt:
+                # Use custom prompt directly
+                prompt = custom_prompt
+            else:
+                # Build context-aware prompt
+                prompts = []
+
+                # Add temporal context (time of day, day of week)
+                temporal_prompt = self.temporal.get_music_prompt()
+                prompts.append(temporal_prompt)
+
+                # Add mood if set in current session
+                if self._current_mood:
+                    mood_prompt = MoodContext.get_prompt(self._current_mood)
+                    prompts.append(mood_prompt)
+
+                prompt = ", ".join(prompts) if prompts else "ambient background music"
+
+            # Generate the track
+            generator = AIGenerator(output_dir=self.config.ai_music_dir)
+            track = generator.generate(prompt, duration)
+
+            if not track:
+                return {"error": "Failed to generate AI music"}
+
+            # Save to AI tracks (store original prompt, not the enhanced one)
+            self.ai_tracks.add_track(
+                prompt=prompt,
+                file_path=track.source,
+                duration=duration,
+            )
+
+            # Log to history
+            self.history.log(
+                source=track.source,
+                source_type=track.source_type,
+                title=track.title,
+                mood=self._current_mood.value if self._current_mood else None,
+                context=self.temporal.get_time_period().value,
+            )
+
+            # Play the track
+            success = await self.player.play(track)
+
+            if success:
+                return {
+                    "status": "playing",
+                    "track": track.to_dict(),
+                    "prompt": prompt,
+                }
+            else:
+                return {"error": "Failed to start playback"}
+
+        except ImportError:
+            return {
+                "error": "AI generation not available. Install with: pip install 'coder-music-cli[ai]'"
+            }
+
+    async def _cmd_ai_replay(self, args: dict) -> dict:
+        """Replay an AI track by index, or regenerate if file is missing.
+
+        Args (from args dict):
+            index: 1-based index of the track.
+            regenerate: If True, regenerate the track even if file exists.
+        """
+        index = args.get("index", 1)
+        regenerate = args.get("regenerate", False)
+
+        track_entry = self.ai_tracks.get_by_index(index)
+        if not track_entry:
+            count = self.ai_tracks.count()
+            if count == 0:
+                return {"error": "No AI tracks available. Generate one with 'music-cli ai play'"}
+            return {"error": f"Invalid index. Choose between 1 and {count}"}
+
+        # Check if file exists
+        if not track_entry.file_exists() or regenerate:
+            # File is missing or regeneration requested
+            if not regenerate:
+                return {
+                    "status": "file_missing",
+                    "prompt": track_entry.prompt,
+                    "message": "Audio file not found. Regenerate with the same prompt?",
+                }
+
+            # Regenerate the track
+            try:
+                from .sources.ai_generator import AIGenerator, is_ai_available
+
+                if not is_ai_available():
+                    return {
+                        "error": "AI generation not available. Install with: pip install 'coder-music-cli[ai]'"
+                    }
+
+                generator = AIGenerator(output_dir=self.config.ai_music_dir)
+                track = generator.generate(track_entry.prompt, track_entry.duration)
+
+                if not track:
+                    return {"error": "Failed to regenerate AI music"}
+
+                # Update the track entry with new file path
+                self.ai_tracks.update_file_path(index, track.source)
+
+                # Play the regenerated track
+                success = await self.player.play(track)
+                if success:
+                    return {
+                        "status": "playing",
+                        "track": track.to_dict(),
+                        "regenerated": True,
+                    }
+                else:
+                    return {"error": "Failed to start playback"}
+
+            except ImportError:
+                return {
+                    "error": "AI generation not available. Install with: pip install 'coder-music-cli[ai]'"
+                }
+
+        # File exists, play it directly
+        track = TrackInfo(
+            source=track_entry.file_path,
+            source_type="ai",
+            title=f"AI: {track_entry.display_prompt(40)}",
+            metadata={"prompt": track_entry.prompt, "duration": track_entry.duration},
+        )
+
+        success = await self.player.play(track)
+        if success:
+            return {
+                "status": "playing",
+                "track": track.to_dict(),
+            }
+        else:
+            return {"error": "Failed to start playback"}
+
+    async def _cmd_ai_remove(self, args: dict) -> dict:
+        """Remove an AI track and its audio file.
+
+        Args (from args dict):
+            index: 1-based index of the track to remove.
+        """
+        index = args.get("index", 1)
+
+        track_entry = self.ai_tracks.get_by_index(index)
+        if not track_entry:
+            count = self.ai_tracks.count()
+            if count == 0:
+                return {"error": "No AI tracks to remove"}
+            return {"error": f"Invalid index. Choose between 1 and {count}"}
+
+        # Remove the track (also deletes the audio file)
+        removed = self.ai_tracks.remove_by_index(index)
+
+        if removed:
+            return {
+                "status": "removed",
+                "prompt": removed.prompt,
+                "file_path": removed.file_path,
+            }
+        else:
+            return {"error": "Failed to remove track"}
 
 
 def run_daemon() -> None:

@@ -130,6 +130,7 @@ Radio Capital|https://icecast.unitedradio.it/Capital.mp3
         self.socket_path = self.config_dir / "music-cli.sock"
         self.pid_file = self.config_dir / "music-cli.pid"
         self.ai_music_dir = self.config_dir / "ai_music"
+        self.ai_tracks_file = self.config_dir / "ai_tracks.json"
         self._config: dict[str, Any] = {}
         self._ensure_config_dir()
         self._load_config()

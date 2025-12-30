@@ -167,6 +167,59 @@ class DaemonClient:
         response = self.send_command("list_history", {"limit": limit})
         return response.get("history", [])
 
+    def ai_list(self) -> list[dict]:
+        """List all AI-generated tracks."""
+        response = self.send_command("ai_list")
+        return response.get("tracks", [])
+
+    def ai_play(
+        self,
+        prompt: str | None = None,
+        duration: int = 5,
+        mood: str | None = None,
+    ) -> dict:
+        """Generate and play AI music.
+
+        Args:
+            prompt: Custom prompt for generation (optional).
+            duration: Duration in seconds.
+            mood: Mood for context-based generation.
+
+        Returns:
+            Response dict with track info or error.
+        """
+        args: dict = {"duration": duration}
+        if prompt:
+            args["prompt"] = prompt
+        if mood:
+            args["mood"] = mood
+        return self.send_command("ai_play", args, timeout=AI_TIMEOUT)
+
+    def ai_replay(self, index: int, regenerate: bool = False) -> dict:
+        """Replay an AI track by index.
+
+        Args:
+            index: 1-based index of the track.
+            regenerate: If True, regenerate the track even if file exists.
+
+        Returns:
+            Response dict with track info or error.
+        """
+        args = {"index": index, "regenerate": regenerate}
+        timeout = AI_TIMEOUT if regenerate else DEFAULT_TIMEOUT
+        return self.send_command("ai_replay", args, timeout=timeout)
+
+    def ai_remove(self, index: int) -> dict:
+        """Remove an AI track and its audio file.
+
+        Args:
+            index: 1-based index of the track.
+
+        Returns:
+            Response dict with removed track info or error.
+        """
+        return self.send_command("ai_remove", {"index": index})
+
 
 def get_client() -> DaemonClient:
     """Get a daemon client instance."""
