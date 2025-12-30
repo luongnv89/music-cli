@@ -1,6 +1,5 @@
 """Tests for AI tracks management."""
 
-import json
 import tempfile
 from pathlib import Path
 
@@ -111,9 +110,7 @@ class TestAITracksManager:
     @pytest.fixture
     def temp_tracks_file(self):
         """Create a temporary tracks file."""
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             f.write("[]")
             yield Path(f.name)
         # Clean up
