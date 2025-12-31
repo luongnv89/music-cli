@@ -18,6 +18,8 @@ class ModelConfig:
         hf_model_id: Full HuggingFace model ID (e.g., "facebook/musicgen-small").
         model_type: Type of model, determines which strategy to use
                    (e.g., "musicgen", "audioldm", "bark").
+        description: Human-readable description of the model.
+        expected_size_gb: Approximate download size in gigabytes.
         default_duration: Default generation duration in seconds.
         max_duration: Maximum allowed duration in seconds.
         min_duration: Minimum allowed duration in seconds.
@@ -29,6 +31,8 @@ class ModelConfig:
     id: str
     hf_model_id: str
     model_type: str
+    description: str = ""
+    expected_size_gb: float = 0.0
     default_duration: int = 30
     max_duration: int = 60
     min_duration: int = 5
@@ -73,6 +77,8 @@ class ModelConfig:
             id=model_id,
             hf_model_id=data.get("hf_model_id", f"facebook/{model_id}"),
             model_type=data.get("model_type", "musicgen"),
+            description=data.get("description", ""),
+            expected_size_gb=data.get("expected_size_gb", 0.0),
             default_duration=data.get("default_duration", 30),
             max_duration=data.get("max_duration", 60),
             min_duration=data.get("min_duration", 5),
@@ -90,6 +96,8 @@ class ModelConfig:
         result = {
             "hf_model_id": self.hf_model_id,
             "model_type": self.model_type,
+            "description": self.description,
+            "expected_size_gb": self.expected_size_gb,
             "default_duration": self.default_duration,
             "max_duration": self.max_duration,
             "min_duration": self.min_duration,
@@ -223,6 +231,8 @@ DEFAULT_AI_MODELS_CONFIG: dict[str, Any] = {
         "musicgen-small": {
             "hf_model_id": "facebook/musicgen-small",
             "model_type": "musicgen",
+            "description": "Fast music generation, good quality",
+            "expected_size_gb": 2.0,
             "default_duration": 30,
             "max_duration": 60,
             "min_duration": 5,
@@ -232,6 +242,8 @@ DEFAULT_AI_MODELS_CONFIG: dict[str, Any] = {
         "musicgen-medium": {
             "hf_model_id": "facebook/musicgen-medium",
             "model_type": "musicgen",
+            "description": "Balanced speed and quality",
+            "expected_size_gb": 3.5,
             "default_duration": 30,
             "max_duration": 60,
             "min_duration": 5,
@@ -241,6 +253,8 @@ DEFAULT_AI_MODELS_CONFIG: dict[str, Any] = {
         "musicgen-large": {
             "hf_model_id": "facebook/musicgen-large",
             "model_type": "musicgen",
+            "description": "Best quality, slower generation",
+            "expected_size_gb": 7.0,
             "default_duration": 20,
             "max_duration": 45,
             "min_duration": 5,
@@ -250,6 +264,8 @@ DEFAULT_AI_MODELS_CONFIG: dict[str, Any] = {
         "musicgen-melody": {
             "hf_model_id": "facebook/musicgen-melody",
             "model_type": "musicgen",
+            "description": "Melody-conditioned generation",
+            "expected_size_gb": 3.5,
             "default_duration": 30,
             "max_duration": 60,
             "min_duration": 5,
@@ -260,10 +276,12 @@ DEFAULT_AI_MODELS_CONFIG: dict[str, Any] = {
         "audioldm-s-full-v2": {
             "hf_model_id": "cvssp/audioldm-s-full-v2",
             "model_type": "audioldm",
+            "description": "Sound effects and ambient audio",
+            "expected_size_gb": 1.5,
             "default_duration": 10,
             "max_duration": 30,
             "min_duration": 2,
-            "tokens_per_second": 50,  # Not used for AudioLDM (uses duration directly)
+            "tokens_per_second": 50,
             "enabled": True,
             "extra_params": {
                 "num_inference_steps": 10,
@@ -273,6 +291,8 @@ DEFAULT_AI_MODELS_CONFIG: dict[str, Any] = {
         "audioldm-l-full": {
             "hf_model_id": "cvssp/audioldm-l-full",
             "model_type": "audioldm",
+            "description": "High-quality audio generation",
+            "expected_size_gb": 3.0,
             "default_duration": 10,
             "max_duration": 30,
             "min_duration": 2,
@@ -287,8 +307,10 @@ DEFAULT_AI_MODELS_CONFIG: dict[str, Any] = {
         "bark": {
             "hf_model_id": "suno/bark",
             "model_type": "bark",
+            "description": "Speech synthesis and audio effects",
+            "expected_size_gb": 5.0,
             "default_duration": 10,
-            "max_duration": 15,  # Bark has limited generation length
+            "max_duration": 15,
             "min_duration": 2,
             "tokens_per_second": 50,
             "enabled": True,
@@ -296,6 +318,8 @@ DEFAULT_AI_MODELS_CONFIG: dict[str, Any] = {
         "bark-small": {
             "hf_model_id": "suno/bark-small",
             "model_type": "bark",
+            "description": "Faster speech synthesis",
+            "expected_size_gb": 2.0,
             "default_duration": 10,
             "max_duration": 15,
             "min_duration": 2,

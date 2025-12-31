@@ -845,14 +845,39 @@ def ai_replay(index):
         sys.exit(1)
 
 
-@ai_group.command("models")
-def ai_models_cmd():
-    """List available AI models and their configurations."""
+@ai_group.group("models", invoke_without_command=True)
+@click.pass_context
+def ai_models_group(ctx):
+    """Manage AI models.
+
+    \b
+    Commands:
+      list          - Show all models with download status (default)
+      download      - Download a model to cache
+      delete        - Delete a cached model
+      set-default   - Set the default model
+
+    \b
+    Examples:
+      music-cli ai models                    # List all models
+      music-cli ai models list               # List all models
+      music-cli ai models download musicgen-medium
+      music-cli ai models delete musicgen-large
+      music-cli ai models set-default musicgen-small
+    """
+    if ctx.invoked_subcommand is None:
+        ctx.invoke(ai_models_list)
+
+
+@ai_models_group.command("list")
+def ai_models_list():
+    """List available AI models with download status and sizes."""
+    from .model_manager import ModelManager
+
     config = get_config()
+    manager = ModelManager(config)
 
-    models = config.get("ai.models", {})
-    default_model = config.get_default_ai_model()
-
+    models = manager.list_models()
     if not models:
         click.echo("No AI models configured.")
         click.echo("Add models to config.toml under [ai.models]")
@@ -861,39 +886,183 @@ def ai_models_cmd():
     click.echo("Available AI models:\n")
 
     # Group models by type
-    model_types = {}
-    for model_id in sorted(models.keys()):
-        model_info = models[model_id]
-        model_type = model_info.get("model_type", "unknown")
-        if model_type not in model_types:
-            model_types[model_type] = []
-        model_types[model_type].append((model_id, model_info))
-
     type_descriptions = {
         "musicgen": "MusicGen (Meta) - Music generation",
         "audioldm": "AudioLDM (CVSSP) - Sound effects & ambient audio",
         "bark": "Bark (Suno) - Speech synthesis & audio",
     }
 
-    for model_type in ["musicgen", "audioldm", "bark"]:
-        if model_type not in model_types:
-            continue
+    current_type = None
+    for model in models:
+        # Print type header if type changed
+        if model.model_type != current_type:
+            if current_type is not None:
+                click.echo()
+            current_type = model.model_type
+            click.echo(f"  {type_descriptions.get(model.model_type, model.model_type)}:")
 
-        click.echo(f"  {type_descriptions.get(model_type, model_type)}:")
+        # Build status string
+        default_flag = " (default)" if model.is_default else ""
+        disabled_flag = " [disabled]" if not model.enabled else ""
 
-        for model_id, model_info in model_types[model_type]:
-            is_default = " (default)" if model_id == default_model else ""
-            enabled = model_info.get("enabled", True)
-            status = "" if enabled else " [disabled]"
-            duration = f"{model_info.get('default_duration', 30)}s"
+        # Build size string
+        if model.is_downloaded and model.cached_size_gb:
+            size_str = f"[downloaded: {model.cached_size_gb:.1f} GB]"
+        elif model.expected_size_gb > 0:
+            size_str = f"[not downloaded, ~{model.expected_size_gb:.1f} GB]"
+        else:
+            size_str = "[not downloaded]"
 
-            click.echo(f"    - {model_id}{is_default}{status} (default: {duration})")
+        # Build description
+        desc = f" - {model.description}" if model.description else ""
 
-        click.echo()
+        click.echo(f"    - {model.id}{default_flag} {size_str}{disabled_flag}{desc}")
 
-    click.echo(f"Current default: {default_model}")
-    click.echo("\nUse with: music-cli ai play -m <model_id>")
-    click.echo("Configure in: ~/.config/music-cli/config.toml")
+    click.echo()
+
+    # Print summary
+    summary = manager.get_summary()
+    click.echo(f"Default: {summary['default_model']}")
+    if summary["downloaded"] > 0:
+        click.echo(
+            f"Downloaded: {summary['downloaded']}/{summary['total']} models "
+            f"({summary['total_size_gb']:.1f} GB total)"
+        )
+
+    click.echo("\nCommands:")
+    click.echo("  music-cli ai models download <model_id>    - Download a model")
+    click.echo("  music-cli ai models delete <model_id>      - Delete cached model")
+    click.echo("  music-cli ai models set-default <model_id> - Set default model")
+
+
+@ai_models_group.command("download")
+@click.argument("model_id")
+def ai_models_download(model_id):
+    """Download an AI model to the HuggingFace cache.
+
+    The model will be downloaded with a progress bar showing the download status.
+    This may take a while depending on model size and connection speed.
+
+    \b
+    Examples:
+      music-cli ai models download musicgen-medium
+      music-cli ai models download audioldm-s-full-v2
+    """
+    from .model_manager import ModelManager
+
+    config = get_config()
+    manager = ModelManager(config)
+
+    # Validate model
+    is_valid, error = manager.validate_model(model_id)
+    if not is_valid:
+        click.echo(f"Error: {error}", err=True)
+        sys.exit(1)
+
+    model = manager.get_model(model_id)
+    if model is None:
+        click.echo(f"Error: Model '{model_id}' not found", err=True)
+        sys.exit(1)
+
+    if model.is_downloaded:
+        size = f"{model.cached_size_gb:.1f} GB" if model.cached_size_gb else "unknown size"
+        click.echo(f"Model '{model_id}' is already downloaded ({size})")
+        return
+
+    click.echo(f"Downloading {model_id} ({model.hf_model_id})...")
+    if model.expected_size_gb > 0:
+        click.echo(f"Expected size: ~{model.expected_size_gb:.1f} GB")
+    click.echo("This may take a while depending on your connection speed.\n")
+
+    success, message = manager.download_model(model_id)
+
+    if success:
+        click.echo(f"\n{message}")
+        click.echo(f"You can now use it with: music-cli ai play -m {model_id}")
+    else:
+        click.echo(f"\nError: {message}", err=True)
+        sys.exit(1)
+
+
+@ai_models_group.command("delete")
+@click.argument("model_id")
+def ai_models_delete(model_id):
+    """Delete a model from the HuggingFace cache.
+
+    This will free up disk space but you'll need to re-download
+    the model to use it again.
+
+    \b
+    Examples:
+      music-cli ai models delete musicgen-large
+      music-cli ai models delete bark
+    """
+    from .model_manager import ModelManager
+
+    config = get_config()
+    manager = ModelManager(config)
+
+    model = manager.get_model(model_id)
+    if model is None:
+        available = ", ".join(m.id for m in manager.list_models())
+        click.echo(f"Error: Unknown model '{model_id}'", err=True)
+        click.echo(f"Available models: {available}", err=True)
+        sys.exit(1)
+
+    if not model.is_downloaded:
+        click.echo(f"Model '{model_id}' is not downloaded.", err=True)
+        sys.exit(1)
+
+    # Show model info
+    size = f"{model.cached_size_gb:.1f} GB" if model.cached_size_gb else "unknown size"
+    click.echo(f"Model: {model_id} ({size})")
+    if model.description:
+        click.echo(f"Description: {model.description}")
+
+    # Warn if deleting default
+    if model.is_default:
+        click.echo("\nWarning: This is currently the default model!", err=True)
+
+    # Confirm deletion
+    if not click.confirm("\nDelete this model from cache?", default=False):
+        click.echo("Cancelled.")
+        return
+
+    success, message, _ = manager.delete_model(model_id)
+
+    if success:
+        click.echo(f"\n{message}")
+    else:
+        click.echo(f"\nError: {message}", err=True)
+        sys.exit(1)
+
+
+@ai_models_group.command("set-default")
+@click.argument("model_id")
+def ai_models_set_default(model_id):
+    """Set the default AI model used for generation.
+
+    The default model is used when you don't specify -m option in 'ai play'.
+
+    \b
+    Examples:
+      music-cli ai models set-default musicgen-medium
+      music-cli ai models set-default audioldm-s-full-v2
+    """
+    from .model_manager import ModelManager
+
+    config = get_config()
+    manager = ModelManager(config)
+
+    # Validate and set
+    success, message = manager.set_default_model(model_id)
+
+    if success:
+        click.echo(message)
+        click.echo("Use with: music-cli ai play")
+    else:
+        click.echo(f"Error: {message}", err=True)
+        sys.exit(1)
 
 
 @ai_group.command("remove")

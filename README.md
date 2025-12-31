@@ -294,6 +294,16 @@ GitHub: https://github.com/luongnv89/music-cli
 
 ## Changelog
 
+### v0.6.0
+- Add AI model management commands:
+  - `music-cli ai models download <model>` - Download models before use
+  - `music-cli ai models delete <model>` - Delete cached models to free space
+  - `music-cli ai models set-default <model>` - Set default generation model
+- Add model descriptions and expected sizes to `ai models` output
+- Add download status tracking via HuggingFace cache inspection
+- Add comprehensive AI Playbook documentation with examples
+- Improve config fallback to DEFAULT_CONFIG when user config is missing AI settings
+
 ### v0.5.0
 - Add multiple AI model support:
   - **AudioLDM models**: `audioldm-s-full-v2`, `audioldm-l-full` for sound effects and ambient audio

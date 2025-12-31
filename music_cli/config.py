@@ -47,6 +47,8 @@ class Config:
                 "musicgen-small": {
                     "hf_model_id": "facebook/musicgen-small",
                     "model_type": "musicgen",
+                    "description": "Fast music generation, good quality",
+                    "expected_size_gb": 2.0,
                     "default_duration": 30,
                     "max_duration": 60,
                     "min_duration": 5,
@@ -56,6 +58,8 @@ class Config:
                 "musicgen-medium": {
                     "hf_model_id": "facebook/musicgen-medium",
                     "model_type": "musicgen",
+                    "description": "Balanced speed and quality",
+                    "expected_size_gb": 3.5,
                     "default_duration": 30,
                     "max_duration": 60,
                     "min_duration": 5,
@@ -65,6 +69,8 @@ class Config:
                 "musicgen-large": {
                     "hf_model_id": "facebook/musicgen-large",
                     "model_type": "musicgen",
+                    "description": "Best quality, slower generation",
+                    "expected_size_gb": 7.0,
                     "default_duration": 20,
                     "max_duration": 45,
                     "min_duration": 5,
@@ -74,6 +80,8 @@ class Config:
                 "musicgen-melody": {
                     "hf_model_id": "facebook/musicgen-melody",
                     "model_type": "musicgen",
+                    "description": "Melody-conditioned generation",
+                    "expected_size_gb": 3.5,
                     "default_duration": 30,
                     "max_duration": 60,
                     "min_duration": 5,
@@ -84,6 +92,8 @@ class Config:
                 "audioldm-s-full-v2": {
                     "hf_model_id": "cvssp/audioldm-s-full-v2",
                     "model_type": "audioldm",
+                    "description": "Sound effects and ambient audio",
+                    "expected_size_gb": 1.5,
                     "default_duration": 10,
                     "max_duration": 30,
                     "min_duration": 2,
@@ -97,6 +107,8 @@ class Config:
                 "audioldm-l-full": {
                     "hf_model_id": "cvssp/audioldm-l-full",
                     "model_type": "audioldm",
+                    "description": "High-quality audio generation",
+                    "expected_size_gb": 3.0,
                     "default_duration": 10,
                     "max_duration": 30,
                     "min_duration": 2,
@@ -111,6 +123,8 @@ class Config:
                 "bark": {
                     "hf_model_id": "suno/bark",
                     "model_type": "bark",
+                    "description": "Speech synthesis and audio effects",
+                    "expected_size_gb": 5.0,
                     "default_duration": 10,
                     "max_duration": 15,
                     "min_duration": 2,
@@ -120,6 +134,8 @@ class Config:
                 "bark-small": {
                     "hf_model_id": "suno/bark-small",
                     "model_type": "bark",
+                    "description": "Faster speech synthesis",
+                    "expected_size_gb": 2.0,
                     "default_duration": 10,
                     "max_duration": 15,
                     "min_duration": 2,
@@ -477,6 +493,9 @@ Radio Capital|https://icecast.unitedradio.it/Capital.mp3
         from .sources.ai_models import AIModelsConfig
 
         ai_config = self.get("ai", {})
+        # Fall back to DEFAULT_CONFIG if user's config doesn't have ai section
+        if not ai_config or not ai_config.get("models"):
+            ai_config = self.DEFAULT_CONFIG.get("ai", {})
         return AIModelsConfig.from_dict(ai_config)
 
     def get_ai_model_config(self, model_id: str | None = None) -> dict[str, Any] | None:
@@ -493,6 +512,9 @@ Radio Capital|https://icecast.unitedradio.it/Capital.mp3
             model_id = self.get_default_ai_model()
 
         models = self.get("ai.models", {})
+        # Fall back to DEFAULT_CONFIG if user's config doesn't have ai.models
+        if not models:
+            models = self.DEFAULT_CONFIG.get("ai", {}).get("models", {})
         return models.get(model_id)
 
     def get_default_ai_model(self) -> str:
@@ -517,6 +539,9 @@ Radio Capital|https://icecast.unitedradio.it/Capital.mp3
             List of model IDs.
         """
         models = self.get("ai.models", {})
+        # Fall back to DEFAULT_CONFIG if user's config doesn't have ai.models
+        if not models:
+            models = self.DEFAULT_CONFIG.get("ai", {}).get("models", {})
         if enabled_only:
             return [mid for mid, m in models.items() if m.get("enabled", True)]
         return list(models.keys())
@@ -531,6 +556,9 @@ Radio Capital|https://icecast.unitedradio.it/Capital.mp3
             True if model exists and is enabled.
         """
         models = self.get("ai.models", {})
+        # Fall back to DEFAULT_CONFIG if user's config doesn't have ai.models
+        if not models:
+            models = self.DEFAULT_CONFIG.get("ai", {}).get("models", {})
         model = models.get(model_id)
         return model is not None and model.get("enabled", True)
 
