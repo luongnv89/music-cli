@@ -148,7 +148,7 @@ music-cli play -m ai --mood happy
 music-cli play -m ai --mood focus -d 60
 ```
 
-For the full AI command suite, see [AI Music Generation](#ai-music-generation).
+For the full AI command suite, see [AI Music Generation](#ai-music-generation) or the comprehensive [AI Playbook](AI_PLAYBOOK.md).
 
 ### History Mode
 
@@ -306,6 +306,8 @@ music-cli ai remove 2   # Delete track #2
 
 # First run downloads model (size varies by model)
 ```
+
+For detailed examples, prompt writing tips, and use case recipes, see the [AI Playbook](AI_PLAYBOOK.md).
 
 #### Available AI Models
 

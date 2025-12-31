@@ -282,6 +282,7 @@ GitHub: https://github.com/luongnv89/music-cli
 | Document | Description |
 |----------|-------------|
 | [User Guide](docs/user-guide.md) | Complete usage instructions |
+| [AI Playbook](docs/AI_PLAYBOOK.md) | AI music generation guide with examples |
 | [Architecture](docs/architecture.md) | System design and diagrams |
 | [Development](docs/development.md) | Contributing guide |
 
