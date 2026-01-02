@@ -169,7 +169,11 @@ class ModelManager:
             return False, f"Model '{model_id}' not found"
 
         if not hf_cache.is_available():
-            return False, "HuggingFace Hub utilities not available. Install with: pip install 'coder-music-cli[ai]'"
+            return (
+                False,
+                "HuggingFace Hub utilities not available. "
+                "Install with: pip install 'coder-music-cli[ai]'",
+            )
 
         # Check if already downloaded
         if model.is_downloaded:

@@ -22,9 +22,9 @@ try:
     HF_HUB_AVAILABLE = True
 except ImportError:
     HF_HUB_AVAILABLE = False
-    scan_cache_dir = None  # type: ignore
-    snapshot_download = None  # type: ignore
-    HfHubHTTPError = Exception  # type: ignore
+    scan_cache_dir = None
+    snapshot_download = None
+    HfHubHTTPError = Exception
 
 
 @dataclass

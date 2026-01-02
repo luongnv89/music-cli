@@ -511,10 +511,12 @@ Radio Capital|https://icecast.unitedradio.it/Capital.mp3
         if model_id is None:
             model_id = self.get_default_ai_model()
 
-        models = self.get("ai.models", {})
+        models: dict[str, Any] = self.get("ai.models", {})
         # Fall back to DEFAULT_CONFIG if user's config doesn't have ai.models
         if not models:
-            models = self.DEFAULT_CONFIG.get("ai", {}).get("models", {})
+            ai_config = self.DEFAULT_CONFIG.get("ai", {})
+            if isinstance(ai_config, dict):
+                models = ai_config.get("models", {})
         return models.get(model_id)
 
     def get_default_ai_model(self) -> str:
@@ -538,10 +540,12 @@ Radio Capital|https://icecast.unitedradio.it/Capital.mp3
         Returns:
             List of model IDs.
         """
-        models = self.get("ai.models", {})
+        models: dict[str, Any] = self.get("ai.models", {})
         # Fall back to DEFAULT_CONFIG if user's config doesn't have ai.models
         if not models:
-            models = self.DEFAULT_CONFIG.get("ai", {}).get("models", {})
+            ai_config = self.DEFAULT_CONFIG.get("ai", {})
+            if isinstance(ai_config, dict):
+                models = ai_config.get("models", {})
         if enabled_only:
             return [mid for mid, m in models.items() if m.get("enabled", True)]
         return list(models.keys())
@@ -555,10 +559,12 @@ Radio Capital|https://icecast.unitedradio.it/Capital.mp3
         Returns:
             True if model exists and is enabled.
         """
-        models = self.get("ai.models", {})
+        models: dict[str, Any] = self.get("ai.models", {})
         # Fall back to DEFAULT_CONFIG if user's config doesn't have ai.models
         if not models:
-            models = self.DEFAULT_CONFIG.get("ai", {}).get("models", {})
+            ai_config = self.DEFAULT_CONFIG.get("ai", {})
+            if isinstance(ai_config, dict):
+                models = ai_config.get("models", {})
         model = models.get(model_id)
         return model is not None and model.get("enabled", True)
 
