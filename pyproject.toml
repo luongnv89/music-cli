@@ -112,6 +112,7 @@ skips = [
     "B311",  # Allow random for non-crypto purposes (music shuffle)
     "B404",  # Allow subprocess import (controlled usage)
     "B603",  # Allow subprocess without shell=True (controlled usage)
+    "B615",  # Allow HuggingFace downloads without revision pinning (user-initiated)
 ]
 
 [tool.coverage.run]
