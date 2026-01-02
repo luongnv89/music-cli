@@ -303,6 +303,15 @@ GitHub: https://github.com/luongnv89/music-cli
 
 ## Changelog
 
+### v0.7.0
+- Add YouTube audio streaming support:
+  - Stream audio directly from YouTube URLs without downloading
+  - Support for youtube.com, youtu.be, YouTube Shorts, and YouTube Music URLs
+  - Install with: `pip install 'coder-music-cli[youtube]'`
+  - Play with: `music-cli play -m youtube -s "https://youtube.com/watch?v=..."`
+  - Short alias: `music-cli play -m yt -s "https://youtu.be/..."`
+- Fix version sync between pyproject.toml and __init__.py
+
 ### v0.6.0
 - Add AI model management commands:
   - `music-cli ai models download <model>` - Download models before use
