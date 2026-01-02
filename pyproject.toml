@@ -46,6 +46,9 @@ ai = [
     "tqdm>=4.64",
     "accelerate>=0.20",
 ]
+youtube = [
+    "yt-dlp>=2023.1.0",
+]
 dev = [
     "pytest>=7.0",
     "pytest-asyncio>=0.21",

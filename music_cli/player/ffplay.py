@@ -63,7 +63,7 @@ class FFplayPlayer(Player):
                 cmd.append("-autoexit")  # Exit when done (for files)
 
             # For streams, add reconnect options
-            if track.source_type == "radio":
+            if track.source_type in ("radio", "youtube"):
                 cmd.extend(
                     [
                         "-reconnect",

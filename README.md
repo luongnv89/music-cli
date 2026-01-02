@@ -46,13 +46,26 @@ pip install 'coder-music-cli[ai]'  # ~5GB (PyTorch + Transformers + Diffusers)
 
 Supports multiple AI models via HuggingFace: MusicGen, AudioLDM, and Bark.
 
-## Features
+### Optional: YouTube Audio Streaming
 
+```bash
+pip install 'coder-music-cli[youtube]'  # ~10MB (yt-dlp)
+```
+
+Stream audio directly from YouTube URLs without downloading:
+
+```bash
+music-cli play -m youtube -s "https://youtube.com/watch?v=..."
+music-cli play -m yt -s "https://youtu.be/..."  # Short alias
+```
+
+## Features
 - **Daemon-based** - Persistent background playback
-- **Multiple sources** - Local files, radio streams, AI generation
+- **Multiple sources** - Local files, radio streams, AI generation, **YouTube audio streaming**
 - **Context-aware** - Selects music based on time of day and mood
 - **35+ Radio Stations** - Curated stations in English, French, Spanish, and Italian
 - **AI Music Generation** - Generate music with MusicGen, AudioLDM, or Bark models
+- **YouTube Streaming** - Extract and stream audio directly from YouTube URLs
 - **Version-aware Updates** - Automatic notification when new stations are available
 - **Inspirational Quotes** - Random music quotes with every status check
 - **Simple config** - Human-readable text files
@@ -64,21 +77,15 @@ Supports multiple AI models via HuggingFace: MusicGen, AudioLDM, and Bark.
 music-cli play                    # Context-aware radio
 music-cli play --mood focus       # Focus music
 music-cli play -m local --auto    # Shuffle local library
-
-# Control
-music-cli pause | resume | stop | status
-
-# Manage radio stations
-music-cli radios                  # List all stations
-music-cli radios play 5           # Play station #5
-music-cli radios add              # Add new station
+music-cli play -m youtube -s "https://youtube.com/watch?v=..."  # YouTube audio
+music-cli play -m yt -s "https://youtu.be/..."  # YouTube (short alias)
 ```
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `play` | Start playing (radio/local/ai/history) |
+| `play` | Start playing (radio/local/ai/history/youtube) |
 | `stop` / `pause` / `resume` | Playback control |
 | `status` | Current track, state, and inspirational quote |
 | `next` | Skip track (auto-play mode) |
@@ -88,6 +95,8 @@ music-cli radios add              # Add new station
 | `history` | Playback log |
 | `moods` | Available mood tags |
 | `config` | Show configuration file locations |
+| `update-radios` | Update stations after version upgrade |
+| `daemon start\|stop\|status` | Daemon control |
 | `update-radios` | Update stations after version upgrade |
 | `daemon start\|stop\|status` | Daemon control |
 

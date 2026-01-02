@@ -167,7 +167,7 @@ def main(ctx):
 @click.option(
     "--mode",
     "-m",
-    type=click.Choice(["local", "radio", "ai", "context", "history"]),
+    type=click.Choice(["local", "radio", "ai", "context", "history", "youtube", "yt"]),
     default="radio",
     help="Playback mode",
 )
@@ -192,6 +192,8 @@ def play(mode, source, mood, auto, duration, index):
       music-cli play -m ai --mood happy # Generate happy AI music
       music-cli play -m history -i 3    # Replay 3rd item from history
       music-cli play -m local --auto    # Shuffle local library
+      music-cli play -m youtube -s "https://youtube.com/watch?v=..."  # YouTube audio
+      music-cli play -m yt -s "https://youtu.be/..."  # YouTube (short alias)
     """
     if not check_ffplay_available():
         click.echo("Error: ffplay not found. Please install FFmpeg.", err=True)

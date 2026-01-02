@@ -15,6 +15,7 @@ SOCKET_BUFFER_SIZE = 4096
 MAX_RESPONSE_SIZE = 10 * 1024 * 1024  # 10MB limit
 DEFAULT_TIMEOUT = 10.0
 AI_TIMEOUT = 300.0  # 5 minutes for AI generation
+YOUTUBE_TIMEOUT = 60.0  # 1 minute for YouTube URL extraction
 
 
 class DaemonClient:
@@ -54,6 +55,8 @@ class DaemonClient:
         if timeout is None:
             if command == "play" and args.get("mode") == "ai":
                 timeout = AI_TIMEOUT
+            elif command == "play" and args.get("mode") in ("youtube", "yt"):
+                timeout = YOUTUBE_TIMEOUT
             elif command == "ai_play":
                 timeout = AI_TIMEOUT
             else:

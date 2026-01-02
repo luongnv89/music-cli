@@ -17,6 +17,7 @@ from .player.base import TrackInfo
 from .player.ffplay import FFplayPlayer
 from .sources.local import LocalSource
 from .sources.radio import RadioSource
+from .sources.youtube import YouTubeSource, is_youtube_available
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,7 @@ class MusicDaemon:
         self.player = FFplayPlayer()
         self.local_source = LocalSource()
         self.radio_source = RadioSource()
+        self.youtube_source = YouTubeSource()
         self.history = get_history()
         self.temporal = TemporalContext()
         self.ai_tracks = get_ai_tracks()
@@ -226,14 +228,36 @@ class MusicDaemon:
                 track = self.radio_source.get_random_station()
 
         elif mode == "history":
-            # Play from history
             index = args.get("index", 1)
             entry = self.history.get_by_index(index)
             if entry:
                 if entry.source_type == "local":
                     track = self.local_source.get_track(entry.source)
+                elif entry.source_type == "youtube":
+                    if not is_youtube_available():
+                        return {
+                            "error": "YouTube playback not available. Install with: pip install 'coder-music-cli[youtube]'"
+                        }
+                    track = self.youtube_source.get_track(entry.source)
+                    if not track:
+                        return {
+                            "error": f"Could not load YouTube video (may be deleted or private): {entry.source}"
+                        }
                 else:
                     track = self.radio_source.get_track(entry.source, entry.title)
+
+        elif mode == "youtube" or mode == "yt":
+            if not source:
+                return {
+                    "error": "YouTube URL is required. Use: -s 'https://youtube.com/watch?v=...'"
+                }
+
+            if not is_youtube_available():
+                return {
+                    "error": "YouTube playback not available. Install with: pip install 'coder-music-cli[youtube]'"
+                }
+
+            track = self.youtube_source.get_track(source)
 
         if not track:
             return {"error": "Could not find track to play"}
@@ -247,9 +271,13 @@ class MusicDaemon:
         success = await self.player.play(track)
 
         if success:
-            # Log to history
+            # For YouTube, log the original YouTube URL (not the stream URL) for replay
+            log_source = track.source
+            if track.source_type == "youtube" and track.metadata.get("youtube_url"):
+                log_source = track.metadata["youtube_url"]
+
             self.history.log(
-                source=track.source,
+                source=log_source,
                 source_type=track.source_type,
                 title=track.title,
                 artist=track.artist,
