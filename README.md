@@ -6,6 +6,7 @@
 
 <p align="center">
   <a href="https://pypi.org/project/coder-music-cli/"><img src="https://img.shields.io/pypi/v/coder-music-cli.svg" alt="PyPI version"></a>
+  <a href="https://pepy.tech/project/coder-music-cli"><img src="https://static.pepy.tech/badge/coder-music-cli" alt="PyPI Downloads"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.9+-blue.svg" alt="Python 3.9+"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 </p>
@@ -52,11 +53,13 @@ Supports multiple AI models via HuggingFace: MusicGen, AudioLDM, and Bark.
 pip install 'coder-music-cli[youtube]'  # ~10MB (yt-dlp)
 ```
 
-Stream audio directly from YouTube URLs without downloading:
+Stream audio directly from YouTube URLs with automatic offline caching:
 
 ```bash
 music-cli play -m youtube -s "https://youtube.com/watch?v=..."
 music-cli play -m yt -s "https://youtu.be/..."  # Short alias
+music-cli youtube                               # List cached tracks
+music-cli youtube play 1                        # Play cached track offline
 ```
 
 ## Features
@@ -66,6 +69,7 @@ music-cli play -m yt -s "https://youtu.be/..."  # Short alias
 - **35+ Radio Stations** - Curated stations in English, French, Spanish, and Italian
 - **AI Music Generation** - Generate music with MusicGen, AudioLDM, or Bark models
 - **YouTube Streaming** - Extract and stream audio directly from YouTube URLs
+- **YouTube Offline Cache** - Automatically cache YouTube audio for offline playback
 - **Version-aware Updates** - Automatic notification when new stations are available
 - **Inspirational Quotes** - Random music quotes with every status check
 - **Simple config** - Human-readable text files
@@ -91,12 +95,11 @@ music-cli play -m yt -s "https://youtu.be/..."  # YouTube (short alias)
 | `next` | Skip track (auto-play mode) |
 | `volume [0-100]` | Get/set volume |
 | `radios` | Manage radio stations (list/play/add/remove) |
+| `youtube` | Manage cached YouTube tracks (list/play/remove/clear) |
 | `ai` | Manage AI-generated tracks (list/play/replay/remove) |
 | `history` | Playback log |
 | `moods` | Available mood tags |
 | `config` | Show configuration file locations |
-| `update-radios` | Update stations after version upgrade |
-| `daemon start\|stop\|status` | Daemon control |
 | `update-radios` | Update stations after version upgrade |
 | `daemon start\|stop\|status` | Daemon control |
 
@@ -226,6 +229,55 @@ num_inference_steps = 10  # More = better quality, slower
 guidance_scale = 2.5      # How closely to follow prompt
 ```
 
+## YouTube Offline Cache
+
+YouTube audio is automatically cached for offline playback. When you play a YouTube URL, the audio is downloaded in the background and stored locally.
+
+```bash
+# Play YouTube audio (automatically cached)
+music-cli play -m youtube -s "https://youtube.com/watch?v=..."
+
+# Manage cached tracks
+music-cli youtube                    # List all cached tracks
+music-cli youtube cached             # Same as above
+music-cli youtube play 3             # Play cached track #3 (works offline)
+music-cli youtube remove 1           # Remove cached track #1
+music-cli youtube clear              # Clear entire cache
+```
+
+### YouTube Command Suite
+
+| Command | Description |
+|---------|-------------|
+| `youtube` | List all cached tracks (default) |
+| `youtube cached` | List cached tracks with cache statistics |
+| `youtube play <num>` | Play cached track by number (offline) |
+| `youtube remove <num>` | Remove a cached track |
+| `youtube clear` | Clear all cached tracks |
+
+### Features
+- **Automatic caching** - Audio cached in background while streaming
+- **Offline playback** - Play cached tracks without internet
+- **LRU eviction** - 2GB cache limit with automatic cleanup of oldest tracks
+- **M4A format** - 192kbps quality for good balance of size and quality
+- **Instant replay** - Cached tracks play immediately
+
+### Configuration
+
+Configure YouTube cache in `~/.config/music-cli/config.toml`:
+
+```toml
+[youtube.cache]
+enabled = true          # Enable/disable automatic caching
+max_size_gb = 2.0       # Maximum cache size in GB
+```
+
+### Cache Location
+
+Cached files are stored in:
+- **Linux/macOS**: `~/.config/music-cli/youtube_cache/`
+- **Windows**: `%LOCALAPPDATA%\music-cli\youtube_cache\`
+
 ## Moods
 
 `focus` `happy` `sad` `excited` `relaxed` `energetic` `melancholic` `peaceful`
@@ -243,6 +295,8 @@ Configuration files location:
 | `history.jsonl` | Play history |
 | `ai_tracks.json` | AI track metadata (prompts, durations) |
 | `ai_music/` | AI-generated audio files |
+| `youtube_cache.json` | YouTube cache metadata |
+| `youtube_cache/` | Cached YouTube audio files |
 
 ### Version Updates
 
@@ -302,6 +356,19 @@ GitHub: https://github.com/luongnv89/music-cli
 - **Supported Platforms**: Linux, macOS, Windows 10+
 
 ## Changelog
+
+### v0.8.1
+- Fix cached YouTube tracks not playing: reconnect options were incorrectly applied to local cached files instead of only remote streams
+
+### v0.8.0
+- Add YouTube offline cache for automatic offline playback:
+  - Automatically cache YouTube audio when played
+  - Play cached tracks offline with `music-cli youtube play <num>`
+  - Manage cache with `music-cli youtube` commands (list/play/remove/clear)
+  - 2GB LRU cache with automatic eviction of oldest tracks
+  - M4A format at 192kbps quality
+  - Thread-safe cache operations
+- Add `youtube` command group for cache management
 
 ### v0.7.0
 - Add YouTube audio streaming support:
