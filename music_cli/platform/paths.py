@@ -68,15 +68,12 @@ class PathProvider(ABC):
         return config_dir / "ai_music"
 
     def get_history_file(self, config_dir: Path) -> Path:
-        """Get playback history file path.
-
-        Args:
-            config_dir: The config directory.
-
-        Returns:
-            Path to the history file.
-        """
+        """Get playback history file path."""
         return config_dir / "history.jsonl"
+
+    def get_youtube_cache_dir(self, config_dir: Path) -> Path:
+        """Get YouTube cache directory for offline audio storage."""
+        return config_dir / "youtube_cache"
 
 
 class UnixPathProvider(PathProvider):
