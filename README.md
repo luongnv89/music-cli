@@ -4,6 +4,8 @@
 
 <h1 align="center">music-cli</h1>
 
+<p align="center"><em>Code. Listen. Iterate.</em></p>
+
 <p align="center">
   <a href="https://pypi.org/project/coder-music-cli/"><img src="https://img.shields.io/pypi/v/coder-music-cli.svg" alt="PyPI version"></a>
   <a href="https://pepy.tech/project/coder-music-cli"><img src="https://static.pepy.tech/badge/coder-music-cli" alt="PyPI Downloads"></a>
