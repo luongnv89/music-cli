@@ -359,6 +359,11 @@ GitHub: https://github.com/luongnv89/music-cli
 
 ## Changelog
 
+### v0.8.2
+- Fix missing mood radio mappings: all 8 moods now have working radio streams
+  - Added streams for: relaxed (Groove Salad), energetic (DEF CON Radio), melancholic (Indie Pop Rocks), peaceful (Drone Zone)
+  - Fixed fallback to default config when user config lacks mood mappings
+
 ### v0.8.1
 - Fix cached YouTube tracks not playing: reconnect options were incorrectly applied to local cached files instead of only remote streams
 
@@ -371,11 +376,6 @@ GitHub: https://github.com/luongnv89/music-cli
   - M4A format at 192kbps quality
   - Thread-safe cache operations
 - Add `youtube` command group for cache management
-
-### v0.7.1
-- Fix missing mood radio mappings: all 8 moods now have working radio streams
-  - Added streams for: relaxed (Groove Salad), energetic (DEF CON Radio), melancholic (Indie Pop Rocks), peaceful (Drone Zone)
-  - Fixed fallback to default config when user config lacks mood mappings
 
 ### v0.7.0
 - Add YouTube audio streaming support:
