@@ -35,7 +35,15 @@ class Config:
         },
         "context": {
             "enabled": True,
-            "use_ai": False,  # Requires optional AI dependencies
+            "use_ai": False,
+        },
+        "youtube": {
+            "cache": {
+                "max_size_gb": 2.0,
+                "enabled": True,
+                "audio_format": "m4a",
+                "audio_quality": "192",
+            },
         },
         "ai": {
             "default_model": "musicgen-small",
@@ -149,6 +157,10 @@ class Config:
             "happy": "https://streams.ilovemusic.de/iloveradio1.mp3",
             "sad": "https://streams.ilovemusic.de/iloveradio5.mp3",
             "excited": "https://streams.ilovemusic.de/iloveradio2.mp3",
+            "relaxed": "http://ice1.somafm.com/groovesalad-128-mp3",
+            "energetic": "http://ice1.somafm.com/defcon-128-mp3",
+            "melancholic": "http://ice1.somafm.com/indiepop-128-mp3",
+            "peaceful": "http://ice1.somafm.com/dronezone-128-mp3",
         },
         "time_radio_map": {
             "morning": "https://streams.ilovemusic.de/iloveradio17.mp3",
@@ -246,6 +258,8 @@ Radio Capital|https://icecast.unitedradio.it/Capital.mp3
         self.socket_path = self._path_provider.get_socket_path(self.config_dir)
         self.pid_file = self._path_provider.get_pid_file(self.config_dir)
         self.ai_music_dir = self._path_provider.get_ai_music_dir(self.config_dir)
+        self.youtube_cache_dir = self._path_provider.get_youtube_cache_dir(self.config_dir)
+        self.youtube_cache_file = self.config_dir / "youtube_cache.json"
         self.ai_tracks_file = self.config_dir / "ai_tracks.json"
         self._config: dict[str, Any] = {}
         self._ensure_config_dir()
@@ -255,6 +269,7 @@ Radio Capital|https://icecast.unitedradio.it/Capital.mp3
         """Create config directory and default files if they don't exist."""
         self.config_dir.mkdir(parents=True, exist_ok=True)
         self.ai_music_dir.mkdir(parents=True, exist_ok=True)
+        self.youtube_cache_dir.mkdir(parents=True, exist_ok=True)
 
         if not self.config_file.exists():
             self._write_default_config()
@@ -379,8 +394,13 @@ Radio Capital|https://icecast.unitedradio.it/Capital.mp3
 
     def get_mood_radio(self, mood: str) -> str | None:
         """Get radio URL for a specific mood."""
+        mood_lower = mood.lower()
         mood_map = self.get("mood_radio_map", {})
-        return mood_map.get(mood.lower())
+        url = mood_map.get(mood_lower)
+        if url is None:
+            default_map: dict[str, str] = self.DEFAULT_CONFIG.get("mood_radio_map", {})  # type: ignore[assignment]
+            url = default_map.get(mood_lower)
+        return url
 
     def get_time_radio(self, time_period: str) -> str | None:
         """Get radio URL for a time period (morning/afternoon/evening/night)."""
@@ -569,12 +589,20 @@ Radio Capital|https://icecast.unitedradio.it/Capital.mp3
         return model is not None and model.get("enabled", True)
 
     def get_ai_cache_max_models(self) -> int:
-        """Get the maximum number of AI models to keep in memory.
-
-        Returns:
-            Max models for the LRU cache (default: 2).
-        """
+        """Get the maximum number of AI models to keep in memory."""
         return self.get("ai.cache.max_models", 2)
+
+    def get_youtube_cache_config(self) -> dict[str, Any]:
+        """Get YouTube cache configuration."""
+        return self.get(
+            "youtube.cache",
+            {
+                "max_size_gb": 2.0,
+                "enabled": True,
+                "audio_format": "m4a",
+                "audio_quality": "192",
+            },
+        )
 
 
 # Global config instance
