@@ -372,6 +372,11 @@ GitHub: https://github.com/luongnv89/music-cli
   - Thread-safe cache operations
 - Add `youtube` command group for cache management
 
+### v0.7.1
+- Fix missing mood radio mappings: all 8 moods now have working radio streams
+  - Added streams for: relaxed (Groove Salad), energetic (DEF CON Radio), melancholic (Indie Pop Rocks), peaceful (Drone Zone)
+  - Fixed fallback to default config when user config lacks mood mappings
+
 ### v0.7.0
 - Add YouTube audio streaming support:
   - Stream audio directly from YouTube URLs without downloading
