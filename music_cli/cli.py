@@ -2,6 +2,7 @@
 
 import logging
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -433,13 +434,17 @@ def radios_list():
             categories[cat] = []
         categories[cat].append(station)
 
+    # Get terminal width and calculate columns
+    terminal_width = shutil.get_terminal_size().columns
+    col_width = 24  # Width for each column
+    indent = 4  # Left margin for station rows
+    # Calculate number of columns that fit (minimum 1, maximum 6)
+    num_cols = max(1, min(6, (terminal_width - indent) // col_width))
+
     # Display each category
     for category, stations in categories.items():
         click.echo(f"  [{category}]")
 
-        # Display in 4 columns
-        col_width = 24  # Width for each column
-        num_cols = 4
         for i in range(0, len(stations), num_cols):
             row_parts = []
             for j in range(num_cols):
