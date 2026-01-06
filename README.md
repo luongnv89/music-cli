@@ -361,10 +361,12 @@ GitHub: https://github.com/luongnv89/music-cli
 
 ## Changelog
 
+### v0.8.5
+- Change radio list to 4-column layout for more compact display
+
 ### v0.8.4
 - Improve radio station list display:
-  - Show stations in 2-column format for better readability
-  - Group stations by category (genre/language)
+  - Show stations in categorized format grouped by genre/language
   - Categories extracted from radios.txt comment structure
 
 ### v0.8.3
