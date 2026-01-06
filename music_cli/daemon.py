@@ -189,6 +189,14 @@ class MusicDaemon:
                 if not track:
                     track = self.radio_source.get_random_station()
 
+            # Handle YouTube URLs in radio stations
+            if track and ("youtube.com" in track.source or "youtu.be" in track.source):
+                station_name = track.title
+                yt_track = self.youtube_source.get_track(track.source)
+                if yt_track:
+                    yt_track.title = station_name
+                    track = yt_track
+
         elif mode == "ai":
             # Try to use AI generation
             try:

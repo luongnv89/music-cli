@@ -2,7 +2,10 @@
 
 import asyncio
 import logging
+import os
+import shlex
 import shutil
+import signal
 
 from ..platform import get_player_controller, is_windows
 from ..platform.player_control import PlayerController
@@ -24,6 +27,7 @@ class FFplayPlayer(Player):
         self._process: asyncio.subprocess.Process | None = None
         self._monitor_task: asyncio.Task | None = None
         self._paused = False
+        self._is_process_group = False
         # Platform-specific player controller for pause/resume
         self._controller: PlayerController = get_player_controller()
         self._is_windows = is_windows()
@@ -46,6 +50,13 @@ class FFplayPlayer(Player):
         self._current_track = track
 
         try:
+            # For YouTube sources, try piping yt-dlp to ffplay (Unix only)
+            youtube_url = track.metadata.get("youtube_url") if track.metadata else None
+            if track.source_type == "youtube" and youtube_url:
+                if await self._play_youtube_pipe(youtube_url):
+                    return True
+                # Fallback: play extracted URL directly (Windows or pipe failure)
+
             # Build ffplay command
             cmd = [
                 "ffplay",
@@ -105,6 +116,53 @@ class FFplayPlayer(Player):
             self._state = PlayerState.ERROR
             return False
 
+    async def _play_youtube_pipe(self, youtube_url: str) -> bool:
+        """Play YouTube audio by piping yt-dlp output to ffplay.
+
+        This is more reliable for live streams as yt-dlp handles reconnection
+        and URL refresh automatically. Only supported on Unix systems.
+        """
+        if self._is_windows:
+            logger.warning("YouTube pipe not supported on Windows, falling back to direct URL")
+            return False  # Caller will fall back to direct URL playback
+
+        yt_dlp_path = shutil.which("yt-dlp")
+        if not yt_dlp_path:
+            logger.error("yt-dlp not found in PATH")
+            self._state = PlayerState.ERROR
+            return False
+
+        logger.info(f"Starting YouTube pipe playback: {youtube_url}")
+
+        try:
+            # Use shell pipe: yt-dlp streams to ffplay
+            # Format priority: audio-only, format 91 (lowest quality for live), or best available
+            cmd = (
+                f"{shlex.quote(yt_dlp_path)} -f 'bestaudio/91/best' -q -o - {shlex.quote(youtube_url)} | "
+                f"ffplay -nodisp -loglevel quiet -volume {self._volume} -"
+            )
+
+            self._process = await asyncio.create_subprocess_shell(
+                cmd,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+                preexec_fn=os.setsid,
+            )
+            self._is_process_group = True
+
+            self._state = PlayerState.PLAYING
+            self._paused = False
+            self._controller.reset()
+
+            self._monitor_task = asyncio.create_task(self._monitor_playback())
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to start YouTube playback: {e}")
+            self._state = PlayerState.ERROR
+            return False
+
     async def _monitor_playback(self) -> None:
         """Monitor the ffplay process and handle completion."""
         if self._process is None:
@@ -138,16 +196,21 @@ class FFplayPlayer(Player):
 
         if self._process:
             try:
-                self._process.terminate()
-                try:
-                    await asyncio.wait_for(self._process.wait(), timeout=2.0)
-                except asyncio.TimeoutError:
+                if self._is_process_group:
+                    os.killpg(self._process.pid, signal.SIGTERM)
+                else:
+                    self._process.terminate()
+                await asyncio.wait_for(self._process.wait(), timeout=2.0)
+            except asyncio.TimeoutError:
+                if self._is_process_group:
+                    os.killpg(self._process.pid, signal.SIGKILL)
+                else:
                     self._process.kill()
-                    await self._process.wait()
-            except ProcessLookupError:
-                pass  # Process already ended
+                await self._process.wait()
+            except (ProcessLookupError, OSError):
+                pass
             self._process = None
-
+            self._is_process_group = False
         self._state = PlayerState.STOPPED
         self._current_track = None
         self._paused = False
