@@ -186,6 +186,7 @@ Hirschmilch Chillout|http://hirschmilch.de:7000/chillout.mp3
 
 # Electronic
 Deep House|https://streams.ilovemusic.de/iloveradio14.mp3
+Anjunadeep Radio|https://www.youtube.com/watch?v=D4MdHQOILdw
 DEF CON Radio [SomaFM]|http://ice1.somafm.com/defcon-128-mp3
 Beat Blender [SomaFM]|http://ice1.somafm.com/beatblender-128-mp3
 
