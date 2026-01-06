@@ -437,18 +437,18 @@ def radios_list():
     for category, stations in categories.items():
         click.echo(f"  [{category}]")
 
-        # Display in 2 columns
-        col_width = 32  # Width for each column
-        for i in range(0, len(stations), 2):
-            left = stations[i]
-            left_str = f"    {left['index']:2}. {left['name'][: col_width - 8]}"
-
-            if i + 1 < len(stations):
-                right = stations[i + 1]
-                right_str = f"{right['index']:2}. {right['name'][: col_width - 5]}"
-                click.echo(f"{left_str:<{col_width}}{right_str}")
-            else:
-                click.echo(left_str)
+        # Display in 4 columns
+        col_width = 24  # Width for each column
+        num_cols = 4
+        for i in range(0, len(stations), num_cols):
+            row_parts = []
+            for j in range(num_cols):
+                if i + j < len(stations):
+                    station = stations[i + j]
+                    name = station["name"][: col_width - 5]
+                    col_str = f"{station['index']:2}. {name}"
+                    row_parts.append(f"{col_str:<{col_width}}")
+            click.echo(f"  {''.join(row_parts)}")
 
         click.echo()  # Empty line after each category
 
