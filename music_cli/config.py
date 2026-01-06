@@ -197,6 +197,13 @@ Top Hits|https://streams.ilovemusic.de/iloveradio1.mp3
 Rock Radio|https://streams.ilovemusic.de/iloveradio3.mp3
 Metal [SomaFM]|http://ice1.somafm.com/metal-128-mp3
 
+# Synthwave / Retrowave (Nightride FM)
+Nightride FM|https://stream.nightride.fm/nightride.mp3
+Chillsynth FM|https://stream.nightride.fm/chillsynth.mp3
+Darksynth FM|https://stream.nightride.fm/darksynth.mp3
+Datawave FM|https://stream.nightride.fm/datawave.mp3
+Spacesynth FM|https://stream.nightride.fm/spacesynth.mp3
+
 # Jazz
 Jazz [SomaFM]|http://ice1.somafm.com/secretagent-128-mp3
 
