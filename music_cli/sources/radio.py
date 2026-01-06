@@ -4,6 +4,12 @@ import random
 
 from ..config import get_config
 from ..player.base import TrackInfo
+from .youtube import is_youtube_available
+
+
+def _is_youtube_url(url: str) -> bool:
+    """Check if URL is a YouTube URL."""
+    return "youtube.com" in url or "youtu.be" in url
 
 
 class RadioSource:
@@ -12,10 +18,23 @@ class RadioSource:
     def __init__(self):
         """Initialize radio source."""
         self.config = get_config()
+        self._youtube_available: bool | None = None
+
+    def _check_youtube(self) -> bool:
+        """Lazy check for YouTube availability."""
+        if self._youtube_available is None:
+            self._youtube_available = is_youtube_available()
+        return self._youtube_available
 
     def get_stations(self) -> list[tuple[str, str]]:
-        """Get list of (name, url) tuples for all configured stations."""
-        return self.config.get_radios()
+        """Get list of (name, url) tuples for all configured stations.
+
+        YouTube stations are filtered out if yt-dlp is not installed.
+        """
+        stations = self.config.get_radios()
+        if not self._check_youtube():
+            stations = [(name, url) for name, url in stations if not _is_youtube_url(url)]
+        return stations
 
     def get_track(self, url: str, name: str | None = None) -> TrackInfo:
         """Create a track info for a radio stream."""
