@@ -361,6 +361,14 @@ GitHub: https://github.com/luongnv89/music-cli
 
 ## Changelog
 
+### v0.8.7
+- Improve YouTube livestream playback for radio stations:
+  - Pipe yt-dlp directly to ffplay for reliable HLS buffering and reconnections
+  - Eliminates intermittent dropouts on YouTube livestreams
+  - Falls back to direct URL playback on Windows
+- Add Anjunadeep Radio as example YouTube radio station
+- Add contributors section to README
+
 ### v0.8.6
 - Auto-detect terminal width for radio list columns (1-6 columns based on terminal size)
 
