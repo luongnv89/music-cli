@@ -361,6 +361,9 @@ GitHub: https://github.com/luongnv89/music-cli
 
 ## Changelog
 
+### v0.8.6
+- Auto-detect terminal width for radio list columns (1-6 columns based on terminal size)
+
 ### v0.8.5
 - Change radio list to 4-column layout for more compact display
 
