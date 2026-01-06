@@ -68,7 +68,7 @@ music-cli youtube play 1                        # Play cached track offline
 - **Daemon-based** - Persistent background playback
 - **Multiple sources** - Local files, radio streams, AI generation, **YouTube audio streaming**
 - **Context-aware** - Selects music based on time of day and mood
-- **35+ Radio Stations** - Curated stations in English, French, Spanish, and Italian
+- **40+ Radio Stations** - Curated stations in English, French, Spanish, Italian, and Synthwave
 - **AI Music Generation** - Generate music with MusicGen, AudioLDM, or Bark models
 - **YouTube Streaming** - Extract and stream audio directly from YouTube URLs
 - **YouTube Offline Cache** - Automatically cache YouTube audio for offline playback
@@ -124,9 +124,11 @@ music-cli radios remove 10
 
 ### Pre-configured Stations
 
-35 stations across 4 languages:
+40 stations across multiple genres and languages:
 
-- **English**: ChillHop, SomaFM (Groove Salad, Drone Zone, DEF CON, etc.), BBC Radio 3
+- **Chill/Lo-fi**: ChillHop, SomaFM (Groove Salad, Drone Zone, Space Station)
+- **Electronic**: Deep House, DEF CON Radio, Beat Blender
+- **Synthwave**: Nightride FM, Chillsynth FM, Darksynth FM, Datawave FM, Spacesynth FM
 - **French**: FIP Radio, France Inter, France Musique, Mouv
 - **Spanish**: Salsa Radio, Tropical 100, Los 40 Principales, Cadena SER
 - **Italian**: Radio Italia, RTL 102.5, Radio 105, Virgin Radio Italy
@@ -358,6 +360,20 @@ GitHub: https://github.com/luongnv89/music-cli
 - **Supported Platforms**: Linux, macOS, Windows 10+
 
 ## Changelog
+
+### v0.8.4
+- Improve radio station list display:
+  - Show stations in 2-column format for better readability
+  - Group stations by category (genre/language)
+  - Categories extracted from radios.txt comment structure
+
+### v0.8.3
+- Add 5 new Nightride FM synthwave radio stations (320kbps):
+  - Nightride FM (Synthwave/Retrowave/Outrun)
+  - Chillsynth FM (Chillsynth/Chillwave)
+  - Darksynth FM (Darksynth/Cyberpunk)
+  - Datawave FM (Glitchy Synthwave/IDM)
+  - Spacesynth FM (Spacesynth/Space Disco)
 
 ### v0.8.2
 - Fix missing mood radio mappings: all 8 moods now have working radio streams
