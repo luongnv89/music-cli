@@ -416,7 +416,7 @@ def radios_group(ctx):
 def radios_list():
     """List all available radio stations."""
     config = get_config()
-    radios = config.get_radios()
+    radios = config.get_radios_categorized()
 
     if not radios:
         click.echo(f"No stations configured. Add stations to: {config.radios_file}")
@@ -424,10 +424,35 @@ def radios_list():
         return
 
     click.echo("Available radio stations:\n")
-    for i, (name, _url) in enumerate(radios, 1):
-        click.echo(f"  {i:2}. {name}")
 
-    click.echo(f"\nTotal: {len(radios)} station(s)")
+    # Group stations by category
+    categories: dict[str, list[dict]] = {}
+    for station in radios:
+        cat = station["category"]
+        if cat not in categories:
+            categories[cat] = []
+        categories[cat].append(station)
+
+    # Display each category
+    for category, stations in categories.items():
+        click.echo(f"  [{category}]")
+
+        # Display in 2 columns
+        col_width = 32  # Width for each column
+        for i in range(0, len(stations), 2):
+            left = stations[i]
+            left_str = f"    {left['index']:2}. {left['name'][: col_width - 8]}"
+
+            if i + 1 < len(stations):
+                right = stations[i + 1]
+                right_str = f"{right['index']:2}. {right['name'][: col_width - 5]}"
+                click.echo(f"{left_str:<{col_width}}{right_str}")
+            else:
+                click.echo(left_str)
+
+        click.echo()  # Empty line after each category
+
+    click.echo(f"Total: {len(radios)} station(s)")
     click.echo("Play with: music-cli radios play <number>")
 
 
@@ -637,13 +662,14 @@ def show_config():
     config = get_config()
 
     click.echo("Configuration files:")
-    click.echo(f"  Config:    {config.config_file}")
-    click.echo(f"  Radios:    {config.radios_file}")
-    click.echo(f"  History:   {config.history_file}")
-    click.echo(f"  AI Tracks: {config.ai_tracks_file}")
-    click.echo(f"  AI Music:  {config.ai_music_dir}")
-    click.echo(f"  Socket:    {config.socket_path}")
-    click.echo(f"  PID:       {config.pid_file}")
+    click.echo(f"  Config:        {config.config_file}")
+    click.echo(f"  Radios:        {config.radios_file}")
+    click.echo(f"  History:       {config.history_file}")
+    click.echo(f"  AI Tracks:     {config.ai_tracks_file}")
+    click.echo(f"  AI Music:      {config.ai_music_dir}")
+    click.echo(f"  YouTube Cache: {config.youtube_cache_dir}")
+    click.echo(f"  Socket:        {config.socket_path}")
+    click.echo(f"  PID:           {config.pid_file}")
 
 
 @main.command("moods")
@@ -1108,16 +1134,175 @@ def ai_remove(index):
         sys.exit(1)
 
 
+@main.group("youtube", invoke_without_command=True)
+@click.pass_context
+def youtube_group(ctx):
+    """Manage cached YouTube audio for offline playback.
+
+    \\b
+    Commands:
+      cached        - Show all cached YouTube tracks (default)
+      play <number> - Play a cached track by number (offline)
+      remove <num>  - Remove a cached track
+      clear         - Clear all cached tracks
+
+    \\b
+    Examples:
+      music-cli youtube              # List cached tracks
+      music-cli youtube cached       # List cached tracks
+      music-cli youtube play 3       # Play cached track #3
+      music-cli youtube remove 1     # Remove track #1
+      music-cli youtube clear        # Clear entire cache
+    """
+    if ctx.invoked_subcommand is None:
+        ctx.invoke(youtube_cached)
+
+
+@youtube_group.command("cached")
+def youtube_cached():
+    """List all cached YouTube tracks available for offline playback."""
+    client = ensure_daemon()
+
+    try:
+        response = client.youtube_cached()
+
+        if "error" in response:
+            click.echo(f"Error: {response['error']}", err=True)
+            sys.exit(1)
+
+        tracks = response.get("tracks", [])
+        stats = response.get("stats", {})
+
+        if not tracks:
+            click.echo("No cached YouTube tracks.")
+            click.echo("Play a YouTube URL to cache it automatically:")
+            click.echo("  music-cli play -m youtube -s 'https://youtube.com/watch?v=...'")
+            return
+
+        click.echo("Cached YouTube tracks:\n")
+        for track in tracks:
+            idx = track.get("index", "?")
+            title = track.get("title", "Unknown")[:45]
+            if len(track.get("title", "")) > 45:
+                title += "..."
+            duration = track.get("duration")
+            dur_str = f"{int(duration // 60)}:{int(duration % 60):02d}" if duration else "?"
+            size_mb = track.get("file_size_mb", 0)
+            exists = "" if track.get("file_exists", True) else " [missing]"
+
+            click.echo(f"  {idx:2}. {title} ({dur_str}) [{size_mb:.1f} MB]{exists}")
+
+        click.echo(
+            f"\\nTotal: {stats.get('count', 0)} track(s), {stats.get('total_size_mb', 0):.1f} MB"
+        )
+        click.echo(
+            f"Cache limit: {stats.get('max_size_gb', 2.0):.1f} GB ({stats.get('usage_percent', 0):.1f}% used)"
+        )
+        click.echo("\nPlay with: music-cli youtube play <number>")
+
+    except ConnectionError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@youtube_group.command("play")
+@click.argument("number", type=int)
+def youtube_play(number):
+    """Play a cached YouTube track by its number (works offline)."""
+    client = ensure_daemon()
+
+    try:
+        response = client.youtube_play(number)
+
+        if "error" in response:
+            click.echo(f"Error: {response['error']}", err=True)
+            sys.exit(1)
+
+        track = response.get("track", {})
+        title = track.get("title", "Unknown")
+        click.echo(f"▶ Playing: {title} [cached]")
+
+    except ConnectionError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@youtube_group.command("remove")
+@click.argument("number", type=int)
+def youtube_remove(number):
+    """Remove a cached YouTube track by its number."""
+    client = ensure_daemon()
+
+    try:
+        cached_response = client.youtube_cached()
+        tracks = cached_response.get("tracks", [])
+        track = next((t for t in tracks if t.get("index") == number), None)
+
+        if not track:
+            if not tracks:
+                click.echo("No cached tracks to remove.", err=True)
+            else:
+                click.echo(f"Invalid number. Choose between 1 and {len(tracks)}.", err=True)
+            sys.exit(1)
+
+        title = track.get("title", "Unknown")
+        click.echo(f"Track #{number}: {title}")
+
+        if not click.confirm("Remove this cached track?", default=False):
+            click.echo("Cancelled.")
+            return
+
+        response = client.youtube_remove(number)
+
+        if "error" in response:
+            click.echo(f"Error: {response['error']}", err=True)
+            sys.exit(1)
+
+        click.echo(f"Removed: {response.get('title', 'Unknown')}")
+
+    except ConnectionError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@youtube_group.command("clear")
+def youtube_clear():
+    """Clear all cached YouTube tracks."""
+    client = ensure_daemon()
+
+    try:
+        cached_response = client.youtube_cached()
+        stats = cached_response.get("stats", {})
+        count = stats.get("count", 0)
+
+        if count == 0:
+            click.echo("Cache is already empty.")
+            return
+
+        size_mb = stats.get("total_size_mb", 0)
+        click.echo(f"This will remove {count} cached track(s) ({size_mb:.1f} MB).")
+
+        if not click.confirm("Clear entire YouTube cache?", default=False):
+            click.echo("Cancelled.")
+            return
+
+        response = client.youtube_clear()
+
+        if "error" in response:
+            click.echo(f"Error: {response['error']}", err=True)
+            sys.exit(1)
+
+        removed = response.get("removed_count", 0)
+        click.echo(f"Cleared {removed} cached track(s).")
+
+    except ConnectionError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
 @main.command("update-radios")
 def update_radios():
-    """Update radio stations list after version upgrade.
-
-    When a new version includes additional radio stations, this command
-    lets you choose how to handle the update:
-    - Merge: Add new stations to your existing list (recommended)
-    - Overwrite: Replace with new defaults (backs up your old file)
-    - Keep: Keep your current stations unchanged
-    """
+    """Update radio stations list after version upgrade."""
     config = get_config()
 
     new_stations = config.get_new_default_stations()

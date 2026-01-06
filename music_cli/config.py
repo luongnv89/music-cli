@@ -197,7 +197,7 @@ Top Hits|https://streams.ilovemusic.de/iloveradio1.mp3
 Rock Radio|https://streams.ilovemusic.de/iloveradio3.mp3
 Metal [SomaFM]|http://ice1.somafm.com/metal-128-mp3
 
-# Synthwave / Retrowave (Nightride FM)
+# Synthwave/Retrowave
 Nightride FM|https://stream.nightride.fm/nightride.mp3
 Chillsynth FM|https://stream.nightride.fm/chillsynth.mp3
 Darksynth FM|https://stream.nightride.fm/darksynth.mp3
@@ -352,6 +352,62 @@ Radio Capital|https://icecast.unitedradio.it/Capital.mp3
                 radios.append((name.strip(), url.strip()))
             else:
                 radios.append((line, line))
+        return radios
+
+    def get_radios_categorized(self) -> list[dict]:
+        """Load radio stations with category information.
+
+        Returns list of dicts with keys: index, name, url, category
+        Category is extracted from comment lines in radios.txt.
+        """
+        radios: list[dict] = []
+        if not self.radios_file.exists():
+            return radios
+
+        current_category = "Other"
+        station_index = 0
+
+        for line in self.radios_file.read_text().splitlines():
+            line = line.strip()
+            if not line:
+                continue
+
+            if line.startswith("#"):
+                # Check for major category (e.g., "# ========== ENGLISH ==========")
+                if "==========" in line:
+                    # Extract category name between equals signs
+                    category = line.replace("=", "").replace("#", "").strip()
+                    if category:
+                        current_category = category
+                # Check for subcategory (e.g., "# Chill/Lo-fi")
+                elif not line.startswith("# Format:") and not line.startswith("# Add"):
+                    subcategory = line.lstrip("#").strip()
+                    if subcategory and not subcategory.startswith("Format"):
+                        current_category = subcategory
+                continue
+
+            # Parse station
+            station_index += 1
+            if "|" in line:
+                name, url = line.split("|", 1)
+                radios.append(
+                    {
+                        "index": station_index,
+                        "name": name.strip(),
+                        "url": url.strip(),
+                        "category": current_category,
+                    }
+                )
+            else:
+                radios.append(
+                    {
+                        "index": station_index,
+                        "name": line,
+                        "url": line,
+                        "category": current_category,
+                    }
+                )
+
         return radios
 
     def get_radio_by_index(self, index: int) -> tuple[str, str] | None:
