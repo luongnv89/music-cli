@@ -469,6 +469,14 @@ GitHub: https://github.com/luongnv89/music-cli
 - Context-aware music selection
 - Mood support
 
+## Contributors
+
+Thanks to all contributors who have helped improve music-cli!
+
+| Contributor | PR | Contribution |
+|-------------|-----|--------------|
+| [kylephillipsau](https://github.com/kylephillipsau) | [#5](https://github.com/luongnv89/music-cli/pull/5) | Improved YouTube livestream playback for radio stations by piping yt-dlp to ffplay for reliable HLS buffering and reconnections |
+
 ## License
 
 MIT
