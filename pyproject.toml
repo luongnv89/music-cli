@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "coder-music-cli"
-version = "0.8.7"
+version = "0.8.8"
 description = "A command-line music application for coders with daemon support, radio streaming, and AI-generated music"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = "MIT"
 authors = [
     {name = "Luong Nguyen", email = "luongnv89@gmail.com"}
@@ -15,7 +15,7 @@ authors = [
 maintainers = [
     {name = "Luong Nguyen", email = "luongnv89@gmail.com"}
 ]
-keywords = ["music", "cli", "daemon", "radio", "ai-music", "focus", "coding", "background-music", "lofi", "productivity"]
+keywords = ["music", "cli", "daemon", "radio", "ai-music", "focus", "coding", "background-music", "lofi", "productivity", "media-keys", "mpris", "now-playing"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
@@ -24,7 +24,6 @@ classifiers = [
     "Operating System :: MacOS",
     "Operating System :: Microsoft :: Windows",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -35,6 +34,10 @@ dependencies = [
     "click>=8.0",
     "tomli>=2.0;python_version<'3.11'",
     "tomli-w>=1.0",
+    # Media controller dependencies (platform-specific)
+    "pyobjc-framework-MediaPlayer>=10.0; sys_platform == 'darwin'",
+    "dbus-next>=0.2.3; sys_platform == 'linux'",
+    "winrt-Windows.Media.Playback>=2.0.0; sys_platform == 'win32'",
 ]
 
 [project.optional-dependencies]
@@ -76,11 +79,11 @@ include = ["music_cli*"]
 
 [tool.black]
 line-length = 100
-target-version = ["py39"]
+target-version = ["py310"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py39"
+target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "S", "PTH"]
