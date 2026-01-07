@@ -485,6 +485,24 @@ Thanks to all contributors who have helped improve music-cli!
 |-------------|-----|--------------|
 | [kylephillipsau](https://github.com/kylephillipsau) | [#5](https://github.com/luongnv89/music-cli/pull/5) | Improved YouTube livestream playback for radio stations by piping yt-dlp to ffplay for reliable HLS buffering and reconnections |
 
+## Acknowledgements
+
+music-cli is built with these excellent open-source libraries:
+
+| Library | Maintainer | Purpose |
+|---------|------------|---------|
+| [Click](https://github.com/pallets/click) | [Pallets](https://github.com/pallets) | CLI framework for building commands and argument parsing |
+| [tomli](https://github.com/hukkin/tomli) | [hukkin](https://github.com/hukkin) | TOML parser for reading configuration files |
+| [tomli-w](https://github.com/hukkin/tomli-w) | [hukkin](https://github.com/hukkin) | TOML writer for saving configuration files |
+| [pyobjc](https://github.com/ronaldoussoren/pyobjc) | [Ronald Oussoren](https://github.com/ronaldoussoren) | macOS framework bindings for media key support |
+| [dbus-next](https://github.com/altdesktop/python-dbus-next) | [altdesktop](https://github.com/altdesktop) | D-Bus client for Linux MPRIS media controls |
+| [PyTorch](https://github.com/pytorch/pytorch) | [PyTorch Team](https://github.com/pytorch) | Deep learning framework powering AI music generation |
+| [Transformers](https://github.com/huggingface/transformers) | [Hugging Face](https://github.com/huggingface) | Pre-trained models for MusicGen and Bark |
+| [Diffusers](https://github.com/huggingface/diffusers) | [Hugging Face](https://github.com/huggingface) | Diffusion models for AudioLDM audio generation |
+| [SciPy](https://github.com/scipy/scipy) | [SciPy Community](https://github.com/scipy) | Scientific computing for audio signal processing |
+| [tqdm](https://github.com/tqdm/tqdm) | [tqdm developers](https://github.com/tqdm) | Progress bars for model downloads and generation |
+| [yt-dlp](https://github.com/yt-dlp/yt-dlp) | [yt-dlp Team](https://github.com/yt-dlp) | YouTube audio extraction and streaming |
+
 ## License
 
 MIT
