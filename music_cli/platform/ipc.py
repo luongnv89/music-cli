@@ -207,7 +207,7 @@ class UnixIPCClient(IPCClient):
         except ConnectionRefusedError as e:
             sock.close()
             raise ConnectionError("Daemon not running (connection refused)") from e
-        except socket.timeout as e:
+        except TimeoutError as e:
             sock.close()
             raise ConnectionError("Daemon not responding (timeout)") from e
         except OSError as e:
@@ -290,7 +290,7 @@ class TCPIPCClient(IPCClient):
         except ConnectionRefusedError as e:
             sock.close()
             raise ConnectionError("Daemon not running (connection refused)") from e
-        except socket.timeout as e:
+        except TimeoutError as e:
             sock.close()
             raise ConnectionError("Daemon not responding (timeout)") from e
         except OSError as e:
