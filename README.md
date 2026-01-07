@@ -361,7 +361,7 @@ GitHub: https://github.com/luongnv89/music-cli
 
 ## Changelog
 
-### v0.8.8
+### v0.8.9
 - Add acknowledgements section to README listing open-source dependencies
 - Fix ruff linting errors (use TimeoutError, import Callable from collections.abc)
 - Update Python requirement to 3.10+ in CI and documentation
