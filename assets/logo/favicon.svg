@@ -2,7 +2,7 @@
   <!-- Simplified favicon for 16px/32px display -->
 
   <!-- Background -->
-  <rect width="32" height="32" rx="6" fill="#6366F1"/>
+  <rect width="32" height="32" rx="6" fill="#22C55E"/>
 
   <!-- Simplified: chevron + 2 waves -->
   <path
