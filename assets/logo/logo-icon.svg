@@ -2,7 +2,7 @@
   <!-- App icon: Square with rounded corners -->
 
   <!-- Background -->
-  <rect width="512" height="512" rx="96" fill="#6366F1"/>
+  <rect width="512" height="512" rx="96" fill="#22C55E"/>
 
   <!-- Logo mark (white on indigo) -->
   <g transform="translate(96, 96) scale(5)">

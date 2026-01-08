@@ -7,7 +7,7 @@
   <!-- Terminal chevron/prompt forming the source -->
   <path
     d="M8 16 L24 32 L8 48"
-    stroke="#6366F1"
+    stroke="#22C55E"
     stroke-width="5"
     stroke-linecap="round"
     stroke-linejoin="round"
@@ -18,7 +18,7 @@
   <!-- Wave 1 (closest) -->
   <path
     d="M32 20 Q44 32 32 44"
-    stroke="#6366F1"
+    stroke="#22C55E"
     stroke-width="4"
     stroke-linecap="round"
     fill="none"
@@ -27,7 +27,7 @@
   <!-- Wave 2 (middle) -->
   <path
     d="M40 14 Q56 32 40 50"
-    stroke="#6366F1"
+    stroke="#22C55E"
     stroke-width="4"
     stroke-linecap="round"
     fill="none"
@@ -37,7 +37,7 @@
   <!-- Wave 3 (furthest) -->
   <path
     d="M48 8 Q68 32 48 56"
-    stroke="#6366F1"
+    stroke="#22C55E"
     stroke-width="4"
     stroke-linecap="round"
     fill="none"
