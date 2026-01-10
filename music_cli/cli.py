@@ -198,7 +198,9 @@ def main(ctx):
 @click.option("--source", "-s", help="Source file/URL/station name")
 @click.option(
     "--mood",
-    type=click.Choice(["happy", "sad", "excited", "focus", "relaxed", "energetic"]),
+    type=click.Choice(
+        ["happy", "sad", "excited", "focus", "relaxed", "energetic", "melancholic", "peaceful"]
+    ),
     help="Mood for context-aware playback",
 )
 @click.option("--auto", "-a", is_flag=True, help="Enable auto-play (shuffle local files)")
@@ -778,7 +780,9 @@ def ai_list():
 @click.option("-p", "--prompt", help="Custom prompt for AI music generation")
 @click.option(
     "--mood",
-    type=click.Choice(["happy", "sad", "excited", "focus", "relaxed", "energetic"]),
+    type=click.Choice(
+        ["happy", "sad", "excited", "focus", "relaxed", "energetic", "melancholic", "peaceful"]
+    ),
     help="Mood for context-aware generation",
 )
 @click.option("--duration", "-d", default=5, help="Duration in seconds (5-60)")
