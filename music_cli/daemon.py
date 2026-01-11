@@ -11,7 +11,6 @@ from .config import get_config
 from .context.mood import Mood, MoodContext
 from .context.temporal import TemporalContext
 from .history import get_history
-from .youtube_history import get_youtube_history
 from .platform import get_ipc_server, supports_unix_signals
 from .platform.ipc import IPCServer
 from .player.base import TrackInfo
@@ -19,6 +18,7 @@ from .player.ffplay import FFplayPlayer
 from .sources.local import LocalSource
 from .sources.radio import RadioSource
 from .sources.youtube import YouTubeSource, is_youtube_available
+from .youtube_history import get_youtube_history
 
 logger = logging.getLogger(__name__)
 
