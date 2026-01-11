@@ -8,14 +8,21 @@ class AudioManager {
     this.onStateChange = null;
     this.onError = null;
 
-    this.audio.addEventListener('play', () => this._notifyStateChange('playing'));
-    this.audio.addEventListener('pause', () => this._notifyStateChange('paused'));
-    this.audio.addEventListener('ended', () => this._notifyStateChange('ended'));
-    this.audio.addEventListener('waiting', () => this._notifyStateChange('loading'));
-    this.audio.addEventListener('canplay', () => {
-      if (this.isPlaying) this._notifyStateChange('playing');
+    this.audio.addEventListener('playing', () => {
+      this.isPlaying = true;
+      this._notifyStateChange('playing');
     });
+    this.audio.addEventListener('pause', () => {
+      this.isPlaying = false;
+      this._notifyStateChange('paused');
+    });
+    this.audio.addEventListener('ended', () => {
+      this.isPlaying = false;
+      this._notifyStateChange('ended');
+    });
+    this.audio.addEventListener('waiting', () => this._notifyStateChange('loading'));
     this.audio.addEventListener('error', (e) => {
+      this.isPlaying = false;
       this._notifyStateChange('error');
       if (this.onError) this.onError(e);
     });
@@ -40,6 +47,7 @@ class AudioManager {
     return this.audio.play()
       .then(() => {
         this.isPlaying = true;
+        this._notifyStateChange('playing');
         return true;
       })
       .catch((error) => {
@@ -61,6 +69,7 @@ class AudioManager {
       return this.audio.play()
         .then(() => {
           this.isPlaying = true;
+          this._notifyStateChange('playing');
           return true;
         })
         .catch(() => false);
