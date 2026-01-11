@@ -229,6 +229,18 @@ class DaemonClient:
         """
         return self.send_command("ai_remove", {"index": index})
 
+    def youtube_cached(self) -> dict:
+        return self.send_command("youtube_history_list")
+
+    def youtube_play(self, index: int) -> dict:
+        return self.send_command("youtube_history_play", {"index": index})
+
+    def youtube_remove(self, index: int) -> dict:
+        return self.send_command("youtube_history_remove", {"index": index})
+
+    def youtube_clear(self) -> dict:
+        return self.send_command("youtube_history_clear")
+
 
 def get_client() -> DaemonClient:
     """Get a daemon client instance."""

@@ -11,6 +11,7 @@ from .config import get_config
 from .context.mood import Mood, MoodContext
 from .context.temporal import TemporalContext
 from .history import get_history
+from .youtube_history import get_youtube_history
 from .platform import get_ipc_server, supports_unix_signals
 from .platform.ipc import IPCServer
 from .player.base import TrackInfo
@@ -32,6 +33,7 @@ class MusicDaemon:
         self.radio_source = RadioSource()
         self.youtube_source = YouTubeSource()
         self.history = get_history()
+        self.youtube_history = get_youtube_history()
         self.temporal = TemporalContext()
         self.ai_tracks = get_ai_tracks()
 
@@ -138,6 +140,10 @@ class MusicDaemon:
             "ai_play": self._cmd_ai_play,
             "ai_replay": self._cmd_ai_replay,
             "ai_remove": self._cmd_ai_remove,
+            "youtube_history_list": self._cmd_youtube_history_list,
+            "youtube_history_play": self._cmd_youtube_history_play,
+            "youtube_history_remove": self._cmd_youtube_history_remove,
+            "youtube_history_clear": self._cmd_youtube_history_clear,
             "shutdown": self._cmd_shutdown,
         }
 
@@ -283,6 +289,13 @@ class MusicDaemon:
             log_source = track.source
             if track.source_type == "youtube" and track.metadata.get("youtube_url"):
                 log_source = track.metadata["youtube_url"]
+                self.youtube_history.add_entry(
+                    video_id=track.metadata.get("video_id", ""),
+                    url=log_source,
+                    title=track.title or "Unknown",
+                    artist=track.artist,
+                    duration=track.duration,
+                )
 
             self.history.log(
                 source=log_source,
@@ -565,11 +578,6 @@ class MusicDaemon:
             return {"error": "Failed to start playback"}
 
     async def _cmd_ai_remove(self, args: dict) -> dict:
-        """Remove an AI track and its audio file.
-
-        Args (from args dict):
-            index: 1-based index of the track to remove.
-        """
         index = args.get("index", 1)
 
         track_entry = self.ai_tracks.get_by_index(index)
@@ -579,7 +587,6 @@ class MusicDaemon:
                 return {"error": "No AI tracks to remove"}
             return {"error": f"Invalid index. Choose between 1 and {count}"}
 
-        # Remove the track (also deletes the audio file)
         removed = self.ai_tracks.remove_by_index(index)
 
         if removed:
@@ -590,6 +597,112 @@ class MusicDaemon:
             }
         else:
             return {"error": "Failed to remove track"}
+
+    async def _cmd_youtube_history_list(self, args: dict) -> dict:
+        entries = self.youtube_history.get_all()
+
+        total_size_bytes = 0
+        cache_dir = self.config.youtube_cache_dir
+        if cache_dir.exists():
+            for f in cache_dir.glob("*.m4a"):
+                total_size_bytes += f.stat().st_size
+
+        max_size_gb = self.config.get_youtube_cache_config().get("max_size_gb", 2.0)
+        max_size_bytes = max_size_gb * 1024 * 1024 * 1024
+        usage_percent = (total_size_bytes / max_size_bytes * 100) if max_size_bytes > 0 else 0
+
+        tracks = []
+        for i, entry in enumerate(entries):
+            file_path = cache_dir / f"{entry.video_id}.m4a"
+            file_exists = file_path.exists()
+            file_size_mb = file_path.stat().st_size / (1024 * 1024) if file_exists else 0
+
+            tracks.append(
+                {
+                    "index": i + 1,
+                    "video_id": entry.video_id,
+                    "url": entry.url,
+                    "title": entry.title,
+                    "artist": entry.artist,
+                    "duration": entry.duration,
+                    "timestamp": entry.timestamp,
+                    "file_exists": file_exists,
+                    "file_size_mb": file_size_mb,
+                }
+            )
+
+        return {
+            "tracks": tracks,
+            "stats": {
+                "count": len(entries),
+                "total_size_mb": total_size_bytes / (1024 * 1024),
+                "max_size_gb": max_size_gb,
+                "usage_percent": usage_percent,
+            },
+        }
+
+    async def _cmd_youtube_history_play(self, args: dict) -> dict:
+        index = args.get("index", 1)
+        entry = self.youtube_history.get_by_index(index)
+        if not entry:
+            return {"error": f"Invalid index: {index}"}
+
+        if not is_youtube_available():
+            return {"error": "YouTube playback not available."}
+
+        file_path = self.config.youtube_cache_dir / f"{entry.video_id}.m4a"
+        if file_path.exists():
+            track = TrackInfo(
+                source=str(file_path),
+                source_type="youtube",
+                title=entry.title,
+                artist=entry.artist,
+                duration=entry.duration,
+                metadata={"youtube_url": entry.url, "video_id": entry.video_id, "cached": True},
+            )
+        else:
+            track = self.youtube_source.get_track(entry.url)
+
+        if not track:
+            return {"error": "Could not load track"}
+
+        success = await self.player.play(track)
+        if success:
+            self.youtube_history.add_entry(
+                video_id=entry.video_id,
+                url=entry.url,
+                title=entry.title,
+                artist=entry.artist,
+                duration=entry.duration,
+            )
+            return {"status": "playing", "track": track.to_dict()}
+        else:
+            return {"error": "Failed to start playback"}
+
+    async def _cmd_youtube_history_remove(self, args: dict) -> dict:
+        index = args.get("index", 1)
+        removed = self.youtube_history.remove_by_index(index)
+        if removed:
+            file_path = self.config.youtube_cache_dir / f"{removed.video_id}.m4a"
+            if file_path.exists():
+                try:
+                    file_path.unlink()
+                except OSError:
+                    pass
+            return {"status": "removed", "title": removed.title}
+        return {"error": f"Invalid index: {index}"}
+
+    async def _cmd_youtube_history_clear(self, args: dict) -> dict:
+        count = self.youtube_history.count()
+        cache_dir = self.config.youtube_cache_dir
+        if cache_dir.exists():
+            for f in cache_dir.glob("*.m4a"):
+                try:
+                    f.unlink()
+                except OSError:
+                    pass
+        self.youtube_history.clear()
+        return {"status": "cleared", "removed_count": count}
 
     async def _cmd_shutdown(self, args: dict) -> dict:
         """Shutdown the daemon gracefully.

@@ -1195,7 +1195,6 @@ def youtube_group(ctx):
 
 @youtube_group.command("cached")
 def youtube_cached():
-    """List all cached YouTube tracks available for offline playback."""
     client = ensure_daemon()
 
     try:
@@ -1209,12 +1208,12 @@ def youtube_cached():
         stats = response.get("stats", {})
 
         if not tracks:
-            click.echo("No cached YouTube tracks.")
-            click.echo("Play a YouTube URL to cache it automatically:")
+            click.echo("No YouTube history yet.")
+            click.echo("Play a YouTube URL to add it to history:")
             click.echo("  music-cli play -m youtube -s 'https://youtube.com/watch?v=...'")
             return
 
-        click.echo("Cached YouTube tracks:\n")
+        click.echo("YouTube replay history:\n")
         for track in tracks:
             idx = track.get("index", "?")
             title = track.get("title", "Unknown")[:45]
@@ -1222,18 +1221,12 @@ def youtube_cached():
                 title += "..."
             duration = track.get("duration")
             dur_str = f"{int(duration // 60)}:{int(duration % 60):02d}" if duration else "?"
-            size_mb = track.get("file_size_mb", 0)
-            exists = "" if track.get("file_exists", True) else " [missing]"
+            cached = " [cached]" if track.get("file_exists") else ""
 
-            click.echo(f"  {idx:2}. {title} ({dur_str}) [{size_mb:.1f} MB]{exists}")
+            click.echo(f"  {idx:2}. {title} ({dur_str}){cached}")
 
-        click.echo(
-            f"\\nTotal: {stats.get('count', 0)} track(s), {stats.get('total_size_mb', 0):.1f} MB"
-        )
-        click.echo(
-            f"Cache limit: {stats.get('max_size_gb', 2.0):.1f} GB ({stats.get('usage_percent', 0):.1f}% used)"
-        )
-        click.echo("\nPlay with: music-cli youtube play <number>")
+        click.echo(f"\nTotal: {stats.get('count', 0)} track(s)")
+        click.echo("Replay with: music-cli youtube play <number>")
 
     except ConnectionError as e:
         click.echo(f"Error: {e}", err=True)
@@ -1243,7 +1236,6 @@ def youtube_cached():
 @youtube_group.command("play")
 @click.argument("number", type=int)
 def youtube_play(number):
-    """Play a cached YouTube track by its number (works offline)."""
     client = ensure_daemon()
 
     try:
@@ -1255,7 +1247,7 @@ def youtube_play(number):
 
         track = response.get("track", {})
         title = track.get("title", "Unknown")
-        click.echo(f"▶ Playing: {title} [cached]")
+        click.echo(f"▶ Playing: {title}")
 
     except ConnectionError as e:
         click.echo(f"Error: {e}", err=True)
@@ -1265,7 +1257,6 @@ def youtube_play(number):
 @youtube_group.command("remove")
 @click.argument("number", type=int)
 def youtube_remove(number):
-    """Remove a cached YouTube track by its number."""
     client = ensure_daemon()
 
     try:
@@ -1275,7 +1266,7 @@ def youtube_remove(number):
 
         if not track:
             if not tracks:
-                click.echo("No cached tracks to remove.", err=True)
+                click.echo("No YouTube history to remove.", err=True)
             else:
                 click.echo(f"Invalid number. Choose between 1 and {len(tracks)}.", err=True)
             sys.exit(1)
@@ -1283,7 +1274,7 @@ def youtube_remove(number):
         title = track.get("title", "Unknown")
         click.echo(f"Track #{number}: {title}")
 
-        if not click.confirm("Remove this cached track?", default=False):
+        if not click.confirm("Remove this entry?", default=False):
             click.echo("Cancelled.")
             return
 
@@ -1302,7 +1293,6 @@ def youtube_remove(number):
 
 @youtube_group.command("clear")
 def youtube_clear():
-    """Clear all cached YouTube tracks."""
     client = ensure_daemon()
 
     try:
@@ -1311,13 +1301,12 @@ def youtube_clear():
         count = stats.get("count", 0)
 
         if count == 0:
-            click.echo("Cache is already empty.")
+            click.echo("History is already empty.")
             return
 
-        size_mb = stats.get("total_size_mb", 0)
-        click.echo(f"This will remove {count} cached track(s) ({size_mb:.1f} MB).")
+        click.echo(f"This will remove {count} YouTube history entry(s).")
 
-        if not click.confirm("Clear entire YouTube cache?", default=False):
+        if not click.confirm("Clear entire YouTube history?", default=False):
             click.echo("Cancelled.")
             return
 
@@ -1328,7 +1317,7 @@ def youtube_clear():
             sys.exit(1)
 
         removed = response.get("removed_count", 0)
-        click.echo(f"Cleared {removed} cached track(s).")
+        click.echo(f"Cleared {removed} entry(s).")
 
     except ConnectionError as e:
         click.echo(f"Error: {e}", err=True)
