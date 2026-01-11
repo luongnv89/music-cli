@@ -2,6 +2,7 @@ import './style.css';
 import { stations, categories, moods, moodIcons, searchStations, getStationsByCategory, getStationsByMood } from './data/stations.js';
 import audioManager from './services/AudioManager.js';
 import youtubeManager from './services/YouTubeManager.js';
+import { createIconElement } from './utils/icons.js';
 
 let currentMode = 'radio';
 let activeCategory = null;
@@ -9,12 +10,39 @@ let activeMood = null;
 let currentStation = null;
 
 function init() {
+  renderQuickLinks();
   renderCategoryFilters();
   renderMoodFilters();
   renderStations(stations);
   setupEventListeners();
   setupAudioManager();
   setupYouTubePlayer();
+}
+
+function renderQuickLinks() {
+  const container = document.getElementById('quick-links');
+  const links = [
+    { href: 'https://luongnv.com', text: 'Website', icon: 'globe' },
+    { href: 'https://github.com/luongnv89/music-cli', text: 'GitHub', icon: 'github', highlight: true },
+    { href: 'https://luongnv.com/claude-tools', text: 'Claude Tools', icon: 'bot' }
+  ];
+
+  links.forEach(link => {
+    const a = document.createElement('a');
+    a.href = link.href;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.className = 'quick-link' + (link.highlight ? ' github-link' : '');
+
+    const iconSpan = createIconElement(link.icon);
+    const textSpan = document.createElement('span');
+    textSpan.className = 'link-text';
+    textSpan.textContent = link.text;
+
+    a.appendChild(iconSpan);
+    a.appendChild(textSpan);
+    container.appendChild(a);
+  });
 }
 
 function renderCategoryFilters() {

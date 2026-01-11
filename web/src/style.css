@@ -160,6 +160,68 @@ body::before {
   box-shadow: 0 0 0 3px var(--color-primary-glow);
 }
 
+.quick-links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.quick-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  background: var(--color-bg-glass);
+  border: var(--glass-border);
+  border-radius: var(--radius-xl);
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all var(--transition-normal);
+  white-space: nowrap;
+}
+
+.quick-link:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--color-text);
+  transform: translateY(-2px);
+}
+
+.quick-link.github-link {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.3);
+  color: var(--color-primary-light);
+}
+
+.quick-link.github-link:hover {
+  background: rgba(34, 197, 94, 0.2);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  box-shadow: var(--shadow-glow);
+}
+
+.link-icon {
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lucide-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25em;
+  height: 1.25em;
+}
+
+.lucide-icon svg {
+  width: 100%;
+  height: 100%;
+  color: inherit;
+}
+
 .mode-tabs {
   display: flex;
   justify-content: center;
