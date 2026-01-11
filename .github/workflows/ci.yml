@@ -6,8 +6,16 @@ name: CI
 on:
   push:
     branches: [main, master, develop]
+    paths-ignore:
+      - 'web/**'
+      - 'docs/**'
+      - '*.md'
   pull_request:
     branches: [main, master, develop]
+    paths-ignore:
+      - 'web/**'
+      - 'docs/**'
+      - '*.md'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -15,7 +23,7 @@ concurrency:
 
 jobs:
   lint:
-    name: Lint & Format
+    name: Lint & Format (Python)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -79,7 +87,7 @@ jobs:
 
       - name: Run tests
         run: pytest tests/ -v --cov=music_cli --cov-report=xml --cov-report=term-missing
-        continue-on-error: true  # Tests may not exist yet
+        continue-on-error: true
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -89,7 +97,7 @@ jobs:
           fail_ci_if_error: false
 
   build:
-    name: Build Package
+    name: Build Package (Python)
     runs-on: ubuntu-latest
     needs: [lint]
     steps:
