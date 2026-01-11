@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="music-cli web - A beautiful music player for coders. Stream radio stations and YouTube audio." />
+    <meta name="theme-color" content="#0a0a0f" />
+    <title>music-cli | Code. Listen. Iterate.</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div id="app">
+      <header class="header">
+        <div class="header-content">
+          <div class="logo-section">
+            <img src="/logo.svg" alt="music-cli" class="logo" />
+            <div class="logo-text">
+              <h1>music-cli</h1>
+              <p class="tagline">Code. Listen. Iterate.</p>
+            </div>
+          </div>
+          <div class="search-container">
+            <input type="text" id="search-input" placeholder="Search stations..." class="search-input" />
+          </div>
+        </div>
+      </header>
+
+      <nav class="mode-tabs">
+        <button class="tab-btn active" data-mode="radio">
+          <span class="tab-icon">📻</span>
+          Radio
+        </button>
+        <button class="tab-btn" data-mode="youtube">
+          <span class="tab-icon">▶️</span>
+          YouTube
+        </button>
+      </nav>
+
+      <main class="main-content">
+        <section id="radio-mode" class="mode-section active">
+          <div class="filters">
+            <div class="filter-group">
+              <h3>Categories</h3>
+              <div id="category-filters" class="filter-pills"></div>
+            </div>
+            <div class="filter-group">
+              <h3>Moods</h3>
+              <div id="mood-filters" class="filter-pills"></div>
+            </div>
+          </div>
+          <div id="stations-grid" class="stations-grid"></div>
+        </section>
+
+        <section id="youtube-mode" class="mode-section">
+          <div class="youtube-input-container">
+            <input type="text" id="youtube-url" placeholder="Paste YouTube URL here..." class="youtube-input" />
+            <button id="youtube-play-btn" class="youtube-play-btn">Play</button>
+          </div>
+          <div class="youtube-player-container">
+            <div id="youtube-player"></div>
+            <div id="youtube-placeholder" class="youtube-placeholder">
+              <span class="placeholder-icon">🎬</span>
+              <p>Enter a YouTube URL to start playing</p>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer class="now-playing-bar">
+        <div class="now-playing-content">
+          <div class="track-info">
+            <div class="visualizer" id="visualizer">
+              <span></span><span></span><span></span><span></span><span></span>
+            </div>
+            <div class="track-details">
+              <span id="track-name" class="track-name">Select a station to play</span>
+              <span id="track-category" class="track-category"></span>
+            </div>
+          </div>
+          <div class="playback-controls">
+            <button id="play-pause-btn" class="control-btn play-pause" disabled>
+              <span class="play-icon">▶</span>
+              <span class="pause-icon">⏸</span>
+            </button>
+          </div>
+          <div class="volume-control">
+            <span class="volume-icon">🔊</span>
+            <input type="range" id="volume-slider" class="volume-slider" min="0" max="100" value="80" />
+            <span id="volume-value" class="volume-value">80%</span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
