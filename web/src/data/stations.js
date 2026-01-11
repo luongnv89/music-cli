@@ -82,14 +82,14 @@ export const moodDescriptions = {
 };
 
 export const moodIcons = {
-  focus: '🎯',
-  happy: '😊',
-  sad: '😢',
-  excited: '🎉',
-  relaxed: '😌',
-  energetic: '⚡',
-  melancholic: '🌙',
-  peaceful: '🕊️',
+  focus: 'target',
+  happy: 'smile',
+  sad: 'frown',
+  excited: 'partyPopper',
+  relaxed: 'heart',
+  energetic: 'zap',
+  melancholic: 'moon',
+  peaceful: 'bird',
 };
 
 /**

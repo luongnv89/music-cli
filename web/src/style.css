@@ -258,7 +258,9 @@ body::before {
 }
 
 .tab-icon {
-  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .main-content {
@@ -507,9 +509,16 @@ body::before {
 }
 
 .placeholder-icon {
-  font-size: 4rem;
   margin-bottom: 16px;
   opacity: 0.5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.placeholder-icon .lucide-icon {
+  width: 64px;
+  height: 64px;
 }
 
 .now-playing-bar {
@@ -627,6 +636,13 @@ body::before {
   cursor: not-allowed;
 }
 
+.play-icon,
+.pause-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .play-pause .pause-icon {
   display: none;
 }
@@ -636,7 +652,7 @@ body::before {
 }
 
 .play-pause.playing .pause-icon {
-  display: inline;
+  display: flex;
 }
 
 .volume-control {
@@ -647,8 +663,10 @@ body::before {
 }
 
 .volume-icon {
-  font-size: 1.2rem;
   opacity: 0.7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .volume-slider {

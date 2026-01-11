@@ -40,13 +40,13 @@
         </div>
       </header>
 
-      <nav class="mode-tabs">
+      <nav class="mode-tabs" id="mode-tabs">
         <button class="tab-btn active" data-mode="radio">
-          <span class="tab-icon">📻</span>
+          <span class="tab-icon"></span>
           Radio
         </button>
         <button class="tab-btn" data-mode="youtube">
-          <span class="tab-icon">▶️</span>
+          <span class="tab-icon"></span>
           YouTube
         </button>
       </nav>
@@ -74,7 +74,7 @@
           <div class="youtube-player-container">
             <div id="youtube-player"></div>
             <div id="youtube-placeholder" class="youtube-placeholder">
-              <span class="placeholder-icon">🎬</span>
+              <span class="placeholder-icon" id="youtube-placeholder-icon"></span>
               <p>Enter a YouTube URL to start playing</p>
             </div>
           </div>
@@ -94,12 +94,12 @@
           </div>
           <div class="playback-controls">
             <button id="play-pause-btn" class="control-btn play-pause" disabled>
-              <span class="play-icon">▶</span>
-              <span class="pause-icon">⏸</span>
+              <span class="play-icon"></span>
+              <span class="pause-icon"></span>
             </button>
           </div>
           <div class="volume-control">
-            <span class="volume-icon">🔊</span>
+            <span class="volume-icon" id="volume-icon"></span>
             <input type="range" id="volume-slider" class="volume-slider" min="0" max="100" value="80" />
             <span id="volume-value" class="volume-value">80%</span>
           </div>

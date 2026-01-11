@@ -10,6 +10,8 @@ let activeMood = null;
 let currentStation = null;
 
 function init() {
+  renderTabIcons();
+  renderPlayerIcons();
   renderQuickLinks();
   renderCategoryFilters();
   renderMoodFilters();
@@ -17,6 +19,24 @@ function init() {
   setupEventListeners();
   setupAudioManager();
   setupYouTubePlayer();
+}
+
+function renderTabIcons() {
+  const tabs = document.querySelectorAll('.tab-btn');
+  tabs[0].querySelector('.tab-icon').appendChild(createIconElement('radio', 18));
+  tabs[1].querySelector('.tab-icon').appendChild(createIconElement('film', 18));
+}
+
+function renderPlayerIcons() {
+  const playIcon = document.querySelector('.play-icon');
+  const pauseIcon = document.querySelector('.pause-icon');
+  const volumeIcon = document.getElementById('volume-icon');
+  const youtubeIcon = document.getElementById('youtube-placeholder-icon');
+
+  playIcon.appendChild(createIconElement('play', 24));
+  pauseIcon.appendChild(createIconElement('pause', 24));
+  volumeIcon.appendChild(createIconElement('volume2', 20));
+  youtubeIcon.appendChild(createIconElement('film', 32));
 }
 
 function renderQuickLinks() {
@@ -65,12 +85,21 @@ function renderCategoryFilters() {
 
 function renderMoodFilters() {
   const container = document.getElementById('mood-filters');
-  
+
   moods.forEach(mood => {
     const pill = document.createElement('button');
     pill.className = 'filter-pill';
-    pill.innerHTML = `<span class="pill-icon">${moodIcons[mood]}</span>${mood}`;
     pill.dataset.mood = mood;
+
+    const iconSpan = document.createElement('span');
+    iconSpan.className = 'pill-icon';
+    iconSpan.appendChild(createIconElement(moodIcons[mood], 16));
+
+    const textSpan = document.createElement('span');
+    textSpan.textContent = mood;
+
+    pill.appendChild(iconSpan);
+    pill.appendChild(textSpan);
     container.appendChild(pill);
   });
 }
