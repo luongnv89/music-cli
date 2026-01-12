@@ -7,13 +7,11 @@ on:
   push:
     branches: [main, master, develop]
     paths-ignore:
-      - 'web/**'
       - 'docs/**'
       - '*.md'
   pull_request:
     branches: [main, master, develop]
     paths-ignore:
-      - 'web/**'
       - 'docs/**'
       - '*.md'
 
