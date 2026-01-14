@@ -20,29 +20,6 @@ from .player.ffplay import check_ffplay_available
 
 logger = logging.getLogger(__name__)
 
-# ASCII logo - chevron > with sound waves ))) matching SVG logo
-ASCII_LOGO_LINES = [
-    "    ██╗         ╭╮   ╭╮    ╭╮",
-    "   ██╔╝        ╭╯│  ╭╯│   ╭╯│",
-    "  ██╔╝        ╭╯ │ ╭╯ │  ╭╯ │",
-    " ██╔╝         │  │ │  │  │  │",
-    "██╔╝          │  │ │  │  │  │",
-    " ██╚╗         │  │ │  │  │  │",
-    "  ██╚╗        ╰╮ │ ╰╮ │  ╰╮ │",
-    "   ██╚╗        ╰╮│  ╰╮│   ╰╮│",
-    "    ██╚╗        ╰╯   ╰╯    ╰╯",
-]
-
-
-def print_ascii_logo() -> None:
-    """Print the ASCII logo with bright green color."""
-    # ANSI escape code for bright green
-    bright_green = "\033[92m"
-    reset = "\033[0m"
-    for line in ASCII_LOGO_LINES:
-        click.echo(f"{bright_green}{line}{reset}")
-
-
 # Inspirational quotes about music and life
 INSPIRATIONAL_QUOTES = [
     '"Music is the soundtrack of your life." - Dick Clark',
@@ -323,9 +300,6 @@ def resume():
 @main.command()
 def status():
     """Show current playback status."""
-    # Print ASCII logo
-    print_ascii_logo()
-
     client = ensure_daemon()
 
     try:
