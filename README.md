@@ -24,6 +24,41 @@ music-cli status               # Check what's playing + inspirational quote
 
 ## Installation
 
+### Quick Install (one command)
+
+```bash
+curl -sSL https://raw.githubusercontent.com/luongnv89/music-cli/main/install.sh | bash
+```
+
+Or with wget:
+
+```bash
+wget -qO- https://raw.githubusercontent.com/luongnv89/music-cli/main/install.sh | bash
+```
+
+With optional extras:
+
+```bash
+# YouTube streaming support
+EXTRAS=youtube curl -sSL https://raw.githubusercontent.com/luongnv89/music-cli/main/install.sh | bash
+
+# AI music generation (~5GB, PyTorch + Transformers)
+EXTRAS=ai curl -sSL https://raw.githubusercontent.com/luongnv89/music-cli/main/install.sh | bash
+
+# Both
+EXTRAS="youtube,ai" curl -sSL https://raw.githubusercontent.com/luongnv89/music-cli/main/install.sh | bash
+```
+
+Prefer to inspect first?
+
+```bash
+curl -sSL https://raw.githubusercontent.com/luongnv89/music-cli/main/install.sh -o install.sh
+less install.sh   # review
+bash install.sh
+```
+
+### Manual Install (PyPI)
+
 ```bash
 # Install from PyPI
 pip install coder-music-cli
