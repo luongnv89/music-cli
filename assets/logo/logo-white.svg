@@ -1,23 +1,37 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 64" fill="none">
-  <!-- Full logo: White version for dark backgrounds -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 72" fill="none">
+  <!--
+    music-cli full logo — white version for dark backgrounds
+    Mark uses white bars + green center; wordmark in white
+  -->
 
-  <!-- Logo mark -->
-  <g>
-    <path
-      d="M8 16 L24 32 L8 48"
-      stroke="white"
-      stroke-width="5"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      fill="none"
-    />
-    <path d="M32 20 Q44 32 32 44" stroke="white" stroke-width="4" stroke-linecap="round" fill="none"/>
-    <path d="M40 14 Q56 32 40 50" stroke="white" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.7"/>
-    <path d="M48 8 Q68 32 48 56" stroke="white" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.4"/>
-  </g>
+  <!-- ── MARK ── -->
+  <rect x="4"  y="36" width="7" height="28" rx="2" fill="white" opacity="0.35"/>
+  <rect x="14" y="27" width="7" height="37" rx="2" fill="white" opacity="0.65"/>
+  <rect x="24" y="16" width="7" height="48" rx="2" fill="#22C55E"/>
+  <rect x="34" y="27" width="7" height="37" rx="2" fill="white" opacity="0.65"/>
+  <rect x="44" y="36" width="7" height="28" rx="2" fill="white" opacity="0.35"/>
+  <rect x="4" y="67" width="47" height="2.5" rx="1.25" fill="#22C55E" opacity="0.3"/>
 
-  <!-- Wordmark -->
-  <text x="80" y="42" font-family="'SF Mono', 'JetBrains Mono', 'Fira Code', monospace" font-size="28" font-weight="600" fill="white">
-    music<tspan fill="#86EFAC">-cli</tspan>
-  </text>
+  <!-- Divider -->
+  <line x1="66" y1="12" x2="66" y2="60" stroke="white" stroke-width="1" opacity="0.2"/>
+
+  <!-- ── WORDMARK ── -->
+  <text
+    x="80" y="44"
+    font-family="'SF Mono','JetBrains Mono','Fira Code',monospace"
+    font-size="26"
+    font-weight="700"
+    letter-spacing="-0.5"
+    fill="white"
+  >music<tspan fill="#86EFAC">-cli</tspan></text>
+
+  <!-- ── TAGLINE ── -->
+  <text
+    x="80" y="62"
+    font-family="'SF Mono','JetBrains Mono','Fira Code',monospace"
+    font-size="11"
+    font-weight="400"
+    letter-spacing="0.5"
+    fill="rgba(255,255,255,0.5)"
+  >Code. Listen. Iterate.</text>
 </svg>

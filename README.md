@@ -1,10 +1,6 @@
 <p align="center">
-  <img src="assets/logo/logo-mark.svg" alt="music-cli logo" width="80" height="80">
+  <img src="assets/logo/logo-full.svg" alt="music-cli logo" width="340">
 </p>
-
-<h1 align="center">music-cli</h1>
-
-<p align="center"><em>Code. Listen. Iterate.</em></p>
 
 <p align="center">
   <a href="https://pypi.org/project/coder-music-cli/"><img src="https://img.shields.io/pypi/v/coder-music-cli.svg" alt="PyPI version"></a>

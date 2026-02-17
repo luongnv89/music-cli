@@ -1,46 +1,28 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
   <!--
-    music-cli logo: Terminal chevron that becomes sound waves
-    Concept: The > prompt emanates musical sound waves
+    music-cli logo-mark: "Pulse Prompt"
+    Concept: A terminal block cursor built from equalizer bars.
+    Five vertical bars of ascending then descending height
+    form a waveform peak — simultaneously an audio spectrum
+    and a blinking cursor moment. The tallest center bar
+    anchors the composition.
   -->
 
-  <!-- Terminal chevron/prompt forming the source -->
-  <path
-    d="M8 16 L24 32 L8 48"
-    stroke="#22C55E"
-    stroke-width="5"
-    stroke-linecap="round"
-    stroke-linejoin="round"
-    fill="none"
-  />
+  <!-- Bar 1 — short -->
+  <rect x="6"  y="40" width="7" height="16" rx="2" fill="#22C55E" opacity="0.35"/>
 
-  <!-- Sound waves emanating from the chevron -->
-  <!-- Wave 1 (closest) -->
-  <path
-    d="M32 20 Q44 32 32 44"
-    stroke="#22C55E"
-    stroke-width="4"
-    stroke-linecap="round"
-    fill="none"
-  />
+  <!-- Bar 2 — medium -->
+  <rect x="16" y="30" width="7" height="26" rx="2" fill="#22C55E" opacity="0.65"/>
 
-  <!-- Wave 2 (middle) -->
-  <path
-    d="M40 14 Q56 32 40 50"
-    stroke="#22C55E"
-    stroke-width="4"
-    stroke-linecap="round"
-    fill="none"
-    opacity="0.7"
-  />
+  <!-- Bar 3 — tall (center anchor) -->
+  <rect x="26" y="18" width="7" height="38" rx="2" fill="#22C55E"/>
 
-  <!-- Wave 3 (furthest) -->
-  <path
-    d="M48 8 Q68 32 48 56"
-    stroke="#22C55E"
-    stroke-width="4"
-    stroke-linecap="round"
-    fill="none"
-    opacity="0.4"
-  />
+  <!-- Bar 4 — medium -->
+  <rect x="36" y="30" width="7" height="26" rx="2" fill="#22C55E" opacity="0.65"/>
+
+  <!-- Bar 5 — short -->
+  <rect x="46" y="40" width="7" height="16" rx="2" fill="#22C55E" opacity="0.35"/>
+
+  <!-- Cursor underline — terminal prompt blink indicator -->
+  <rect x="6" y="60" width="47" height="2.5" rx="1.25" fill="#22C55E" opacity="0.25"/>
 </svg>

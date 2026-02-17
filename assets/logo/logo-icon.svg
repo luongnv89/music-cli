@@ -1,23 +1,28 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
-  <!-- App icon: Square with rounded corners -->
+  <!--
+    music-cli app icon: "Pulse Prompt" on dark background
+    Dark charcoal square with rounded corners, white waveform bars
+    and a bright-green center bar.
+  -->
 
-  <!-- Background -->
-  <rect width="512" height="512" rx="96" fill="#22C55E"/>
+  <!-- Background: dark charcoal -->
+  <rect width="512" height="512" rx="100" fill="#09090B"/>
 
-  <!-- Logo mark (white on indigo) -->
-  <g transform="translate(96, 96) scale(5)">
-    <!-- Terminal chevron -->
-    <path
-      d="M8 16 L24 32 L8 48"
-      stroke="white"
-      stroke-width="5"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      fill="none"
-    />
-    <!-- Sound waves -->
-    <path d="M32 20 Q44 32 32 44" stroke="white" stroke-width="4" stroke-linecap="round" fill="none"/>
-    <path d="M40 14 Q56 32 40 50" stroke="white" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.8"/>
-    <path d="M48 8 Q68 32 48 56" stroke="white" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.5"/>
-  </g>
+  <!-- Bar 1 — short, low opacity -->
+  <rect x="82"  y="302" width="58" height="136" rx="14" fill="white" opacity="0.3"/>
+
+  <!-- Bar 2 — medium -->
+  <rect x="158" y="228" width="58" height="210" rx="14" fill="white" opacity="0.6"/>
+
+  <!-- Bar 3 — tall center, brand green -->
+  <rect x="234" y="138" width="58" height="300" rx="14" fill="#22C55E"/>
+
+  <!-- Bar 4 — medium -->
+  <rect x="310" y="228" width="58" height="210" rx="14" fill="white" opacity="0.6"/>
+
+  <!-- Bar 5 — short, low opacity -->
+  <rect x="386" y="302" width="58" height="136" rx="14" fill="white" opacity="0.3"/>
+
+  <!-- Cursor underline -->
+  <rect x="82" y="455" width="362" height="16" rx="8" fill="#22C55E" opacity="0.2"/>
 </svg>
