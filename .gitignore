@@ -57,3 +57,8 @@ Thumbs.db
 
 # Local config (keep defaults)
 # ~/.config/music-cli/ is user-specific
+
+# AI/dev tool configs
+.claude/
+.opencode/
+openspec/
