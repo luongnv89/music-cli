@@ -30,10 +30,24 @@ def is_youtube_available() -> bool:
         return False
 
 
+def _clean_url(url: str) -> str:
+    """Remove backslashes from URL that may be introduced during copy/paste.
+
+    Args:
+        url: The potentially corrupted URL string
+
+    Returns:
+        Cleaned URL with backslashes removed
+    """
+    return url.replace("\\", "")
+
+
 def is_youtube_url(url: str) -> bool:
     """Check if the given string is a valid YouTube URL."""
+    # Clean the URL first to remove any backslashes
+    cleaned_url = _clean_url(url)
     for pattern in YOUTUBE_URL_PATTERNS:
-        if re.match(pattern, url):
+        if re.match(pattern, cleaned_url):
             return True
     return False
 
@@ -72,6 +86,9 @@ class YouTubeSource:
         Returns:
             TrackInfo with direct audio stream URL, or None if extraction fails
         """
+        # Clean the URL first to remove any backslashes that may be introduced during copy/paste
+        url = _clean_url(url)
+
         if not is_youtube_url(url):
             logger.warning(f"Invalid YouTube URL: {url}")
             return None
