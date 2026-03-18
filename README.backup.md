@@ -5,93 +5,26 @@
 <p align="center">
   <a href="https://pypi.org/project/coder-music-cli/"><img src="https://img.shields.io/pypi/v/coder-music-cli.svg" alt="PyPI version"></a>
   <a href="https://pepy.tech/project/coder-music-cli"><img src="https://static.pepy.tech/badge/coder-music-cli" alt="PyPI Downloads"></a>
-  <a href="https://github.com/luongnv89/music-cli/stargazers"><img src="https://img.shields.io/github/stars/luongnv89/music-cli?style=social" alt="GitHub Stars"></a>
-  <a href="https://github.com/luongnv89/music-cli/network/members"><img src="https://img.shields.io/github/forks/luongnv89/music-cli?style=social" alt="GitHub Forks"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10+-blue.svg" alt="Python 3.10+"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
-</p>
-
-<h1 align="center">Your Coding Soundtrack, Without Leaving the Terminal</h1>
-
-<p align="center">
-  <strong>music-cli</strong> is a background music daemon for developers. Radio streams, local MP3s, YouTube audio, and AI-generated music — all from one command. Stay in flow, skip the browser tab.
-</p>
-
-<p align="center">
-  <a href="#get-started-in-30-seconds"><strong>Get Started in 30 Seconds →</strong></a>
 </p>
 
 <p align="center">
   <img src="music-cli-ai.gif" alt="music-cli AI demo" width="600">
 </p>
 
----
-
-## Sound Familiar?
-
-- You open Spotify or YouTube to play focus music. Twenty minutes later you're watching a video essay about fonts. Your flow state is gone.
-- You want background music while coding, but you don't want *another* app eating RAM and competing for your audio output.
-- You finally find the right playlist... and it ends. Or an ad plays. Or the stream dies. Now you're debugging your music instead of your code.
-
-Developers deserve a music player that respects the way they work: in the terminal, in the background, uninterrupted.
-
-## How music-cli Fixes This
-
-- **Zero context-switching.** Start, pause, and skip tracks without leaving your terminal. Four keystrokes, not four clicks.
-- **Always playing.** A persistent background daemon means your music survives terminal closes, SSH sessions, and IDE restarts.
-- **40+ curated radio stations.** Lo-fi, synthwave, deep house, jazz — ready out of the box. No account required.
-- **AI-generated music.** Generate unique focus tracks with MusicGen, AudioLDM, or Bark. Your music, your mood, no subscription.
-- **YouTube audio streaming.** Paste a URL, get audio. Tracks are cached automatically for offline replay.
+A command-line music player for coders. Background daemon with radio streaming, local MP3s, and AI-generated music.
 
 ```bash
 music-cli play --mood focus    # Start focus music
-music-cli pause                # Pause for a meeting
+music-cli pause                # Pause for meeting
 music-cli resume               # Back to coding
-music-cli status               # What's playing + an inspirational quote
+music-cli status               # Check what's playing + inspirational quote
 ```
 
-## How It Works
+## Installation
 
-1. **Install** — one command, no config files to write.
-   ```bash
-   curl -sSL https://raw.githubusercontent.com/luongnv89/music-cli/main/install.sh | bash
-   ```
-2. **Play** — pick a mode: radio, local files, YouTube, or AI.
-   ```bash
-   music-cli play --mood focus
-   ```
-3. **Forget about it** — the daemon runs in the background. Control it whenever you need.
-   ```bash
-   music-cli pause    # meeting time
-   music-cli resume   # back to work
-   ```
-4. **Explore** — discover 40+ stations, generate AI tracks, or stream from YouTube.
-   ```bash
-   music-cli radios                    # Browse stations
-   music-cli ai play -p "jazz piano"   # Generate a track
-   music-cli play -m youtube -s "URL"  # Stream YouTube audio
-   ```
-
-<p align="center">
-  <a href="#get-started-in-30-seconds"><strong>Start Playing Now →</strong></a>
-</p>
-
-## What You Get
-
-| Feature | Details |
-|---------|---------|
-| **Background daemon** | Music survives terminal closes and IDE restarts |
-| **40+ radio stations** | Lo-fi, synthwave, deep house, jazz, French, Spanish, Italian stations — no account needed |
-| **AI music generation** | MusicGen, AudioLDM, Bark — generate unique tracks from text prompts |
-| **YouTube audio** | Paste a URL, stream audio. Automatic offline caching (2GB LRU) |
-| **Context-aware** | Auto-selects music based on time of day and your mood |
-| **Local MP3 playback** | Shuffle your own library with `--auto` |
-| **Inspirational quotes** | Every `status` check comes with a random music quote |
-| **Cross-platform** | Linux, macOS, Windows 10+ |
-
-## Get Started in 30 Seconds
-
-### Quick Install (recommended)
+### Quick Install (one command)
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/luongnv89/music-cli/main/install.sh | bash
@@ -103,31 +36,20 @@ Or with wget:
 wget -qO- https://raw.githubusercontent.com/luongnv89/music-cli/main/install.sh | bash
 ```
 
-### Install from PyPI
+With optional extras:
 
 ```bash
-pip install coder-music-cli
+# YouTube streaming support
+EXTRAS=youtube curl -sSL https://raw.githubusercontent.com/luongnv89/music-cli/main/install.sh | bash
 
-# FFmpeg is required
-brew install ffmpeg       # macOS
-sudo apt install ffmpeg   # Ubuntu/Debian
-choco install ffmpeg      # Windows
-```
-
-### Optional Extras
-
-```bash
-# YouTube streaming support (~10MB)
-pip install 'coder-music-cli[youtube]'
-
-# AI music generation (~5GB — PyTorch + Transformers + Diffusers)
-pip install 'coder-music-cli[ai]'
+# AI music generation (~5GB, PyTorch + Transformers)
+EXTRAS=ai curl -sSL https://raw.githubusercontent.com/luongnv89/music-cli/main/install.sh | bash
 
 # Both
-pip install 'coder-music-cli[youtube,ai]'
+EXTRAS="youtube,ai" curl -sSL https://raw.githubusercontent.com/luongnv89/music-cli/main/install.sh | bash
 ```
 
-Prefer to inspect the install script first?
+Prefer to inspect first?
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/luongnv89/music-cli/main/install.sh -o install.sh
@@ -135,53 +57,68 @@ less install.sh   # review
 bash install.sh
 ```
 
-## FAQ
-
-**Is it free?**
-Yes, 100%. music-cli is MIT licensed, open source, and always will be. No accounts, no subscriptions, no ads.
-
-**Does it work on my OS?**
-Linux, macOS, and Windows 10+ are all supported. You need Python 3.10+ and FFmpeg.
-
-**How much disk space does AI music need?**
-The base install is tiny. The `[ai]` extra downloads ~5GB (PyTorch + HuggingFace models). Models download on first use, not at install time.
-
-**How does it compare to Spotify/YouTube Music?**
-music-cli is not a replacement for your music library. It's a lightweight, terminal-native player for background music while coding. No browser tabs, no electron apps, no accounts.
-
-**Is it actively maintained?**
-Yes. The latest release is v0.8.14. Check the [changelog](CHANGELOG.md) for recent updates.
-
-**Can I add my own radio stations?**
-Absolutely. Run `music-cli radios add` or edit `~/.config/music-cli/radios.txt` directly. Format: `Station Name|stream-url`.
-
-**What AI models are supported?**
-MusicGen (small/medium/large/melody), AudioLDM (small/large), and Bark (standard/small). See the [AI Playbook](docs/AI_PLAYBOOK.md) for examples and tips.
-
-## Start Coding with Music
-
-You're one command away from a focus soundtrack that never interrupts you. No signups, no ads, no browser tabs. MIT licensed, open source, and built for developers who live in the terminal.
+### Manual Install (PyPI)
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/luongnv89/music-cli/main/install.sh | bash && music-cli play --mood focus
+# Install from PyPI
+pip install coder-music-cli
+
+# Or with uv (faster)
+uv pip install coder-music-cli
+
+# Install FFmpeg (required)
+brew install ffmpeg       # macOS
+sudo apt install ffmpeg   # Ubuntu/Debian
+choco install ffmpeg      # Windows (or: winget install ffmpeg)
 ```
 
-[**Install music-cli →**](#get-started-in-30-seconds)
+### Optional: AI Music Generation
 
----
+```bash
+pip install 'coder-music-cli[ai]'  # ~5GB (PyTorch + Transformers + Diffusers)
+```
 
-## Documentation
+Supports multiple AI models via HuggingFace: MusicGen, AudioLDM, and Bark.
 
-| Document | Description |
-|----------|-------------|
-| [User Guide](docs/user-guide.md) | Complete usage instructions |
-| [AI Playbook](docs/AI_PLAYBOOK.md) | AI music generation guide with examples |
-| [Architecture](docs/architecture.md) | System design and diagrams |
-| [Development](docs/development.md) | Contributing guide |
-| [Changelog](CHANGELOG.md) | Version history and release notes |
+### Optional: YouTube Audio Streaming
 
-<details>
-<summary><strong>All Commands</strong></summary>
+```bash
+pip install 'coder-music-cli[youtube]'  # ~10MB (yt-dlp)
+```
+
+Stream audio directly from YouTube URLs with automatic offline caching:
+
+```bash
+music-cli play -m youtube -s "https://youtube.com/watch?v=..."
+music-cli play -m yt -s "https://youtu.be/..."  # Short alias
+music-cli youtube                               # List cached tracks
+music-cli youtube play 1                        # Play cached track offline
+```
+
+## Features
+- **Daemon-based** - Persistent background playback
+- **Multiple sources** - Local files, radio streams, AI generation, **YouTube audio streaming**
+- **Context-aware** - Selects music based on time of day and mood
+- **40+ Radio Stations** - Curated stations in English, French, Spanish, Italian, and Synthwave
+- **AI Music Generation** - Generate music with MusicGen, AudioLDM, or Bark models
+- **YouTube Streaming** - Extract and stream audio directly from YouTube URLs
+- **YouTube Offline Cache** - Automatically cache YouTube audio for offline playback
+- **Version-aware Updates** - Automatic notification when new stations are available
+- **Inspirational Quotes** - Random music quotes with every status check
+- **Simple config** - Human-readable text files
+
+## Quick Start
+
+```bash
+# Play
+music-cli play                    # Context-aware radio
+music-cli play --mood focus       # Focus music
+music-cli play -m local --auto    # Shuffle local library
+music-cli play -m youtube -s "https://youtube.com/watch?v=..."  # YouTube audio
+music-cli play -m yt -s "https://youtu.be/..."  # YouTube (short alias)
+```
+
+## Commands
 
 | Command | Description |
 |---------|-------------|
@@ -199,36 +136,7 @@ curl -sSL https://raw.githubusercontent.com/luongnv89/music-cli/main/install.sh 
 | `update-radios` | Update stations after version upgrade |
 | `daemon start\|stop\|status` | Daemon control |
 
-</details>
-
-<details>
-<summary><strong>Play Modes</strong></summary>
-
-```bash
-# Radio (default)
-music-cli play                     # Time-based selection
-music-cli play -s "deep house"     # By station name
-music-cli play --mood focus        # By mood
-
-# Local
-music-cli play -m local -s song.mp3
-music-cli play -m local --auto     # Shuffle
-
-# AI (requires [ai] extras)
-music-cli play -m ai --mood happy -d 60
-
-# YouTube
-music-cli play -m youtube -s "https://youtube.com/watch?v=..."
-music-cli play -m yt -s "https://youtu.be/..."
-
-# History
-music-cli play -m history -i 3     # Replay item #3
-```
-
-</details>
-
-<details>
-<summary><strong>Radio Station Management</strong></summary>
+## Radio Station Management
 
 ```bash
 # List all stations with numbers
@@ -256,10 +164,26 @@ music-cli radios remove 10
 - **Spanish**: Salsa Radio, Tropical 100, Los 40 Principales, Cadena SER
 - **Italian**: Radio Italia, RTL 102.5, Radio 105, Virgin Radio Italy
 
-</details>
+## Play Modes
 
-<details>
-<summary><strong>AI Music Generation</strong></summary>
+```bash
+# Radio (default)
+music-cli play                     # Time-based selection
+music-cli play -s "deep house"     # By station name
+music-cli play --mood focus        # By mood
+
+# Local
+music-cli play -m local -s song.mp3
+music-cli play -m local --auto     # Shuffle
+
+# AI (requires [ai] extras)
+music-cli play -m ai --mood happy -d 60
+
+# History
+music-cli play -m history -i 3     # Replay item #3
+```
+
+## AI Music Generation
 
 Generate unique audio with multiple AI models via HuggingFace:
 
@@ -306,25 +230,27 @@ music-cli ai remove 2                          # Delete track #2
 | `ai replay <num>` | Replay track by number (regenerates if file missing) |
 | `ai remove <num>` | Delete track and audio file |
 
-### AI Features
-- **Multiple models** — MusicGen, AudioLDM, and Bark model families
-- **Smart caching** — LRU cache keeps up to 2 models in memory (configurable)
-- **Download progress** — Progress bar shown during model downloads
-- **GPU memory management** — Automatic cleanup when switching models
-- **Context-aware** — Uses time of day, day of week, and session mood
-- **Custom prompts** — Generate exactly what you want with `-p`
-- **Seamless looping** — All tracks engineered for infinite playback
-- **Track management** — List, replay, and remove generated tracks
-- **Regeneration** — Missing files can be regenerated with original prompt
+### Features
+- **Multiple models** - MusicGen, AudioLDM, and Bark model families
+- **Smart caching** - LRU cache keeps up to 2 models in memory (configurable)
+- **Download progress** - Progress bar shown during model downloads
+- **GPU memory management** - Automatic cleanup when switching models
+- **Context-aware** - Uses time of day, day of week, and session mood
+- **Custom prompts** - Generate exactly what you want with `-p`
+- **Seamless looping** - All tracks engineered for infinite playback
+- **Track management** - List, replay, and remove generated tracks
+- **Regeneration** - Missing files can be regenerated with original prompt
+- **Animated feedback** - "composing..." animation while generating
+- **Persistent storage** - Tracks saved to config directory
 
-### AI Requirements
+### Requirements
 - ~5GB disk space minimum (PyTorch + Transformers + Diffusers)
 - ~8GB RAM minimum for generation (16GB recommended for larger models)
 - Models are downloaded on first use
 
-### AI Configuration
+### Configuration
 
-Configure in `~/.config/music-cli/config.toml`:
+Configure AI settings in `~/.config/music-cli/config.toml`:
 
 ```toml
 [ai]
@@ -338,17 +264,13 @@ num_inference_steps = 10  # More = better quality, slower
 guidance_scale = 2.5      # How closely to follow prompt
 ```
 
-</details>
+## YouTube Offline Cache
 
-<details>
-<summary><strong>YouTube Audio Streaming & Cache</strong></summary>
-
-Stream audio directly from YouTube URLs with automatic offline caching:
+YouTube audio is automatically cached for offline playback. When you play a YouTube URL, the audio is downloaded in the background and stored locally.
 
 ```bash
 # Play YouTube audio (automatically cached)
 music-cli play -m youtube -s "https://youtube.com/watch?v=..."
-music-cli play -m yt -s "https://youtu.be/..."  # Short alias
 
 # Manage cached tracks
 music-cli youtube                    # List all cached tracks
@@ -368,16 +290,16 @@ music-cli youtube clear              # Clear entire cache
 | `youtube remove <num>` | Remove a cached track |
 | `youtube clear` | Clear all cached tracks |
 
-### YouTube Features
-- **Automatic caching** — Audio cached in background while streaming
-- **Offline playback** — Play cached tracks without internet
-- **LRU eviction** — 2GB cache limit with automatic cleanup of oldest tracks
-- **M4A format** — 192kbps quality for good balance of size and quality
-- **Instant replay** — Cached tracks play immediately
+### Features
+- **Automatic caching** - Audio cached in background while streaming
+- **Offline playback** - Play cached tracks without internet
+- **LRU eviction** - 2GB cache limit with automatic cleanup of oldest tracks
+- **M4A format** - 192kbps quality for good balance of size and quality
+- **Instant replay** - Cached tracks play immediately
 
-### YouTube Configuration
+### Configuration
 
-Configure in `~/.config/music-cli/config.toml`:
+Configure YouTube cache in `~/.config/music-cli/config.toml`:
 
 ```toml
 [youtube.cache]
@@ -387,20 +309,15 @@ max_size_gb = 2.0       # Maximum cache size in GB
 
 ### Cache Location
 
+Cached files are stored in:
 - **Linux/macOS**: `~/.config/music-cli/youtube_cache/`
 - **Windows**: `%LOCALAPPDATA%\music-cli\youtube_cache\`
 
-</details>
-
-<details>
-<summary><strong>Moods</strong></summary>
+## Moods
 
 `focus` `happy` `sad` `excited` `relaxed` `energetic` `melancholic` `peaceful`
 
-</details>
-
-<details>
-<summary><strong>Configuration</strong></summary>
+## Configuration
 
 Configuration files location:
 - **Linux/macOS**: `~/.config/music-cli/`
@@ -441,10 +358,7 @@ ChillHop|https://streams.example.com/chillhop.mp3
 Jazz FM|https://streams.example.com/jazz.mp3
 ```
 
-</details>
-
-<details>
-<summary><strong>Status & Quotes</strong></summary>
+## Status & Quotes
 
 The `status` command shows playback info plus a random inspirational quote:
 
@@ -461,15 +375,25 @@ Version: 0.3.0
 GitHub: https://github.com/luongnv89/music-cli
 ```
 
-</details>
+## Documentation
 
----
+| Document | Description |
+|----------|-------------|
+| [User Guide](docs/user-guide.md) | Complete usage instructions |
+| [AI Playbook](docs/AI_PLAYBOOK.md) | AI music generation guide with examples |
+| [Architecture](docs/architecture.md) | System design and diagrams |
+| [Development](docs/development.md) | Contributing guide |
+| [Changelog](CHANGELOG.md) | Version history and release notes |
 
 ## Requirements
 
 - Python 3.10+
 - FFmpeg
 - **Supported Platforms**: Linux, macOS, Windows 10+
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for a detailed list of changes.
 
 ## Contributors
 
