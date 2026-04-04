@@ -73,7 +73,7 @@ sequenceDiagram
     participant Player
     participant Source
 
-    User->>CLI: music-cli play --mood focus
+    User->>CLI: mc play -M focus
     CLI->>CLI: ensure_daemon()
     CLI->>Socket: connect()
     CLI->>Socket: {"command": "play", "args": {...}}
