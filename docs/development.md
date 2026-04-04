@@ -6,7 +6,7 @@ Guide for contributing to music-cli.
 
 ### Prerequisites
 
-- Python 3.9+
+- Python 3.10+
 - FFmpeg
 - Git
 
@@ -73,7 +73,7 @@ music-cli/
 ```bash
 # Run CLI directly
 python -m music_cli --help
-music-cli play
+mc play
 
 # Run daemon in foreground (for debugging)
 python -m music_cli.daemon
@@ -288,7 +288,7 @@ def test_with_config(config):
 
 - **ci.yml**: Runs on push/PR
   - Lint (Black, Ruff, mypy, Bandit)
-  - Test (Python 3.9-3.12, macOS + Linux)
+  - Test (Python 3.10-3.12, macOS + Linux)
   - Build verification
 
 - **release.yml**: Runs on version tags

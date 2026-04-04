@@ -1,6 +1,6 @@
 # User Guide
 
-Complete guide to using music-cli for background music while coding.
+Complete guide to using music-cli (`mc`) for background music while coding.
 
 ## Quick Start
 
@@ -9,18 +9,18 @@ Complete guide to using music-cli for background music while coding.
 pip install coder-music-cli
 
 # Play context-aware radio (based on time of day)
-music-cli play
+mc play
 
 # Control playback
-music-cli pause
-music-cli resume
-music-cli stop
+mc pause
+mc resume
+mc stop
 ```
 
 ## Installation
 
 ### Requirements
-- Python 3.9+
+- Python 3.10+
 - FFmpeg
 - **Supported Platforms**: Linux, macOS, Windows 10+
 
@@ -74,97 +74,150 @@ pip install 'coder-music-cli[ai]'
 
 | Command | Description |
 |---------|-------------|
-| `music-cli play` | Start playing (context-aware) |
-| `music-cli stop` | Stop playback |
-| `music-cli pause` | Pause playback |
-| `music-cli resume` | Resume playback |
-| `music-cli next` | Skip to next (auto-play mode) |
-| `music-cli status` | Show current status |
-| `music-cli volume [0-100]` | Get/set volume |
+| `mc play` | Start playing (context-aware) |
+| `mc stop` | Stop playback |
+| `mc pause` | Pause playback |
+| `mc resume` | Resume playback |
+| `mc next` | Skip to next track (auto-play mode) |
+| `mc status` | Show current status + inspirational quote |
+| `mc vol` | Show current volume |
+| `mc vol <0-100>` | Set volume |
 
-### Information
+### Radio Stations
 
 | Command | Description |
 |---------|-------------|
-| `music-cli radios` | List radio stations |
-| `music-cli history` | Show playback history |
-| `music-cli moods` | List available moods |
-| `music-cli config` | Show config file paths |
+| `mc radio` | List all radio stations |
+| `mc radio list` | List all radio stations |
+| `mc radio play <num>` | Play station by number |
+| `mc radio add` | Add a new station interactively |
+| `mc radio remove <num>` | Remove a station by number |
+| `mc radio update` | Update stations after version upgrade |
+
+### AI Music
+
+| Command | Description |
+|---------|-------------|
+| `mc ai` | List all AI-generated tracks |
+| `mc ai list` | List all AI-generated tracks |
+| `mc ai play` | Generate and play AI music |
+| `mc ai play -p "prompt"` | Generate with custom prompt |
+| `mc ai replay <num>` | Replay a track by number |
+| `mc ai remove <num>` | Remove a track |
+| `mc ai model` | List available AI models |
+
+### YouTube Cache
+
+| Command | Description |
+|---------|-------------|
+| `mc yt` | List cached YouTube tracks |
+| `mc yt list` | List cached YouTube tracks |
+| `mc yt play <num>` | Play cached track by number (offline) |
+| `mc yt remove <num>` | Remove a cached track |
+| `mc yt clear` | Clear entire YouTube cache |
+
+### History
+
+| Command | Description |
+|---------|-------------|
+| `mc history` | Show recent playback history |
+| `mc history list` | Show recent playback history |
+| `mc history list -n 5` | Show last 5 entries |
+| `mc history play <num>` | Replay an item by number |
+
+### Moods
+
+| Command | Description |
+|---------|-------------|
+| `mc mood` | List available moods |
+| `mc mood <name>` | Start mood-based radio |
 
 ### Daemon Control
 
 | Command | Description |
 |---------|-------------|
-| `music-cli daemon status` | Check daemon status |
-| `music-cli daemon start` | Start daemon |
-| `music-cli daemon stop` | Stop daemon |
-| `music-cli daemon restart` | Restart daemon |
+| `mc daemon status` | Check daemon status |
+| `mc daemon start` | Start daemon |
+| `mc daemon stop` | Stop daemon |
+| `mc daemon restart` | Restart daemon |
+
+### Other
+
+| Command | Description |
+|---------|-------------|
+| `mc config` | Show config file locations |
+| `mc --version` | Show installed version |
 
 ## Playback Modes
 
-### Radio Mode (Default)
+### Smart Play (auto-detection)
 
-Stream from configured radio stations:
+`mc play` auto-detects the source type from the argument:
 
 ```bash
-# Context-aware (time-based)
-music-cli play
+mc play                              # Context-aware radio (time of day)
+mc play ~/song.mp3                   # Auto-detect: local file
+mc play "https://youtube.com/..."    # Auto-detect: YouTube URL
+mc play "https://some-stream.mp3"   # Auto-detect: radio stream URL
+mc play "deep house"                 # Auto-detect: station name
+```
 
-# Specific station by name
-music-cli play -s "ChillHop"
-music-cli play -s "deep house"
+### Mood-Based
 
-# With mood
-music-cli play --mood focus
+```bash
+mc play -M focus        # Radio matching the focus mood
+mc mood focus           # Same — shortcut for mood radio
 ```
 
 ### Local Mode
 
-Play local MP3 files:
-
 ```bash
 # Specific file
-music-cli play -m local -s ~/Music/song.mp3
+mc play ~/Music/song.mp3
 
-# Random from library
-music-cli play -m local
-
-# Shuffle mode (continuous)
-music-cli play -m local --auto
+# Shuffle with auto-play
+mc play -m local --auto
 ```
 
 ### AI Mode
 
-Generate audio with AI models (requires `[ai]` extras):
-
 ```bash
 # Context-aware generation (default: musicgen-small)
-music-cli play -m ai
+mc ai play
 
 # With mood
-music-cli play -m ai --mood happy
+mc ai play -M focus
 
-# Custom duration (seconds)
-music-cli play -m ai --mood focus -d 60
+# Custom prompt and duration
+mc ai play -p "upbeat jazz piano" -d 60
 ```
 
 For the full AI command suite, see [AI Music Generation](#ai-music-generation) or the comprehensive [AI Playbook](AI_PLAYBOOK.md).
 
-### History Mode
+### YouTube Streaming
 
-Replay from history:
+```bash
+# Stream and auto-cache
+mc play "https://youtube.com/watch?v=xxx"
+
+# Play from cache (offline)
+mc yt play 3
+```
+
+### History Mode
 
 ```bash
 # View history
-music-cli history
+mc history
 
-# Replay by index
-music-cli play -m history -i 3
+# Replay by number
+mc history play 3
+
+# Also: replay via play command
+mc play -m history -i 3
 ```
 
 ## Moods
-
-Use moods for context-aware music selection:
 
 | Mood | Description |
 |------|-------------|
@@ -178,8 +231,9 @@ Use moods for context-aware music selection:
 | `peaceful` | Serene, calm |
 
 ```bash
-music-cli play --mood focus
-music-cli play -m ai --mood energetic
+mc mood focus
+mc play -M focus
+mc ai play -M energetic
 ```
 
 ## Configuration
@@ -188,6 +242,12 @@ All config files are stored in a platform-specific directory:
 
 - **Linux/macOS**: `~/.config/music-cli/`
 - **Windows**: `%LOCALAPPDATA%\music-cli\`
+
+Show paths:
+
+```bash
+mc config
+```
 
 ### config.toml
 
@@ -224,6 +284,10 @@ max_models = 2  # Max models to keep in memory (LRU eviction)
 [ai.models.audioldm-s-full-v2.extra_params]
 num_inference_steps = 10
 guidance_scale = 2.5
+
+[youtube.cache]
+enabled = true
+max_size_gb = 2.0
 ```
 
 ### radios.txt
@@ -240,47 +304,36 @@ Top Hits|https://streams.ilovemusic.de/iloveradio1.mp3
 https://some-stream.example.com/stream.mp3
 ```
 
-### history.jsonl
+### Files Summary
 
-Playback history (JSON lines):
-
-```json
-{"timestamp":"2024-01-15T09:30:00","source":"https://...","source_type":"radio","title":"Focus Radio","mood":"focus","context":"morning"}
-{"timestamp":"2024-01-15T14:00:00","source":"/path/to/song.mp3","source_type":"local","title":"song","context":"afternoon"}
-```
+| File | Purpose |
+|------|---------|
+| `config.toml` | Settings (volume, mood mappings, version) |
+| `radios.txt` | Station URLs (`name\|url` format) |
+| `history.jsonl` | Playback history |
+| `ai_tracks.json` | AI track metadata (prompts, durations) |
+| `ai_music/` | AI-generated audio files |
+| `youtube_cache.json` | YouTube cache metadata |
+| `youtube_cache/` | Cached YouTube audio files |
 
 ## Workflows
 
 ### Focus Session
 
 ```bash
-# Start focus music
-music-cli play --mood focus
-
-# Check what's playing
-music-cli status
-
-# Pause for meeting
-music-cli pause
-
-# Resume after
-music-cli resume
-
-# End session
-music-cli stop
+mc play -M focus    # Start focus radio
+mc status           # What's playing
+mc pause            # Pause for a meeting
+mc resume           # Back to work
+mc stop             # End session
 ```
 
 ### Background Shuffle
 
 ```bash
-# Start shuffling local library
-music-cli play -m local --auto
-
-# Skip boring track
-music-cli next
-
-# Check history
-music-cli history
+mc play -m local --auto   # Shuffle local library
+mc next                    # Skip a track
+mc history                 # Review what played
 ```
 
 ### AI Music Generation
@@ -289,49 +342,53 @@ music-cli history
 # Install AI dependencies (~5GB: PyTorch + Transformers + Diffusers)
 pip install 'coder-music-cli[ai]'
 
-# List available models
-music-cli ai models
-
-# Generate with default model (musicgen-small)
-music-cli ai play --mood focus -d 30
-
-# Generate with specific model
-music-cli ai play -m audioldm-s-full-v2 -p "forest ambience with birds"
-music-cli ai play -m bark-small -p "Hello, welcome to the coding session"
-
-# Manage generated tracks
-music-cli ai list       # List all tracks
-music-cli ai replay 1   # Replay track #1
-music-cli ai remove 2   # Delete track #2
-
-# First run downloads model (size varies by model)
+# Generate and manage AI music
+mc ai play                              # Context-aware (default: musicgen-small)
+mc ai play -p "jazz piano"              # Custom prompt
+mc ai play -m audioldm-s-full-v2        # Use AudioLDM model
+mc ai play -m bark-small -p "Hello!"    # Use Bark for speech
+mc ai play -M focus -d 30              # 30-second focus track
+mc ai model                             # List available models
+mc ai list                              # List all generated tracks
+mc ai replay 1                          # Replay track #1
+mc ai remove 2                          # Delete track #2
 ```
 
-For detailed examples, prompt writing tips, and use case recipes, see the [AI Playbook](AI_PLAYBOOK.md).
+### Available AI Models
 
-#### Available AI Models
+| Model ID | Type | Best For | Size |
+|----------|------|----------|------|
+| `musicgen-small` | MusicGen | Music generation (default) | ~1.5GB |
+| `musicgen-medium` | MusicGen | Higher quality music | ~3GB |
+| `musicgen-large` | MusicGen | Best quality music | ~6GB |
+| `musicgen-melody` | MusicGen | Melody-conditioned music | ~3GB |
+| `audioldm-s-full-v2` | AudioLDM | Sound effects, ambient audio | ~1GB |
+| `audioldm-l-full` | AudioLDM | High-quality audio generation | ~2GB |
+| `bark` | Bark | Speech synthesis, audio with voice | ~5GB |
+| `bark-small` | Bark | Faster speech synthesis | ~1.5GB |
 
-| Model ID | Type | Best For |
-|----------|------|----------|
-| `musicgen-small` | MusicGen | Music generation (default) |
-| `musicgen-medium` | MusicGen | Higher quality music |
-| `musicgen-large` | MusicGen | Best quality music |
-| `musicgen-melody` | MusicGen | Melody-conditioned music |
-| `audioldm-s-full-v2` | AudioLDM | Sound effects, ambient audio |
-| `audioldm-l-full` | AudioLDM | High-quality audio generation |
-| `bark` | Bark | Speech synthesis, audio with voice |
-| `bark-small` | Bark | Faster speech synthesis |
+For detailed prompt writing tips and recipes, see the [AI Playbook](AI_PLAYBOOK.md).
+
+### Version Updates
+
+When you update music-cli, you'll be notified if new radio stations are available:
+
+```bash
+mc radio update
+
+# Options:
+# [M] Merge     - Add new stations to your list (recommended)
+# [O] Overwrite - Replace with new defaults (backs up old file)
+# [K] Keep      - Keep your current stations unchanged
+```
 
 ## Troubleshooting
 
 ### Daemon Issues
 
 ```bash
-# Check if running
-music-cli daemon status
-
-# Restart if stuck
-music-cli daemon restart
+mc daemon status    # Check if running
+mc daemon restart   # Restart if stuck
 
 # Manual cleanup (Linux/macOS)
 rm ~/.config/music-cli/music-cli.sock
@@ -343,17 +400,15 @@ Remove-Item "$env:LOCALAPPDATA\music-cli\music-cli.pid"
 
 ### No Sound
 
-1. Check FFmpeg:
-   - Linux/macOS: `which ffplay`
-   - Windows: `where ffplay`
+1. Check FFmpeg is installed: `which ffplay` (Linux/macOS) or `where ffplay` (Windows)
 2. Test manually: `ffplay -nodisp -autoexit /path/to/file.mp3`
-3. Check volume: `music-cli volume`
+3. Check volume: `mc vol`
 
 ### Radio Not Playing
 
 1. Check URL accessibility: `curl -I <stream-url>`
-2. Try different station: `music-cli radios`
-3. Check network connection
+2. Try a different station: `mc radio`
+3. Check your network connection
 
 ### AI Mode Not Working
 
@@ -365,22 +420,18 @@ python -c "import transformers; import torch; print('AI ready!')"
 pip install 'coder-music-cli[ai]'
 
 # Check available models
-music-cli ai models
-
-# First run downloads model (size varies by model)
-# musicgen-small: ~1.5GB
-# audioldm-s-full-v2: ~1GB
-# bark-small: ~1.5GB
+mc ai model
 ```
 
-**Memory Issues:**
+**Memory requirements:**
 - Minimum 8GB RAM for smaller models
-- 16GB recommended for larger models (musicgen-large, bark)
-- LRU cache limits memory usage (default: 2 models in memory)
+- 16GB recommended for larger models (`musicgen-large`, `bark`)
+- LRU cache limits in-memory usage (default: 2 models)
 
 ## Tips
 
-- **Autostart**: Add `music-cli daemon start` to shell profile
-- **Aliases**: `alias mplay='music-cli play'`
-- **Focus**: Use `--mood focus` for coding sessions
+- **Autostart**: Add `mc daemon start` to your shell profile
+- **Aliases**: `alias mplay='mc play'`
+- **Focus**: `mc play -M focus` is the fastest way into a coding session
 - **History grep**: `grep focus ~/.config/music-cli/history.jsonl`
+- **Suppress color**: `mc --no-color status` or set `NO_COLOR=1`
