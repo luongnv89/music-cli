@@ -42,6 +42,44 @@ def get_random_quote() -> str:
     return random.choice(INSPIRATIONAL_QUOTES)  # noqa: S311
 
 
+# ---------------------------------------------------------------------------
+# Task 3.2: NO_COLOR / --no-color support
+# ---------------------------------------------------------------------------
+
+# Mapping from unicode symbol to plain-text fallback
+_ICON_FALLBACKS: dict[str, str] = {
+    "\u25b6": "[playing]",    # ▶
+    "\u23f8": "[paused]",     # ⏸
+    "\u23f9": "[stopped]",    # ⏹
+    "\u23ed": "[skip]",       # ⏭
+    "\u274c": "[error]",      # ❌
+    "\u23f3": "[loading]",    # ⏳
+    "\u26a0": "[warning]",    # ⚠
+}
+
+
+def _is_no_color() -> bool:
+    """Return True when colour/emoji output should be suppressed."""
+    try:
+        ctx = click.get_current_context()
+        return ctx.obj.get("no_color", False)
+    except RuntimeError:
+        # No active Click context — fall back to env var
+        return os.environ.get("NO_COLOR", "") != ""
+
+
+def icon(symbol: str, text_fallback: str | None = None) -> str:
+    """Return *symbol* normally, or a plain-text fallback when NO_COLOR is active.
+
+    If *text_fallback* is not provided, _ICON_FALLBACKS is consulted.
+    """
+    if not _is_no_color():
+        return symbol
+    if text_fallback is not None:
+        return text_fallback
+    return _ICON_FALLBACKS.get(symbol, symbol)
+
+
 # Track if we've already checked for updates this session
 _update_checked = False
 
@@ -181,15 +219,24 @@ def _register_alias(group: AliasedGroup, alias: str, target: str) -> None:
     group.add_alias(alias, target)
 
 
-@click.group(cls=AliasedGroup, invoke_without_command=True)
+@click.group(
+    cls=AliasedGroup,
+    invoke_without_command=True,
+    context_settings=dict(help_option_names=["-h", "--help"]),
+)
 @click.version_option(__version__)
+@click.option("--no-color", is_flag=True, default=False, help="Disable emoji/unicode symbols in output")
 @click.pass_context
-def main(ctx):
+def main(ctx, no_color):
     """mc: A command-line music player for coders.
 
     Play local MP3s, stream radio, or generate AI music based on your mood
     and the time of day.
     """
+    # Task 3.2: NO_COLOR support (https://no-color.org/)
+    ctx.ensure_object(dict)
+    ctx.obj["no_color"] = no_color or os.environ.get("NO_COLOR", "") != ""
+
     # Check for updates on any command
     if ctx.invoked_subcommand is not None:
         _check_for_updates_once()
@@ -295,14 +342,14 @@ def play(source, mode, source_flag, mood, auto, duration, index):
     # Task 2.2: Deprecate play -m ai
     if mode == "ai":
         click.echo(
-            "\u26a0 Deprecated: use 'mc ai play' instead. This will be removed in v1.0.",
+            f"{icon(chr(0x26a0))} Deprecated: use 'mc ai play' instead. This will be removed in v1.0.",
             err=True,
         )
 
     # Task 2.3: Deprecate play -m history
     if mode == "history":
         click.echo(
-            "\u26a0 Deprecated: use 'mc history play N' instead. This will be removed in v1.0.",
+            f"{icon(chr(0x26a0))} Deprecated: use 'mc history play N' instead. This will be removed in v1.0.",
             err=True,
         )
 
@@ -342,7 +389,7 @@ def play(source, mode, source_flag, mood, auto, duration, index):
         title = track.get("title", track.get("source", "Unknown"))
         source_type = track.get("source_type", "unknown")
 
-        click.echo(f"\u25b6 Playing: {title} [{source_type}]")
+        click.echo(f"{icon(chr(0x25b6))} Playing: {title} [{source_type}]")
         if auto:
             click.echo("  Auto-play enabled (shuffle mode)")
 
@@ -363,7 +410,7 @@ def stop():
         if "error" in response:
             click.echo(f"Error: {response['error']}", err=True)
         else:
-            click.echo("⏹ Stopped")
+            click.echo(f"{icon(chr(0x23f9))} Stopped")
     except ConnectionError as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
@@ -379,7 +426,7 @@ def pause():
         if "error" in response:
             click.echo(f"Error: {response['error']}", err=True)
         else:
-            click.echo("⏸ Paused")
+            click.echo(f"{icon(chr(0x23f8))} Paused")
     except ConnectionError as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
@@ -395,7 +442,7 @@ def resume():
         if "error" in response:
             click.echo(f"Error: {response['error']}", err=True)
         else:
-            click.echo("▶ Resumed")
+            click.echo(f"{icon(chr(0x25b6), '[resumed]')} Resumed")
     except ConnectionError as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
@@ -415,11 +462,11 @@ def status():
 
         state = response.get("state", "unknown")
         state_icons = {
-            "playing": "▶",
-            "paused": "⏸",
-            "stopped": "⏹",
-            "loading": "⏳",
-            "error": "❌",
+            "playing": icon("\u25b6"),
+            "paused": icon("\u23f8"),
+            "stopped": icon("\u23f9"),
+            "loading": icon("\u23f3"),
+            "error": icon("\u274c"),
         }
 
         click.echo(f"Status: {state_icons.get(state, '?')} {state}")
@@ -464,7 +511,7 @@ def next_track():
         if "error" in response:
             click.echo(f"Error: {response['error']}", err=True)
         else:
-            click.echo("⏭ Skipped to next track")
+            click.echo(f"{icon(chr(0x23ed))} Skipped to next track")
     except ConnectionError as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
@@ -594,7 +641,7 @@ def radios_play(number):
             click.echo(f"Error: {response['error']}", err=True)
             sys.exit(1)
 
-        click.echo(f"▶ Playing: {name}")
+        click.echo(f"{icon(chr(0x25b6))} Playing: {name}")
 
     except ConnectionError as e:
         click.echo(f"Error: {e}", err=True)
@@ -728,7 +775,7 @@ def history_play(number):
 
         track = response.get("track", {})
         title = track.get("title", track.get("source", "Unknown"))
-        click.echo(f"\u25b6 Replaying: {title}")
+        click.echo(f"{icon(chr(0x25b6))} Replaying: {title}")
 
     except ConnectionError as e:
         click.echo(f"Error: {e}", err=True)
@@ -848,7 +895,7 @@ def list_moods(mood_name):
                 sys.exit(1)
             track = response.get("track", {})
             title = track.get("title", track.get("source", "Unknown"))
-            click.echo(f"\u25b6 Playing mood '{mood_name}': {title}")
+            click.echo(f"{icon(chr(0x25b6))} Playing mood '{mood_name}': {title}")
         except ConnectionError as e:
             click.echo(f"Error: {e}", err=True)
             sys.exit(1)
@@ -1396,7 +1443,7 @@ def youtube_play(number):
 
         track = response.get("track", {})
         title = track.get("title", "Unknown")
-        click.echo(f"▶ Playing: {title}")
+        click.echo(f"{icon(chr(0x25b6))} Playing: {title}")
 
     except ConnectionError as e:
         click.echo(f"Error: {e}", err=True)

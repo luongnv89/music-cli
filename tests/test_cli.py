@@ -1,4 +1,4 @@
-"""Tests for CLI v2 Phase 1 & Phase 2."""
+"""Tests for CLI v2 Phase 1, Phase 2 & Phase 3."""
 
 import os
 from unittest.mock import MagicMock, patch
@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from click.testing import CliRunner
 
-from music_cli.cli import main, _detect_play_mode
+from music_cli.cli import main, _detect_play_mode, icon, _is_no_color
 
 
 @pytest.fixture
@@ -681,3 +681,224 @@ class TestPhase2Integration:
         assert result.exit_code == 0
         call_kwargs = mock_daemon_client.play.call_args
         assert call_kwargs[1]["mode"] == "radio" or call_kwargs.kwargs["mode"] == "radio"
+
+
+# =========================================================================
+# Phase 3 Tests
+# =========================================================================
+
+
+# -------------------------------------------------------------------------
+# 3.1 — -h as help shortcut
+# -------------------------------------------------------------------------
+
+
+class TestHelpShortcut:
+    """-h shows help at every command level (same as --help)."""
+
+    def test_main_dash_h(self, runner):
+        result = runner.invoke(main, ["-h"])
+        assert result.exit_code == 0
+        assert "mc:" in result.output or "music player" in result.output.lower()
+
+    def test_main_dash_h_matches_dash_dash_help(self, runner):
+        h_result = runner.invoke(main, ["-h"])
+        help_result = runner.invoke(main, ["--help"])
+        assert h_result.output == help_result.output
+
+    @pytest.mark.parametrize(
+        "cmd_args",
+        [
+            ["play", "-h"],
+            ["stop", "-h"],
+            ["pause", "-h"],
+            ["resume", "-h"],
+            ["next", "-h"],
+            ["status", "-h"],
+            ["radio", "-h"],
+            ["yt", "-h"],
+            ["ai", "-h"],
+            ["history", "-h"],
+            ["mood", "-h"],
+            ["vol", "-h"],
+            ["config", "-h"],
+            ["daemon", "-h"],
+        ],
+    )
+    def test_subcommand_dash_h(self, runner, cmd_args):
+        result = runner.invoke(main, cmd_args)
+        assert result.exit_code == 0, f"Failed for {cmd_args}: {result.output}"
+        assert "Usage:" in result.output or "usage:" in result.output.lower()
+
+    @pytest.mark.parametrize(
+        "cmd_args",
+        [
+            ["play"],
+            ["radio"],
+            ["yt"],
+            ["ai"],
+            ["history"],
+            ["mood"],
+            ["vol"],
+        ],
+    )
+    def test_dash_h_matches_dash_dash_help_for_subcommands(self, runner, cmd_args):
+        h_result = runner.invoke(main, cmd_args + ["-h"])
+        help_result = runner.invoke(main, cmd_args + ["--help"])
+        assert h_result.output == help_result.output
+
+    def test_nested_subcommand_dash_h(self, runner):
+        """Nested subcommands also accept -h."""
+        for cmd_args in [
+            ["radio", "play", "-h"],
+            ["ai", "play", "-h"],
+            ["ai", "model", "-h"],
+            ["history", "list", "-h"],
+            ["history", "play", "-h"],
+        ]:
+            result = runner.invoke(main, cmd_args)
+            assert result.exit_code == 0, f"Failed for {cmd_args}: {result.output}"
+
+
+# -------------------------------------------------------------------------
+# 3.2 — NO_COLOR / --no-color support
+# -------------------------------------------------------------------------
+
+
+class TestNoColorFlag:
+    """--no-color flag and NO_COLOR env var suppress emoji."""
+
+    @patch("music_cli.cli.ensure_daemon")
+    def test_no_color_flag_status_no_emoji(self, mock_daemon, runner, mock_daemon_client):
+        mock_daemon.return_value = mock_daemon_client
+        result = runner.invoke(main, ["--no-color", "status"])
+        assert result.exit_code == 0
+        # Should not contain unicode emoji
+        assert "\u25b6" not in result.output  # ▶
+        assert "\u23f8" not in result.output  # ⏸
+        assert "\u23f9" not in result.output  # ⏹
+        assert "\u23f3" not in result.output  # ⏳
+        assert "\u274c" not in result.output  # ❌
+        # Should contain text fallback
+        assert "[playing]" in result.output
+
+    @patch("music_cli.cli.ensure_daemon")
+    def test_no_color_env_status_no_emoji(self, mock_daemon, runner, mock_daemon_client):
+        mock_daemon.return_value = mock_daemon_client
+        result = runner.invoke(main, ["status"], env={"NO_COLOR": "1"})
+        assert result.exit_code == 0
+        assert "\u25b6" not in result.output
+        assert "[playing]" in result.output
+
+    @patch("music_cli.cli.ensure_daemon")
+    def test_no_color_env_empty_string_means_color(self, mock_daemon, runner, mock_daemon_client):
+        """NO_COLOR='' (empty) should NOT disable color."""
+        mock_daemon.return_value = mock_daemon_client
+        result = runner.invoke(main, ["status"], env={"NO_COLOR": ""})
+        assert result.exit_code == 0
+        # With color enabled, should have unicode symbol
+        assert "\u25b6" in result.output
+
+    @patch("music_cli.cli.ensure_daemon")
+    def test_color_by_default_status_has_emoji(self, mock_daemon, runner, mock_daemon_client):
+        mock_daemon.return_value = mock_daemon_client
+        # Ensure NO_COLOR is not set
+        env = os.environ.copy()
+        env.pop("NO_COLOR", None)
+        result = runner.invoke(main, ["status"], env=env)
+        assert result.exit_code == 0
+        assert "\u25b6" in result.output
+
+    @patch("music_cli.cli.ensure_daemon")
+    def test_no_color_stop_text_fallback(self, mock_daemon, runner, mock_daemon_client):
+        mock_daemon_client.stop.return_value = {"status": "stopped"}
+        mock_daemon.return_value = mock_daemon_client
+        result = runner.invoke(main, ["--no-color", "stop"])
+        assert result.exit_code == 0
+        assert "\u23f9" not in result.output
+        assert "[stopped]" in result.output
+
+    @patch("music_cli.cli.ensure_daemon")
+    def test_no_color_pause_text_fallback(self, mock_daemon, runner, mock_daemon_client):
+        mock_daemon_client.pause.return_value = {"status": "paused"}
+        mock_daemon.return_value = mock_daemon_client
+        result = runner.invoke(main, ["--no-color", "pause"])
+        assert result.exit_code == 0
+        assert "\u23f8" not in result.output
+        assert "[paused]" in result.output
+
+    @patch("music_cli.cli.ensure_daemon")
+    def test_no_color_resume_text_fallback(self, mock_daemon, runner, mock_daemon_client):
+        mock_daemon_client.resume.return_value = {"status": "resumed"}
+        mock_daemon.return_value = mock_daemon_client
+        result = runner.invoke(main, ["--no-color", "resume"])
+        assert result.exit_code == 0
+        assert "\u25b6" not in result.output
+        assert "[resumed]" in result.output
+
+    @patch("music_cli.cli.ensure_daemon")
+    def test_no_color_next_text_fallback(self, mock_daemon, runner, mock_daemon_client):
+        mock_daemon_client.next_track.return_value = {"status": "next"}
+        mock_daemon.return_value = mock_daemon_client
+        result = runner.invoke(main, ["--no-color", "next"])
+        assert result.exit_code == 0
+        assert "\u23ed" not in result.output
+        assert "[skip]" in result.output
+
+    @patch("music_cli.cli.ensure_daemon")
+    @patch("music_cli.cli.check_ffplay_available", return_value=True)
+    def test_no_color_play_text_fallback(self, mock_ffplay, mock_daemon, runner, mock_daemon_client):
+        mock_daemon.return_value = mock_daemon_client
+        result = runner.invoke(main, ["--no-color", "play"])
+        assert result.exit_code == 0
+        assert "\u25b6" not in result.output
+        assert "[playing]" in result.output
+
+
+class TestIconHelper:
+    """Unit tests for the icon() helper function."""
+
+    def test_icon_returns_symbol_when_color_enabled(self, runner):
+        """Without NO_COLOR, icon returns the symbol."""
+        env = os.environ.copy()
+        env.pop("NO_COLOR", None)
+        result = runner.invoke(main, ["--help"])  # Just establish a context
+        # Test icon outside click context using env var
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("NO_COLOR", None)
+            # icon() falls back to env var check when no click context
+            assert icon("\u25b6") == "\u25b6"
+
+    def test_icon_returns_fallback_when_no_color(self, runner):
+        """With NO_COLOR env, icon returns text fallback."""
+        with patch.dict(os.environ, {"NO_COLOR": "1"}):
+            assert icon("\u25b6") == "[playing]"
+            assert icon("\u23f9") == "[stopped]"
+            assert icon("\u23f8") == "[paused]"
+            assert icon("\u23ed") == "[skip]"
+            assert icon("\u274c") == "[error]"
+            assert icon("\u23f3") == "[loading]"
+
+    def test_icon_custom_fallback(self, runner):
+        """Custom text_fallback overrides the default mapping."""
+        with patch.dict(os.environ, {"NO_COLOR": "1"}):
+            assert icon("\u25b6", "[resumed]") == "[resumed]"
+
+    def test_icon_unknown_symbol_passthrough(self, runner):
+        """Unknown symbols pass through as-is."""
+        with patch.dict(os.environ, {"NO_COLOR": "1"}):
+            assert icon("X") == "X"
+
+
+# -------------------------------------------------------------------------
+# 3.3 — --no-color appears in --help
+# -------------------------------------------------------------------------
+
+
+class TestNoColorInHelp:
+    """Verify --no-color is documented in --help."""
+
+    def test_no_color_in_main_help(self, runner):
+        result = runner.invoke(main, ["--help"])
+        assert result.exit_code == 0
+        assert "--no-color" in result.output
