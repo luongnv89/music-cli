@@ -150,7 +150,38 @@ def start_daemon_background() -> None:
         )
 
 
-@click.group(invoke_without_command=True)
+class AliasedGroup(click.Group):
+    """Click group that supports hidden command aliases.
+
+    Aliases are registered as a mapping from alias name to real command name.
+    They are hidden from --help output but fully functional.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._aliases: dict[str, str] = {}
+
+    def add_alias(self, alias: str, target: str) -> None:
+        """Register *alias* as a hidden forwarding name for *target*."""
+        self._aliases[alias] = target
+
+    def get_command(self, ctx, cmd_name):
+        """Resolve aliases before normal lookup."""
+        # Check if the cmd_name is an alias
+        real_name = self._aliases.get(cmd_name, cmd_name)
+        return super().get_command(ctx, real_name)
+
+    def format_usage(self, ctx, formatter):
+        """Standard usage — aliases stay hidden."""
+        super().format_usage(ctx, formatter)
+
+
+def _register_alias(group: AliasedGroup, alias: str, target: str) -> None:
+    """Register a hidden alias on an AliasedGroup."""
+    group.add_alias(alias, target)
+
+
+@click.group(cls=AliasedGroup, invoke_without_command=True)
 @click.version_option(__version__)
 @click.pass_context
 def main(ctx):
@@ -162,6 +193,9 @@ def main(ctx):
     # Check for updates on any command
     if ctx.invoked_subcommand is not None:
         _check_for_updates_once()
+    elif ctx.invoked_subcommand is None:
+        # Bare invocation: show status
+        ctx.invoke(status)
 
 
 @main.command()
@@ -175,6 +209,7 @@ def main(ctx):
 @click.option("--source", "-s", help="Source file/URL/station name")
 @click.option(
     "--mood",
+    "-M",
     type=click.Choice(
         ["happy", "sad", "excited", "focus", "relaxed", "energetic", "melancholic", "peaceful"]
     ),
@@ -192,6 +227,7 @@ def play(mode, source, mood, auto, duration, index):
       music-cli play -m local -s song.mp3  # Play local file
       music-cli play -m radio -s "chill"   # Play radio station by name
       music-cli play --mood focus       # Play focus music
+      music-cli play -M focus           # Play focus music (short flag)
       music-cli play -m ai --mood happy # Generate happy AI music
       music-cli play -m history -i 3    # Replay 3rd item from history
       music-cli play -m local --auto    # Shuffle local library
@@ -366,15 +402,16 @@ def next_track():
         sys.exit(1)
 
 
-@main.command()
+@main.command("vol")
 @click.argument("level", type=int, required=False)
 def volume(level):
     """Get or set volume (0-100).
 
     \b
     Examples:
-      music-cli volume      # Show current volume
-      music-cli volume 50   # Set volume to 50%
+      mc vol            # Show current volume
+      mc vol 50         # Set volume to 50%
+      music-cli volume  # Old name still works
     """
     client = ensure_daemon()
 
@@ -390,7 +427,7 @@ def volume(level):
         sys.exit(1)
 
 
-@main.group("radios", invoke_without_command=True)
+@main.group("radio", cls=AliasedGroup, invoke_without_command=True)
 @click.pass_context
 def radios_group(ctx):
     """Manage radio stations.
@@ -404,11 +441,11 @@ def radios_group(ctx):
 
     \b
     Examples:
-      music-cli radios              # List all stations
-      music-cli radios list         # List all stations
-      music-cli radios play 5       # Play station #5
-      music-cli radios add          # Add new station interactively
-      music-cli radios remove 3     # Remove station #3
+      mc radio              # List all stations
+      mc radio list         # List all stations
+      mc radio play 5       # Play station #5
+      mc radio add          # Add new station interactively
+      mc radio remove 3     # Remove station #3
     """
     if ctx.invoked_subcommand is None:
         # Default action: list radios
@@ -679,7 +716,7 @@ def show_config():
     click.echo(f"  PID:           {config.pid_file}")
 
 
-@main.command("moods")
+@main.command("mood")
 def list_moods():
     """List available mood tags."""
     from .context.mood import MoodContext
@@ -687,10 +724,10 @@ def list_moods():
     click.echo("Available moods:")
     for mood in MoodContext.get_all_moods():
         click.echo(f"  - {mood}")
-    click.echo("\nUse with: music-cli play --mood <mood>")
+    click.echo("\nUse with: mc play --mood <mood>")
 
 
-@main.group("ai", invoke_without_command=True)
+@main.group("ai", cls=AliasedGroup, invoke_without_command=True)
 @click.pass_context
 def ai_group(ctx):
     """Manage AI-generated music tracks.
@@ -754,6 +791,7 @@ def ai_list():
 @click.option("-p", "--prompt", help="Custom prompt for AI music generation")
 @click.option(
     "--mood",
+    "-M",
     type=click.Choice(
         ["happy", "sad", "excited", "focus", "relaxed", "energetic", "melancholic", "peaceful"]
     ),
@@ -1143,31 +1181,31 @@ def ai_remove(index):
         sys.exit(1)
 
 
-@main.group("youtube", invoke_without_command=True)
+@main.group("yt", cls=AliasedGroup, invoke_without_command=True)
 @click.pass_context
 def youtube_group(ctx):
     """Manage cached YouTube audio for offline playback.
 
-    \\b
+    \b
     Commands:
-      cached        - Show all cached YouTube tracks (default)
+      list          - Show all cached YouTube tracks (default)
       play <number> - Play a cached track by number (offline)
       remove <num>  - Remove a cached track
       clear         - Clear all cached tracks
 
-    \\b
+    \b
     Examples:
-      music-cli youtube              # List cached tracks
-      music-cli youtube cached       # List cached tracks
-      music-cli youtube play 3       # Play cached track #3
-      music-cli youtube remove 1     # Remove track #1
-      music-cli youtube clear        # Clear entire cache
+      mc yt              # List cached tracks
+      mc yt list         # List cached tracks
+      mc yt play 3       # Play cached track #3
+      mc yt remove 1     # Remove track #1
+      mc yt clear        # Clear entire cache
     """
     if ctx.invoked_subcommand is None:
         ctx.invoke(youtube_cached)
 
 
-@youtube_group.command("cached")
+@youtube_group.command("list")
 def youtube_cached():
     client = ensure_daemon()
 
@@ -1350,6 +1388,28 @@ def update_radios():
 
     config.update_version()
     click.echo(f"Config version updated to {__version__}")
+
+
+# ---------------------------------------------------------------------------
+# Register aliases (hidden — don't appear in --help but work on the CLI)
+# ---------------------------------------------------------------------------
+
+# Task 1.3: Old group/command names → hidden aliases on main
+_register_alias(main, "radios", "radio")
+_register_alias(main, "youtube", "yt")
+_register_alias(main, "moods", "mood")
+_register_alias(main, "volume", "vol")
+
+# Task 1.4: Playback single-letter/short aliases
+_register_alias(main, "s", "stop")
+_register_alias(main, "pp", "pause")
+_register_alias(main, "r", "resume")
+_register_alias(main, "n", "next")
+_register_alias(main, "st", "status")
+_register_alias(main, "h", "history")
+
+# Task 1.3: Inside yt group, "cached" → "list"
+_register_alias(youtube_group, "cached", "list")
 
 
 if __name__ == "__main__":
