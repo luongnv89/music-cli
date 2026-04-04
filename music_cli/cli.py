@@ -64,7 +64,7 @@ def _check_for_updates_once() -> None:
                 f"\nNew version detected! {len(new_stations)} new radio station(s) available.",
                 err=True,
             )
-            click.echo("Run 'music-cli update-radios' to update your stations.\n", err=True)
+            click.echo("Run 'mc radio update' to update your stations.\n", err=True)
     except Exception as e:
         # Don't let update check break normal operation
         logger.debug(f"Update check failed: {e}")
@@ -185,7 +185,7 @@ def _register_alias(group: AliasedGroup, alias: str, target: str) -> None:
 @click.version_option(__version__)
 @click.pass_context
 def main(ctx):
-    """music-cli: A command-line music player for coders.
+    """mc: A command-line music player for coders.
 
     Play local MP3s, stream radio, or generate AI music based on your mood
     and the time of day.
@@ -198,15 +198,56 @@ def main(ctx):
         ctx.invoke(status)
 
 
+def _detect_play_mode(source_arg):
+    """Auto-detect playback mode from the SOURCE argument.
+
+    Detection order:
+    1. File path that exists on disk -> local
+    2. YouTube URL pattern -> youtube
+    3. http:// or https:// URL -> radio (stream URL)
+    4. Station name match (case-insensitive) -> radio
+    5. No source -> context
+    """
+    import re
+
+    if source_arg is None:
+        return "context", None
+
+    # 1. Existing file path
+    if os.path.exists(source_arg):
+        return "local", source_arg
+
+    # 2. YouTube URL
+    yt_pattern = re.compile(
+        r"(youtube\.com/watch|youtu\.be/|youtube\.com/playlist)", re.IGNORECASE
+    )
+    if yt_pattern.search(source_arg):
+        return "youtube", source_arg
+
+    # 3. Generic HTTP(S) URL -> radio stream
+    if source_arg.startswith("http://") or source_arg.startswith("https://"):
+        return "radio", source_arg
+
+    # 4. Station name lookup
+    config = get_config()
+    station = config.get_station_by_name(source_arg)
+    if station:
+        return "radio", station[1]  # return the URL
+
+    # Fall back: treat as source for the default radio mode
+    return "radio", source_arg
+
+
 @main.command()
+@click.argument("source", required=False, default=None)
 @click.option(
     "--mode",
     "-m",
     type=click.Choice(["local", "radio", "ai", "context", "history", "youtube", "yt"]),
-    default="radio",
-    help="Playback mode",
+    default=None,
+    help="Playback mode (usually auto-detected from SOURCE)",
 )
-@click.option("--source", "-s", help="Source file/URL/station name")
+@click.option("--source", "-s", "source_flag", default=None, help="Source file/URL/station name (legacy flag)")
 @click.option(
     "--mood",
     "-M",
@@ -216,23 +257,26 @@ def main(ctx):
     help="Mood for context-aware playback",
 )
 @click.option("--auto", "-a", is_flag=True, help="Enable auto-play (shuffle local files)")
-@click.option("--duration", "-d", default=30, help="Duration for AI generation (seconds)")
+@click.option("--duration", "-d", default=15, help="Duration for AI generation (seconds)")
 @click.option("--index", "-i", type=int, help="History entry index to replay")
-def play(mode, source, mood, auto, duration, index):
+def play(source, mode, source_flag, mood, auto, duration, index):
     """Start playing music.
 
     \b
+    SOURCE is auto-detected:
+      file path        -> local mode
+      YouTube URL      -> youtube mode
+      http(s):// URL   -> radio stream
+      station name     -> radio station
+      (nothing)        -> context-aware radio
+
+    \b
     Examples:
-      music-cli play                    # Play context-aware radio
-      music-cli play -m local -s song.mp3  # Play local file
-      music-cli play -m radio -s "chill"   # Play radio station by name
-      music-cli play --mood focus       # Play focus music
-      music-cli play -M focus           # Play focus music (short flag)
-      music-cli play -m ai --mood happy # Generate happy AI music
-      music-cli play -m history -i 3    # Replay 3rd item from history
-      music-cli play -m local --auto    # Shuffle local library
-      music-cli play -m youtube -s "https://youtube.com/watch?v=..."  # YouTube audio
-      music-cli play -m yt -s "https://youtu.be/..."  # YouTube (short alias)
+      mc play ~/song.mp3                          # Auto-detect local
+      mc play "https://youtube.com/watch?v=xxx"   # Auto-detect YouTube
+      mc play chill                                # Auto-detect station name
+      mc play                                      # Context-aware radio
+      mc play -M focus                             # Mood-based radio
     """
     if not check_ffplay_available():
         click.echo("Error: ffplay not found. Please install FFmpeg.", err=True)
@@ -245,6 +289,30 @@ def play(mode, source, mood, auto, duration, index):
             click.echo("  Linux: apt install ffmpeg", err=True)
         sys.exit(1)
 
+    # Positional SOURCE takes priority over -s flag
+    effective_source = source if source is not None else source_flag
+
+    # Task 2.2: Deprecate play -m ai
+    if mode == "ai":
+        click.echo(
+            "\u26a0 Deprecated: use 'mc ai play' instead. This will be removed in v1.0.",
+            err=True,
+        )
+
+    # Task 2.3: Deprecate play -m history
+    if mode == "history":
+        click.echo(
+            "\u26a0 Deprecated: use 'mc history play N' instead. This will be removed in v1.0.",
+            err=True,
+        )
+
+    # Task 2.1: Smart auto-detection when --mode is NOT given
+    if mode is None:
+        mode, detected_source = _detect_play_mode(effective_source)
+        effective_source = detected_source
+    # If mode was explicitly given, keep the old behaviour
+    # (effective_source from flag/positional is used as-is)
+
     client = ensure_daemon()
 
     # Show animation for AI generation
@@ -256,7 +324,7 @@ def play(mode, source, mood, auto, duration, index):
     try:
         response = client.play(
             mode=mode,
-            source=source,
+            source=effective_source,
             mood=mood,
             auto=auto,
             duration=duration,
@@ -274,7 +342,7 @@ def play(mode, source, mood, auto, duration, index):
         title = track.get("title", track.get("source", "Unknown"))
         source_type = track.get("source_type", "unknown")
 
-        click.echo(f"▶ Playing: {title} [{source_type}]")
+        click.echo(f"\u25b6 Playing: {title} [{source_type}]")
         if auto:
             click.echo("  Auto-play enabled (shuffle mode)")
 
@@ -403,7 +471,7 @@ def next_track():
 
 
 @main.command("vol")
-@click.argument("level", type=int, required=False)
+@click.argument("level", type=click.IntRange(0, 100), required=False)
 def volume(level):
     """Get or set volume (0-100).
 
@@ -411,7 +479,6 @@ def volume(level):
     Examples:
       mc vol            # Show current volume
       mc vol 50         # Set volume to 50%
-      music-cli volume  # Old name still works
     """
     client = ensure_daemon()
 
@@ -438,6 +505,7 @@ def radios_group(ctx):
       play <number> - Play a station by number
       add           - Add a new radio station
       remove <num>  - Remove a station by number
+      update        - Update stations after version upgrade
 
     \b
     Examples:
@@ -446,6 +514,7 @@ def radios_group(ctx):
       mc radio play 5       # Play station #5
       mc radio add          # Add new station interactively
       mc radio remove 3     # Remove station #3
+      mc radio update       # Update station list
     """
     if ctx.invoked_subcommand is None:
         # Default action: list radios
@@ -460,7 +529,7 @@ def radios_list():
 
     if not radios:
         click.echo(f"No stations configured. Add stations to: {config.radios_file}")
-        click.echo("Or run: music-cli radios add")
+        click.echo("Or run: mc radio add")
         return
 
     click.echo("Available radio stations:\n")
@@ -497,7 +566,7 @@ def radios_list():
         click.echo()  # Empty line after each category
 
     click.echo(f"Total: {len(radios)} station(s)")
-    click.echo("Play with: music-cli radios play <number>")
+    click.echo("Play with: mc radio play <number>")
 
 
 @radios_group.command("play")
@@ -560,7 +629,7 @@ def radios_add():
     radios = config.get_radios()
     click.echo(f"\nAdded: {name}")
     click.echo(f"Station #{len(radios)} in your list")
-    click.echo(f"Play with: music-cli radios play {len(radios)}")
+    click.echo(f"Play with: mc radio play {len(radios)}")
 
 
 @radios_group.command("remove")
@@ -595,10 +664,31 @@ def radios_remove(number):
         sys.exit(1)
 
 
-@main.command("history")
+@main.group("history", cls=AliasedGroup, invoke_without_command=True)
+@click.pass_context
+def history_group(ctx):
+    """Show and replay playback history.
+
+    \b
+    Commands:
+      list          - Show recent history (default)
+      play <number> - Replay an item by its history number
+
+    \b
+    Examples:
+      mc history              # List recent history
+      mc history list -n 5    # Show last 5 entries
+      mc history play 3       # Replay history item #3
+      mc h play 1             # Short alias
+    """
+    if ctx.invoked_subcommand is None:
+        ctx.invoke(history_list)
+
+
+@history_group.command("list")
 @click.option("--limit", "-n", default=20, help="Number of entries to show")
-def list_history(limit):
-    """Show playback history."""
+def history_list(limit):
+    """List recent playback history."""
     client = ensure_daemon()
 
     try:
@@ -616,7 +706,29 @@ def list_history(limit):
             timestamp = entry.get("timestamp", "")[:16]  # Truncate to date/time
             click.echo(f"  {idx}. [{timestamp}] {title} ({source_type})")
 
-        click.echo("\nReplay with: music-cli play -m history -i <number>")
+        click.echo("\nReplay with: mc history play <number>")
+
+    except ConnectionError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@history_group.command("play")
+@click.argument("number", type=int)
+def history_play(number):
+    """Replay an item from playback history by its number."""
+    client = ensure_daemon()
+
+    try:
+        response = client.play(mode="history", index=number)
+
+        if "error" in response:
+            click.echo(f"Error: {response['error']}", err=True)
+            sys.exit(1)
+
+        track = response.get("track", {})
+        title = track.get("title", track.get("source", "Unknown"))
+        click.echo(f"\u25b6 Replaying: {title}")
 
     except ConnectionError as e:
         click.echo(f"Error: {e}", err=True)
@@ -717,14 +829,38 @@ def show_config():
 
 
 @main.command("mood")
-def list_moods():
-    """List available mood tags."""
+@click.argument("mood_name", required=False, default=None)
+def list_moods(mood_name):
+    """List available moods, or play a mood directly.
+
+    \b
+    Examples:
+      mc mood              # List all moods
+      mc mood focus        # Start focus-mood radio
+    """
+    if mood_name is not None:
+        # Play mood-based radio directly
+        client = ensure_daemon()
+        try:
+            response = client.play(mode="radio", mood=mood_name)
+            if "error" in response:
+                click.echo(f"Error: {response['error']}", err=True)
+                sys.exit(1)
+            track = response.get("track", {})
+            title = track.get("title", track.get("source", "Unknown"))
+            click.echo(f"\u25b6 Playing mood '{mood_name}': {title}")
+        except ConnectionError as e:
+            click.echo(f"Error: {e}", err=True)
+            sys.exit(1)
+        return
+
     from .context.mood import MoodContext
 
     click.echo("Available moods:")
     for mood in MoodContext.get_all_moods():
         click.echo(f"  - {mood}")
-    click.echo("\nUse with: mc play --mood <mood>")
+    click.echo("\nPlay directly: mc mood <mood>")
+    click.echo("Or use with: mc play --mood <mood>")
 
 
 @main.group("ai", cls=AliasedGroup, invoke_without_command=True)
@@ -738,15 +874,16 @@ def ai_group(ctx):
       play          - Generate and play AI music
       replay <num>  - Replay a track by number
       remove <num>  - Remove a track by number
+      model         - Manage AI models
 
     \b
     Examples:
-      music-cli ai                    # List all AI tracks
-      music-cli ai list               # List all AI tracks
-      music-cli ai play               # Generate music from current context
-      music-cli ai play -p "jazz"     # Generate with custom prompt
-      music-cli ai replay 3           # Replay track #3
-      music-cli ai remove 2           # Remove track #2
+      mc ai                    # List all AI tracks
+      mc ai list               # List all AI tracks
+      mc ai play               # Generate music from current context
+      mc ai play -p "jazz"     # Generate with custom prompt
+      mc ai replay 3           # Replay track #3
+      mc ai remove 2           # Remove track #2
     """
     if ctx.invoked_subcommand is None:
         ctx.invoke(ai_list)
@@ -762,7 +899,7 @@ def ai_list():
 
         if not tracks:
             click.echo("No AI-generated tracks yet.")
-            click.echo("Generate one with: music-cli ai play")
+            click.echo("Generate one with: mc ai play")
             return
 
         click.echo("AI-generated tracks:\n")
@@ -780,7 +917,7 @@ def ai_list():
             click.echo(f"  {idx:2}. [{timestamp}] {prompt} ({duration}s) [{model}]{status}")
 
         click.echo(f"\nTotal: {len(tracks)} track(s)")
-        click.echo("Replay with: music-cli ai replay <number>")
+        click.echo("Replay with: mc ai replay <number>")
 
     except ConnectionError as e:
         click.echo(f"Error: {e}", err=True)
@@ -797,11 +934,11 @@ def ai_list():
     ),
     help="Mood for context-aware generation",
 )
-@click.option("--duration", "-d", default=5, help="Duration in seconds (5-60)")
+@click.option("--duration", "-d", default=15, help="Duration in seconds (5-60)")
 @click.option(
     "--model",
     "-m",
-    help="Model to use (e.g., musicgen-small, musicgen-medium). See 'music-cli ai models'",
+    help="Model to use (e.g., musicgen-small, musicgen-medium). See 'mc ai model'",
 )
 def ai_play(prompt, mood, duration, model):
     """Generate and play AI music.
@@ -814,11 +951,11 @@ def ai_play(prompt, mood, duration, model):
 
     \b
     Examples:
-      music-cli ai play                           # Context-aware generation
-      music-cli ai play -p "jazz piano"           # Custom prompt
-      music-cli ai play --mood focus              # With mood
-      music-cli ai play -d 60                     # 60 second track
-      music-cli ai play -m musicgen-medium        # Use specific model
+      mc ai play                           # Context-aware generation
+      mc ai play -p "jazz piano"           # Custom prompt
+      mc ai play --mood focus              # With mood
+      mc ai play -d 60                     # 60 second track
+      mc ai play -m musicgen-medium        # Use specific model
     """
     client = ensure_daemon()
 
@@ -829,7 +966,7 @@ def ai_play(prompt, mood, duration, model):
             available = ", ".join(config.list_ai_models(enabled_only=True))
             click.echo(f"Error: Unknown or disabled model '{model}'", err=True)
             click.echo(f"Available models: {available}", err=True)
-            click.echo("See all models with: music-cli ai models", err=True)
+            click.echo("See all models with: mc ai model", err=True)
             sys.exit(1)
 
     # Show animation during generation
@@ -855,8 +992,8 @@ def ai_play(prompt, mood, duration, model):
         click.echo(f"Prompt: {used_prompt[:60]}{'...' if len(used_prompt) > 60 else ''}")
 
         # Suggest longer duration if using default
-        if duration == 5:
-            click.echo("\nTip: For longer tracks, use -d option (e.g., music-cli ai play -d 30)")
+        if duration == 15:
+            click.echo("\nTip: For longer tracks, use -d option (e.g., mc ai play -d 30)")
 
     except ConnectionError as e:
         animation.stop()
@@ -920,7 +1057,7 @@ def ai_replay(index):
         sys.exit(1)
 
 
-@ai_group.group("models", invoke_without_command=True)
+@ai_group.group("model", cls=AliasedGroup, invoke_without_command=True)
 @click.pass_context
 def ai_models_group(ctx):
     """Manage AI models.
@@ -930,15 +1067,15 @@ def ai_models_group(ctx):
       list          - Show all models with download status (default)
       download      - Download a model to cache
       delete        - Delete a cached model
-      set-default   - Set the default model
+      default       - Set the default model
 
     \b
     Examples:
-      music-cli ai models                    # List all models
-      music-cli ai models list               # List all models
-      music-cli ai models download musicgen-medium
-      music-cli ai models delete musicgen-large
-      music-cli ai models set-default musicgen-small
+      mc ai model                    # List all models
+      mc ai model list               # List all models
+      mc ai model download musicgen-medium
+      mc ai model delete musicgen-large
+      mc ai model default musicgen-small
     """
     if ctx.invoked_subcommand is None:
         ctx.invoke(ai_models_list)
@@ -1005,9 +1142,9 @@ def ai_models_list():
         )
 
     click.echo("\nCommands:")
-    click.echo("  music-cli ai models download <model_id>    - Download a model")
-    click.echo("  music-cli ai models delete <model_id>      - Delete cached model")
-    click.echo("  music-cli ai models set-default <model_id> - Set default model")
+    click.echo("  mc ai model download <model_id>    - Download a model")
+    click.echo("  mc ai model delete <model_id>      - Delete cached model")
+    click.echo("  mc ai model default <model_id>     - Set default model")
 
 
 @ai_models_group.command("download")
@@ -1020,8 +1157,8 @@ def ai_models_download(model_id):
 
     \b
     Examples:
-      music-cli ai models download musicgen-medium
-      music-cli ai models download audioldm-s-full-v2
+      mc ai model download musicgen-medium
+      mc ai model download audioldm-s-full-v2
     """
     from .model_manager import ModelManager
 
@@ -1053,7 +1190,7 @@ def ai_models_download(model_id):
 
     if success:
         click.echo(f"\n{message}")
-        click.echo(f"You can now use it with: music-cli ai play -m {model_id}")
+        click.echo(f"You can now use it with: mc ai play -m {model_id}")
     else:
         click.echo(f"\nError: {message}", err=True)
         sys.exit(1)
@@ -1069,8 +1206,8 @@ def ai_models_delete(model_id):
 
     \b
     Examples:
-      music-cli ai models delete musicgen-large
-      music-cli ai models delete bark
+      mc ai model delete musicgen-large
+      mc ai model delete bark
     """
     from .model_manager import ModelManager
 
@@ -1112,7 +1249,7 @@ def ai_models_delete(model_id):
         sys.exit(1)
 
 
-@ai_models_group.command("set-default")
+@ai_models_group.command("default")
 @click.argument("model_id")
 def ai_models_set_default(model_id):
     """Set the default AI model used for generation.
@@ -1121,8 +1258,8 @@ def ai_models_set_default(model_id):
 
     \b
     Examples:
-      music-cli ai models set-default musicgen-medium
-      music-cli ai models set-default audioldm-s-full-v2
+      mc ai model default musicgen-medium
+      mc ai model default audioldm-s-full-v2
     """
     from .model_manager import ModelManager
 
@@ -1134,7 +1271,7 @@ def ai_models_set_default(model_id):
 
     if success:
         click.echo(message)
-        click.echo("Use with: music-cli ai play")
+        click.echo("Use with: mc ai play")
     else:
         click.echo(f"Error: {message}", err=True)
         sys.exit(1)
@@ -1222,7 +1359,7 @@ def youtube_cached():
         if not tracks:
             click.echo("No YouTube history yet.")
             click.echo("Play a YouTube URL to add it to history:")
-            click.echo("  music-cli play -m youtube -s 'https://youtube.com/watch?v=...'")
+            click.echo("  mc play 'https://youtube.com/watch?v=...'")
             return
 
         click.echo("YouTube replay history:\n")
@@ -1238,7 +1375,7 @@ def youtube_cached():
             click.echo(f"  {idx:2}. {title} ({dur_str}){cached}")
 
         click.echo(f"\nTotal: {stats.get('count', 0)} track(s)")
-        click.echo("Replay with: music-cli youtube play <number>")
+        click.echo("Replay with: mc yt play <number>")
 
     except ConnectionError as e:
         click.echo(f"Error: {e}", err=True)
@@ -1336,8 +1473,8 @@ def youtube_clear():
         sys.exit(1)
 
 
-@main.command("update-radios")
-def update_radios():
+@radios_group.command("update")
+def radio_update():
     """Update radio stations list after version upgrade."""
     config = get_config()
 
@@ -1375,7 +1512,7 @@ def update_radios():
     if choice == "M":
         added = config.merge_radios()
         click.echo(f"\nAdded {added} new station(s) to your radios.txt")
-        click.echo("Run 'music-cli radios' to see the full list")
+        click.echo("Run 'mc radio' to see the full list")
 
     elif choice == "O":
         backup_path = config.backup_radios_path()
@@ -1390,11 +1527,18 @@ def update_radios():
     click.echo(f"Config version updated to {__version__}")
 
 
+@main.command("update-radios", hidden=True)
+@click.pass_context
+def update_radios_legacy(ctx):
+    """Update radio stations (deprecated, use 'mc radio update')."""
+    ctx.invoke(radio_update)
+
+
 # ---------------------------------------------------------------------------
 # Register aliases (hidden — don't appear in --help but work on the CLI)
 # ---------------------------------------------------------------------------
 
-# Task 1.3: Old group/command names → hidden aliases on main
+# Task 1.3: Old group/command names -> hidden aliases on main
 _register_alias(main, "radios", "radio")
 _register_alias(main, "youtube", "yt")
 _register_alias(main, "moods", "mood")
@@ -1408,8 +1552,12 @@ _register_alias(main, "n", "next")
 _register_alias(main, "st", "status")
 _register_alias(main, "h", "history")
 
-# Task 1.3: Inside yt group, "cached" → "list"
+# Task 1.3: Inside yt group, "cached" -> "list"
 _register_alias(youtube_group, "cached", "list")
+
+# Task 2.6: "models" -> "model" (old name), "set-default" -> "default" (old name)
+_register_alias(ai_group, "models", "model")
+_register_alias(ai_models_group, "set-default", "default")
 
 
 if __name__ == "__main__":
