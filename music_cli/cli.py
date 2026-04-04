@@ -62,10 +62,12 @@ def _is_no_color() -> bool:
     """Return True when colour/emoji output should be suppressed."""
     try:
         ctx = click.get_current_context()
-        return ctx.obj.get("no_color", False)
+        if isinstance(ctx.obj, dict):
+            return ctx.obj.get("no_color", False)
     except RuntimeError:
-        # No active Click context — fall back to env var
-        return os.environ.get("NO_COLOR", "") != ""
+        pass
+    # No active Click context or ctx.obj not initialised — fall back to env var
+    return os.environ.get("NO_COLOR", "") != ""
 
 
 def icon(symbol: str, text_fallback: str | None = None) -> str:
