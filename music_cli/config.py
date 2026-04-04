@@ -421,6 +421,16 @@ Radio Capital|https://icecast.unitedradio.it/Capital.mp3
             return radios[index - 1]
         return None
 
+    def get_station_by_name(self, name: str) -> tuple[str, str] | None:
+        """Look up a radio station by name (case-insensitive).
+
+        Returns (name, url) tuple or None if not found.
+        """
+        for station_name, url in self.get_radios():
+            if station_name.lower() == name.lower():
+                return (station_name, url)
+        return None
+
     def add_radio(self, name: str, url: str) -> None:
         """Add a new radio station to the radios.txt file."""
         with self.radios_file.open("a") as f:

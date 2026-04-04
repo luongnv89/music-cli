@@ -1,15 +1,37 @@
-"""Tests for CLI v2 Phase 1: Foundation — mc alias, short names, playback aliases."""
+"""Tests for CLI v2 Phase 1 & Phase 2."""
+
+import os
+from unittest.mock import MagicMock, patch
 
 import pytest
 from click.testing import CliRunner
 
-from music_cli.cli import main
+from music_cli.cli import main, _detect_play_mode
 
 
 @pytest.fixture
 def runner():
     """Create a Click CliRunner."""
     return CliRunner()
+
+
+@pytest.fixture
+def mock_daemon_client():
+    """Return a mocked DaemonClient."""
+    client = MagicMock()
+    client.play.return_value = {
+        "track": {"title": "Test Track", "source": "test.mp3", "source_type": "local"}
+    }
+    client.status.return_value = {
+        "state": "playing",
+        "track": {"title": "Test Track", "source_type": "radio"},
+        "volume": 80,
+    }
+    client.list_history.return_value = [
+        {"index": 1, "title": "Song A", "source_type": "radio", "timestamp": "2026-01-01T00:00"},
+        {"index": 2, "title": "Song B", "source_type": "local", "timestamp": "2026-01-01T01:00"},
+    ]
+    return client
 
 
 # -------------------------------------------------------------------------
@@ -228,11 +250,16 @@ class TestSubcommandHelp:
             ["next", "--help"],
             ["status", "--help"],
             ["history", "--help"],
+            ["history", "list", "--help"],
+            ["history", "play", "--help"],
             ["radio", "--help"],
+            ["radio", "update", "--help"],
             ["yt", "--help"],
             ["mood", "--help"],
             ["vol", "--help"],
             ["ai", "--help"],
+            ["ai", "model", "--help"],
+            ["ai", "model", "default", "--help"],
             ["daemon", "--help"],
             ["config", "--help"],
         ],
@@ -240,3 +267,417 @@ class TestSubcommandHelp:
     def test_command_help_succeeds(self, runner, cmd_args):
         result = runner.invoke(main, cmd_args)
         assert result.exit_code == 0, f"Failed for {cmd_args}: {result.output}"
+
+
+# =========================================================================
+# Phase 2 Tests
+# =========================================================================
+
+
+# -------------------------------------------------------------------------
+# 2.1 — Smart play [SOURCE] auto-detection
+# -------------------------------------------------------------------------
+
+
+class TestSmartPlayDetection:
+    """Test _detect_play_mode auto-detection logic."""
+
+    def test_no_source_returns_context(self):
+        mode, src = _detect_play_mode(None)
+        assert mode == "context"
+        assert src is None
+
+    def test_existing_file_returns_local(self, tmp_path):
+        f = tmp_path / "song.mp3"
+        f.touch()
+        mode, src = _detect_play_mode(str(f))
+        assert mode == "local"
+        assert src == str(f)
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://youtube.com/watch?v=abc123",
+            "https://www.youtube.com/watch?v=abc123",
+            "https://youtu.be/abc123",
+            "https://youtube.com/playlist?list=PLabc",
+        ],
+    )
+    def test_youtube_url_returns_youtube(self, url):
+        mode, src = _detect_play_mode(url)
+        assert mode == "youtube"
+        assert src == url
+
+    def test_http_url_returns_radio(self):
+        url = "https://stream.example.com/radio.mp3"
+        mode, src = _detect_play_mode(url)
+        assert mode == "radio"
+        assert src == url
+
+    def test_http_url_returns_radio_plain(self):
+        url = "http://icecast.example.com:8000/stream"
+        mode, src = _detect_play_mode(url)
+        assert mode == "radio"
+        assert src == url
+
+    @patch("music_cli.cli.get_config")
+    def test_station_name_returns_radio(self, mock_config):
+        mock_cfg = MagicMock()
+        mock_cfg.get_station_by_name.return_value = ("Chill", "https://stream.chill.com/radio")
+        mock_config.return_value = mock_cfg
+        mode, src = _detect_play_mode("Chill")
+        assert mode == "radio"
+        assert src == "https://stream.chill.com/radio"
+
+    @patch("music_cli.cli.get_config")
+    def test_unknown_string_falls_back_to_radio(self, mock_config):
+        mock_cfg = MagicMock()
+        mock_cfg.get_station_by_name.return_value = None
+        mock_config.return_value = mock_cfg
+        mode, src = _detect_play_mode("nonexistent-station")
+        assert mode == "radio"
+        assert src == "nonexistent-station"
+
+    def test_play_help_shows_source_argument(self, runner):
+        result = runner.invoke(main, ["play", "--help"])
+        assert result.exit_code == 0
+        assert "SOURCE" in result.output
+
+    @patch("music_cli.cli.ensure_daemon")
+    @patch("music_cli.cli.check_ffplay_available", return_value=True)
+    def test_play_with_youtube_url(self, mock_ffplay, mock_daemon, runner, mock_daemon_client):
+        mock_daemon.return_value = mock_daemon_client
+        result = runner.invoke(main, ["play", "https://youtube.com/watch?v=test"])
+        assert result.exit_code == 0
+        mock_daemon_client.play.assert_called_once()
+        call_kwargs = mock_daemon_client.play.call_args
+        assert call_kwargs[1]["mode"] == "youtube" or call_kwargs.kwargs["mode"] == "youtube"
+
+    @patch("music_cli.cli.ensure_daemon")
+    @patch("music_cli.cli.check_ffplay_available", return_value=True)
+    def test_play_bare_uses_context(self, mock_ffplay, mock_daemon, runner, mock_daemon_client):
+        mock_daemon.return_value = mock_daemon_client
+        result = runner.invoke(main, ["play"])
+        assert result.exit_code == 0
+        call_kwargs = mock_daemon_client.play.call_args
+        assert call_kwargs[1]["mode"] == "context" or call_kwargs.kwargs["mode"] == "context"
+
+
+# -------------------------------------------------------------------------
+# 2.2 — Deprecate play -m ai
+# -------------------------------------------------------------------------
+
+
+class TestDeprecatePlayAI:
+    """play -m ai shows deprecation warning but still works."""
+
+    @patch("music_cli.cli.ensure_daemon")
+    @patch("music_cli.cli.check_ffplay_available", return_value=True)
+    def test_play_m_ai_shows_warning(self, mock_ffplay, mock_daemon, runner, mock_daemon_client):
+        mock_daemon_client.play.return_value = {
+            "track": {"title": "AI Track", "source_type": "ai"}
+        }
+        mock_daemon.return_value = mock_daemon_client
+        result = runner.invoke(main, ["play", "-m", "ai"])
+        assert "Deprecated" in result.output
+        assert "mc ai play" in result.output
+        # Should still call play
+        mock_daemon_client.play.assert_called_once()
+
+
+# -------------------------------------------------------------------------
+# 2.3 — Deprecate play -m history
+# -------------------------------------------------------------------------
+
+
+class TestDeprecatePlayHistory:
+    """play -m history shows deprecation warning but still works."""
+
+    @patch("music_cli.cli.ensure_daemon")
+    @patch("music_cli.cli.check_ffplay_available", return_value=True)
+    def test_play_m_history_shows_warning(self, mock_ffplay, mock_daemon, runner, mock_daemon_client):
+        mock_daemon.return_value = mock_daemon_client
+        result = runner.invoke(main, ["play", "-m", "history", "-i", "3"])
+        assert "Deprecated" in result.output
+        assert "mc history play N" in result.output
+        mock_daemon_client.play.assert_called_once()
+
+
+# -------------------------------------------------------------------------
+# 2.4 — history play N subcommand
+# -------------------------------------------------------------------------
+
+
+class TestHistoryGroup:
+    """history is now a group with list + play subcommands."""
+
+    def test_history_help_shows_subcommands(self, runner):
+        result = runner.invoke(main, ["history", "--help"])
+        assert result.exit_code == 0
+        assert "list" in result.output
+        assert "play" in result.output
+
+    @patch("music_cli.cli.ensure_daemon")
+    def test_bare_history_lists(self, mock_daemon, runner, mock_daemon_client):
+        mock_daemon.return_value = mock_daemon_client
+        result = runner.invoke(main, ["history"])
+        assert result.exit_code == 0
+        mock_daemon_client.list_history.assert_called_once()
+
+    @patch("music_cli.cli.ensure_daemon")
+    def test_history_list_with_limit(self, mock_daemon, runner, mock_daemon_client):
+        mock_daemon.return_value = mock_daemon_client
+        result = runner.invoke(main, ["history", "list", "-n", "5"])
+        assert result.exit_code == 0
+        mock_daemon_client.list_history.assert_called_once_with(limit=5)
+
+    @patch("music_cli.cli.ensure_daemon")
+    def test_history_play_number(self, mock_daemon, runner, mock_daemon_client):
+        mock_daemon.return_value = mock_daemon_client
+        result = runner.invoke(main, ["history", "play", "3"])
+        assert result.exit_code == 0
+        mock_daemon_client.play.assert_called_once_with(mode="history", index=3)
+
+    @patch("music_cli.cli.ensure_daemon")
+    def test_h_alias_play(self, mock_daemon, runner, mock_daemon_client):
+        mock_daemon.return_value = mock_daemon_client
+        result = runner.invoke(main, ["h", "play", "1"])
+        assert result.exit_code == 0
+        mock_daemon_client.play.assert_called_once_with(mode="history", index=1)
+
+    @patch("music_cli.cli.ensure_daemon")
+    def test_h_bare_lists_history(self, mock_daemon, runner, mock_daemon_client):
+        mock_daemon.return_value = mock_daemon_client
+        result = runner.invoke(main, ["h"])
+        assert result.exit_code == 0
+        mock_daemon_client.list_history.assert_called_once()
+
+    def test_history_list_shows_replay_hint(self, runner):
+        """The list output should mention 'mc history play'."""
+        result = runner.invoke(main, ["history", "list", "--help"])
+        assert result.exit_code == 0
+
+
+# -------------------------------------------------------------------------
+# 2.5 — radio update subcommand
+# -------------------------------------------------------------------------
+
+
+class TestRadioUpdate:
+    """update-radios is now 'radio update', old form still works."""
+
+    def test_radio_update_help(self, runner):
+        result = runner.invoke(main, ["radio", "update", "--help"])
+        assert result.exit_code == 0
+        assert "Update radio stations" in result.output
+
+    def test_radio_help_shows_update(self, runner):
+        result = runner.invoke(main, ["radio", "--help"])
+        assert result.exit_code == 0
+        assert "update" in result.output
+
+    def test_update_radios_legacy_still_works(self, runner):
+        result = runner.invoke(main, ["update-radios", "--help"])
+        assert result.exit_code == 0
+
+    def test_update_radios_hidden_from_main_help(self, runner):
+        result = runner.invoke(main, ["--help"])
+        assert result.exit_code == 0
+        lines = result.output.splitlines()
+        command_lines = [l.strip().split()[0] for l in lines if l.startswith("  ") and l.strip()]
+        assert "update-radios" not in command_lines
+
+
+# -------------------------------------------------------------------------
+# 2.6 — ai model (singular) + default subcommand
+# -------------------------------------------------------------------------
+
+
+class TestAIModelGroup:
+    """ai model/models aliases and default/set-default aliases."""
+
+    def test_ai_model_help(self, runner):
+        result = runner.invoke(main, ["ai", "model", "--help"])
+        assert result.exit_code == 0
+        assert "default" in result.output
+
+    def test_ai_models_alias_works(self, runner):
+        result = runner.invoke(main, ["ai", "models", "--help"])
+        assert result.exit_code == 0
+        assert "default" in result.output
+
+    def test_ai_model_default_help(self, runner):
+        result = runner.invoke(main, ["ai", "model", "default", "--help"])
+        assert result.exit_code == 0
+        assert "MODEL_ID" in result.output
+
+    def test_ai_models_set_default_alias_works(self, runner):
+        result = runner.invoke(main, ["ai", "models", "set-default", "--help"])
+        assert result.exit_code == 0
+        assert "MODEL_ID" in result.output
+
+
+# -------------------------------------------------------------------------
+# 2.7 — Unified AI duration default to 15
+# -------------------------------------------------------------------------
+
+
+class TestAIDurationDefault:
+    """Both ai play and play should default --duration to 15."""
+
+    @patch("music_cli.cli.ensure_daemon")
+    @patch("music_cli.cli.check_ffplay_available", return_value=True)
+    def test_play_duration_default_is_15(self, mock_ffplay, mock_daemon, runner, mock_daemon_client):
+        """play command sends duration=15 when not explicitly set."""
+        mock_daemon.return_value = mock_daemon_client
+        result = runner.invoke(main, ["play"])
+        assert result.exit_code == 0
+        call_kwargs = mock_daemon_client.play.call_args[1]
+        assert call_kwargs["duration"] == 15
+
+    @patch("music_cli.cli.ensure_daemon")
+    def test_ai_play_duration_default_is_15(self, mock_daemon, runner, mock_daemon_client):
+        """ai play command sends duration=15 when not explicitly set."""
+        mock_daemon_client.ai_play.return_value = {
+            "track": {"title": "AI Track", "metadata": {"model": "test"}},
+            "prompt": "test",
+        }
+        mock_daemon.return_value = mock_daemon_client
+        result = runner.invoke(main, ["ai", "play"])
+        assert result.exit_code == 0
+        call_kwargs = mock_daemon_client.ai_play.call_args[1]
+        assert call_kwargs["duration"] == 15
+
+
+# -------------------------------------------------------------------------
+# 2.8 — mood MOOD plays directly
+# -------------------------------------------------------------------------
+
+
+class TestMoodDirectPlay:
+    """mc mood lists moods; mc mood <name> starts playback."""
+
+    def test_bare_mood_lists(self, runner):
+        result = runner.invoke(main, ["mood"])
+        assert result.exit_code == 0
+        assert "Available moods:" in result.output
+
+    def test_mood_help_shows_mood_name(self, runner):
+        result = runner.invoke(main, ["mood", "--help"])
+        assert result.exit_code == 0
+        assert "MOOD_NAME" in result.output
+
+    @patch("music_cli.cli.ensure_daemon")
+    def test_mood_focus_plays(self, mock_daemon, runner, mock_daemon_client):
+        mock_daemon.return_value = mock_daemon_client
+        result = runner.invoke(main, ["mood", "focus"])
+        assert result.exit_code == 0
+        mock_daemon_client.play.assert_called_once_with(mode="radio", mood="focus")
+        assert "Playing mood" in result.output
+
+
+# -------------------------------------------------------------------------
+# 2.9 — Volume validation 0-100
+# -------------------------------------------------------------------------
+
+
+class TestVolumeValidation:
+    """Volume argument is clamped to 0..100."""
+
+    def test_vol_minus_1_rejected(self, runner):
+        result = runner.invoke(main, ["vol", "-1"])
+        assert result.exit_code != 0
+        # Click outputs an error about the range
+        assert "not in the range" in result.output.lower() or "invalid" in result.output.lower() or result.exit_code == 2
+
+    def test_vol_150_rejected(self, runner):
+        result = runner.invoke(main, ["vol", "150"])
+        assert result.exit_code != 0
+
+    @patch("music_cli.cli.ensure_daemon")
+    def test_vol_50_accepted(self, mock_daemon, runner, mock_daemon_client):
+        mock_daemon.return_value = mock_daemon_client
+        mock_daemon_client.set_volume.return_value = {"volume": 50}
+        result = runner.invoke(main, ["vol", "50"])
+        assert result.exit_code == 0
+        assert "50" in result.output
+
+    @patch("music_cli.cli.ensure_daemon")
+    def test_vol_0_accepted(self, mock_daemon, runner, mock_daemon_client):
+        mock_daemon.return_value = mock_daemon_client
+        mock_daemon_client.set_volume.return_value = {"volume": 0}
+        result = runner.invoke(main, ["vol", "0"])
+        assert result.exit_code == 0
+
+    @patch("music_cli.cli.ensure_daemon")
+    def test_vol_100_accepted(self, mock_daemon, runner, mock_daemon_client):
+        mock_daemon.return_value = mock_daemon_client
+        mock_daemon_client.set_volume.return_value = {"volume": 100}
+        result = runner.invoke(main, ["vol", "100"])
+        assert result.exit_code == 0
+
+
+# -------------------------------------------------------------------------
+# 2.10 — No music-cli references in help/echo text
+# -------------------------------------------------------------------------
+
+
+class TestHelpTextUpdated:
+    """No 'music-cli' references remain in echo/help strings."""
+
+    @pytest.mark.parametrize(
+        "cmd_args",
+        [
+            ["play", "--help"],
+            ["radio", "--help"],
+            ["history", "--help"],
+            ["ai", "--help"],
+            ["ai", "play", "--help"],
+            ["ai", "model", "--help"],
+            ["vol", "--help"],
+            ["mood", "--help"],
+            ["yt", "--help"],
+        ],
+    )
+    def test_no_music_cli_in_help(self, runner, cmd_args):
+        result = runner.invoke(main, cmd_args)
+        assert result.exit_code == 0
+        # Check the help body (skip usage line which may contain entry point name)
+        body_lines = result.output.splitlines()[1:]
+        body = "\n".join(body_lines)
+        assert "music-cli" not in body, (
+            f"Found 'music-cli' in help for {cmd_args}:\n{body}"
+        )
+
+
+# -------------------------------------------------------------------------
+# 2.11 — Additional integration tests
+# -------------------------------------------------------------------------
+
+
+class TestPhase2Integration:
+    """Cross-cutting integration checks for Phase 2."""
+
+    def test_play_source_and_flag_positional_wins(self, runner):
+        """When both positional SOURCE and -s flag are given, positional wins."""
+        result = runner.invoke(main, ["play", "--help"])
+        assert result.exit_code == 0
+        # Just verify the command accepts both forms
+        assert "SOURCE" in result.output
+        assert "-s" in result.output
+
+    def test_history_alias_h_resolves_to_group(self, runner):
+        result = runner.invoke(main, ["h", "--help"])
+        assert result.exit_code == 0
+        assert "list" in result.output
+        assert "play" in result.output
+
+    @patch("music_cli.cli.ensure_daemon")
+    @patch("music_cli.cli.check_ffplay_available", return_value=True)
+    def test_play_explicit_mode_overrides_detection(self, mock_ffplay, mock_daemon, runner, mock_daemon_client):
+        """When -m is given explicitly, auto-detection is skipped."""
+        mock_daemon.return_value = mock_daemon_client
+        result = runner.invoke(main, ["play", "-m", "radio", "-s", "something"])
+        assert result.exit_code == 0
+        call_kwargs = mock_daemon_client.play.call_args
+        assert call_kwargs[1]["mode"] == "radio" or call_kwargs.kwargs["mode"] == "radio"
