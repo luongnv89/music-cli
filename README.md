@@ -14,7 +14,7 @@
 <h1 align="center">Your Coding Soundtrack, Without Leaving the Terminal</h1>
 
 <p align="center">
-  <strong>music-cli</strong> is a background music daemon for developers. Radio streams, local MP3s, YouTube audio, and AI-generated music — all from one command. Stay in flow, skip the browser tab.
+  <strong>mc</strong> (music-cli) is a background music daemon for developers. Radio streams, local MP3s, YouTube audio, and AI-generated music — all from one command. Stay in flow, skip the browser tab.
 </p>
 
 <p align="center">
@@ -35,7 +35,7 @@
 
 Developers deserve a music player that respects the way they work: in the terminal, in the background, uninterrupted.
 
-## How music-cli Fixes This
+## How mc Fixes This
 
 - **Zero context-switching.** Start, pause, and skip tracks without leaving your terminal. Four keystrokes, not four clicks.
 - **Always playing.** A persistent background daemon means your music survives terminal closes, SSH sessions, and IDE restarts.
@@ -44,10 +44,10 @@ Developers deserve a music player that respects the way they work: in the termin
 - **YouTube audio streaming.** Paste a URL, get audio. Tracks are cached automatically for offline replay.
 
 ```bash
-music-cli play --mood focus    # Start focus music
-music-cli pause                # Pause for a meeting
-music-cli resume               # Back to coding
-music-cli status               # What's playing + an inspirational quote
+mc play -M focus    # Start focus music
+mc pause            # Pause for a meeting
+mc resume           # Back to coding
+mc status           # What's playing + an inspirational quote
 ```
 
 ## How It Works
@@ -58,18 +58,18 @@ music-cli status               # What's playing + an inspirational quote
    ```
 2. **Play** — pick a mode: radio, local files, YouTube, or AI.
    ```bash
-   music-cli play --mood focus
+   mc play -M focus
    ```
 3. **Forget about it** — the daemon runs in the background. Control it whenever you need.
    ```bash
-   music-cli pause    # meeting time
-   music-cli resume   # back to work
+   mc pause    # meeting time
+   mc resume   # back to work
    ```
 4. **Explore** — discover 40+ stations, generate AI tracks, or stream from YouTube.
    ```bash
-   music-cli radios                    # Browse stations
-   music-cli ai play -p "jazz piano"   # Generate a track
-   music-cli play -m youtube -s "URL"  # Stream YouTube audio
+   mc radio                        # Browse stations
+   mc ai play -p "jazz piano"     # Generate a track
+   mc yt play URL                  # Stream YouTube audio
    ```
 
 <p align="center">
@@ -153,7 +153,7 @@ music-cli is not a replacement for your music library. It's a lightweight, termi
 Yes. The latest release is v0.8.14. Check the [changelog](CHANGELOG.md) for recent updates.
 
 **Can I add my own radio stations?**
-Absolutely. Run `music-cli radios add` or edit `~/.config/music-cli/radios.txt` directly. Format: `Station Name|stream-url`.
+Absolutely. Run `mc radio add` or edit `~/.config/music-cli/radios.txt` directly. Format: `Station Name|stream-url`.
 
 **What AI models are supported?**
 MusicGen (small/medium/large/melody), AudioLDM (small/large), and Bark (standard/small). See the [AI Playbook](docs/AI_PLAYBOOK.md) for examples and tips.
@@ -163,7 +163,7 @@ MusicGen (small/medium/large/melody), AudioLDM (small/large), and Bark (standard
 You're one command away from a focus soundtrack that never interrupts you. No signups, no ads, no browser tabs. MIT licensed, open source, and built for developers who live in the terminal.
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/luongnv89/music-cli/main/install.sh | bash && music-cli play --mood focus
+curl -sSL https://raw.githubusercontent.com/luongnv89/music-cli/main/install.sh | bash && mc play -M focus
 ```
 
 [**Install music-cli →**](#get-started-in-30-seconds)
@@ -181,23 +181,63 @@ curl -sSL https://raw.githubusercontent.com/luongnv89/music-cli/main/install.sh 
 | [Changelog](CHANGELOG.md) | Version history and release notes |
 
 <details>
-<summary><strong>All Commands</strong></summary>
+<summary><strong>Command Reference</strong></summary>
 
-| Command | Description |
-|---------|-------------|
-| `play` | Start playing (radio/local/ai/history/youtube) |
-| `stop` / `pause` / `resume` | Playback control |
-| `status` | Current track, state, and inspirational quote |
-| `next` | Skip track (auto-play mode) |
-| `volume [0-100]` | Get/set volume |
-| `radios` | Manage radio stations (list/play/add/remove) |
-| `youtube` | Manage cached YouTube tracks (list/play/remove/clear) |
-| `ai` | Manage AI-generated tracks (list/play/replay/remove) |
-| `history` | Playback log |
-| `moods` | Available mood tags |
-| `config` | Show configuration file locations |
-| `update-radios` | Update stations after version upgrade |
-| `daemon start\|stop\|status` | Daemon control |
+```
+mc                          # show status
+mc play [SOURCE]            # smart play (auto-detects file/URL/station)
+mc play -M focus            # mood-based radio
+mc stop / mc s              # stop
+mc pause / mc pp            # pause
+mc resume / mc r            # resume
+mc next / mc n              # next track
+mc vol [0-100]              # get/set volume
+mc status / mc st           # full status
+
+mc radio                    # list stations
+mc radio play N             # play station #N
+mc radio add                # add station
+mc radio remove N           # remove station
+mc radio update             # update station list
+
+mc yt play URL              # stream YouTube audio
+mc yt / mc yt list          # list cached tracks
+mc yt play N                # replay cached track
+mc yt remove N / clear      # manage cache
+
+mc ai play [-p PROMPT]      # generate AI music
+mc ai / mc ai list          # list generated tracks
+mc ai replay N              # replay generated track
+mc ai model                 # list/download/delete/default models
+
+mc history / mc h            # show play history
+mc history play N            # replay from history
+mc mood [MOOD]              # list moods or play mood radio
+
+mc config                   # show config paths
+mc daemon start|stop|status # manage daemon
+```
+
+> **Note:** `music-cli` still works as the full command name for all commands.
+
+Use `-h` or `--help` at any level for details (e.g. `mc -h`, `mc play -h`, `mc radio -h`).
+
+</details>
+
+<details>
+<summary><strong>Migration Guide (from music-cli v1)</strong></summary>
+
+| Old command | New command |
+|---|---|
+| `music-cli play -m local -s file.mp3` | `mc play file.mp3` |
+| `music-cli play -m youtube -s URL` | `mc yt play URL` |
+| `music-cli play -m history -i 3` | `mc history play 3` |
+| `music-cli play -m ai` | `mc ai play` |
+| `music-cli radios` | `mc radio` |
+| `music-cli update-radios` | `mc radio update` |
+| `music-cli volume 50` | `mc vol 50` |
+
+All old command names continue to work as hidden aliases; they are simply no longer shown in `--help`.
 
 </details>
 
@@ -205,24 +245,26 @@ curl -sSL https://raw.githubusercontent.com/luongnv89/music-cli/main/install.sh 
 <summary><strong>Play Modes</strong></summary>
 
 ```bash
-# Radio (default)
-music-cli play                     # Time-based selection
-music-cli play -s "deep house"     # By station name
-music-cli play --mood focus        # By mood
+# Smart play (auto-detects source)
+mc play                              # Context-aware radio
+mc play ~/song.mp3                   # Local file
+mc play "https://youtube.com/..."    # YouTube URL
+mc play "deep house"                 # Station name
 
-# Local
-music-cli play -m local -s song.mp3
-music-cli play -m local --auto     # Shuffle
+# Mood-based
+mc play -M focus                     # By mood
+
+# Local shuffle
+mc play -m local --auto              # Shuffle local files
 
 # AI (requires [ai] extras)
-music-cli play -m ai --mood happy -d 60
+mc ai play -p "happy jazz" -d 60    # Generate a 60s track
 
 # YouTube
-music-cli play -m youtube -s "https://youtube.com/watch?v=..."
-music-cli play -m yt -s "https://youtu.be/..."
+mc yt play URL                       # Stream YouTube audio
 
 # History
-music-cli play -m history -i 3     # Replay item #3
+mc history play 3                    # Replay item #3
 ```
 
 </details>
@@ -232,17 +274,17 @@ music-cli play -m history -i 3     # Replay item #3
 
 ```bash
 # List all stations with numbers
-music-cli radios
-music-cli radios list
+mc radio
+mc radio list
 
 # Play by station number
-music-cli radios play 5
+mc radio play 5
 
 # Add a new station interactively
-music-cli radios add
+mc radio add
 
 # Remove a station
-music-cli radios remove 10
+mc radio remove 10
 ```
 
 ### Pre-configured Stations
@@ -268,15 +310,15 @@ Generate unique audio with multiple AI models via HuggingFace:
 pip install 'coder-music-cli[ai]'
 
 # Generate and manage AI music
-music-cli ai play                              # Context-aware (default: musicgen-small)
-music-cli ai play -p "jazz piano"              # Custom prompt
-music-cli ai play -m audioldm-s-full-v2        # Use AudioLDM model
-music-cli ai play -m bark-small -p "Hello!"    # Use Bark for speech
-music-cli ai play --mood focus -d 30           # 30-second focus track
-music-cli ai models                            # List available models
-music-cli ai list                              # List all generated tracks
-music-cli ai replay 1                          # Replay track #1
-music-cli ai remove 2                          # Delete track #2
+mc ai play                              # Context-aware (default: musicgen-small)
+mc ai play -p "jazz piano"              # Custom prompt
+mc ai play -m audioldm-s-full-v2        # Use AudioLDM model
+mc ai play -m bark-small -p "Hello!"    # Use Bark for speech
+mc ai play -M focus -d 30              # 30-second focus track
+mc ai model                             # List available models
+mc ai list                              # List all generated tracks
+mc ai replay 1                          # Replay track #1
+mc ai remove 2                          # Delete track #2
 ```
 
 ### Available AI Models
@@ -296,15 +338,15 @@ music-cli ai remove 2                          # Delete track #2
 
 | Command | Description |
 |---------|-------------|
-| `ai models` | List all available AI models |
-| `ai list` | Show all AI-generated tracks with prompts |
-| `ai play` | Generate music from current context |
-| `ai play -m <model>` | Generate with specific model |
-| `ai play -p "prompt"` | Generate with custom prompt |
-| `ai play --mood focus` | Generate with specific mood |
-| `ai play -d 30` | Generate 30-second track (default: 5s) |
-| `ai replay <num>` | Replay track by number (regenerates if file missing) |
-| `ai remove <num>` | Delete track and audio file |
+| `mc ai model` | List all available AI models |
+| `mc ai list` | Show all AI-generated tracks with prompts |
+| `mc ai play` | Generate music from current context |
+| `mc ai play -m <model>` | Generate with specific model |
+| `mc ai play -p "prompt"` | Generate with custom prompt |
+| `mc ai play -M focus` | Generate with specific mood |
+| `mc ai play -d 30` | Generate 30-second track (default: 15s) |
+| `mc ai replay <num>` | Replay track by number (regenerates if file missing) |
+| `mc ai remove <num>` | Delete track and audio file |
 
 ### AI Features
 - **Multiple models** — MusicGen, AudioLDM, and Bark model families
@@ -347,26 +389,26 @@ Stream audio directly from YouTube URLs with automatic offline caching:
 
 ```bash
 # Play YouTube audio (automatically cached)
-music-cli play -m youtube -s "https://youtube.com/watch?v=..."
-music-cli play -m yt -s "https://youtu.be/..."  # Short alias
+mc play "https://youtube.com/watch?v=..."
+mc play "https://youtu.be/..."
 
 # Manage cached tracks
-music-cli youtube                    # List all cached tracks
-music-cli youtube cached             # Same as above
-music-cli youtube play 3             # Play cached track #3 (works offline)
-music-cli youtube remove 1           # Remove cached track #1
-music-cli youtube clear              # Clear entire cache
+mc yt                    # List all cached tracks
+mc yt list               # Same as above
+mc yt play 3             # Play cached track #3 (works offline)
+mc yt remove 1           # Remove cached track #1
+mc yt clear              # Clear entire cache
 ```
 
 ### YouTube Command Suite
 
 | Command | Description |
 |---------|-------------|
-| `youtube` | List all cached tracks (default) |
-| `youtube cached` | List cached tracks with cache statistics |
-| `youtube play <num>` | Play cached track by number (offline) |
-| `youtube remove <num>` | Remove a cached track |
-| `youtube clear` | Clear all cached tracks |
+| `mc yt` | List all cached tracks (default) |
+| `mc yt list` | List cached tracks with cache statistics |
+| `mc yt play <num>` | Play cached track by number (offline) |
+| `mc yt remove <num>` | Remove a cached track |
+| `mc yt clear` | Clear all cached tracks |
 
 ### YouTube Features
 - **Automatic caching** — Audio cached in background while streaming
@@ -422,7 +464,7 @@ When you update music-cli, you'll be notified if new radio stations are availabl
 
 ```bash
 # Check and update stations
-music-cli update-radios
+mc radio update
 
 # Options:
 # [M] Merge   - Add new stations to your list (recommended)
@@ -434,7 +476,7 @@ music-cli update-radios
 
 ```bash
 # Interactive
-music-cli radios add
+mc radio add
 
 # Or edit directly: ~/.config/music-cli/radios.txt
 ChillHop|https://streams.example.com/chillhop.mp3
@@ -449,7 +491,7 @@ Jazz FM|https://streams.example.com/jazz.mp3
 The `status` command shows playback info plus a random inspirational quote:
 
 ```bash
-$ music-cli status
+$ mc status
 Status: ▶ playing
 Track: Groove Salad [radio]
 Volume: 80%
@@ -457,7 +499,7 @@ Context: morning / weekday
 
 "Music gives a soul to the universe, wings to the mind, flight to the imagination." - Plato
 
-Version: 0.3.0
+Version: 0.8.14
 GitHub: https://github.com/luongnv89/music-cli
 ```
 
