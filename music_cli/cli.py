@@ -217,9 +217,10 @@ class AliasedGroup(click.Group):
         super().format_usage(ctx, formatter)
 
 
-def _register_alias(group: AliasedGroup, alias: str, target: str) -> None:
+def _register_alias(group: click.Group, alias: str, target: str) -> None:
     """Register a hidden alias on an AliasedGroup."""
-    group.add_alias(alias, target)
+    cast_group: AliasedGroup = group  # type: ignore[assignment]
+    cast_group.add_alias(alias, target)
 
 
 @click.group(
@@ -1605,12 +1606,11 @@ _register_alias(main, "st", "status")
 _register_alias(main, "h", "history")
 
 # Task 1.3: Inside yt group, "cached" -> "list"
-_register_alias(youtube_group, "cached", "list")  # type: ignore[arg-type]
+_register_alias(youtube_group, "cached", "list")
 
 # Task 2.6: "models" -> "model" (old name), "set-default" -> "default" (old name)
-_register_alias(ai_group, "models", "model")  # type: ignore[arg-type]
-_register_alias(ai_models_group, "set-default", "default")  # type: ignore[arg-type]
-
+_register_alias(ai_group, "models", "model")
+_register_alias(ai_models_group, "set-default", "default")
 
 if __name__ == "__main__":
     main()

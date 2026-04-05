@@ -107,6 +107,10 @@ disallow_untyped_defs = false
 ignore_missing_imports = true
 check_untyped_defs = false
 
+[[tool.mypy.overrides]]
+module = "music_cli.hf_cache"
+warn_unused_ignores = false
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]

@@ -22,9 +22,9 @@ try:
     HF_HUB_AVAILABLE = True
 except ImportError:
     HF_HUB_AVAILABLE = False
-    scan_cache_dir = None  # type: ignore[assignment]
-    snapshot_download = None  # type: ignore[assignment]
-    HfHubHTTPError = Exception  # type: ignore[misc,assignment]
+    scan_cache_dir = None  # type: ignore[assignment]  # noqa: F811
+    snapshot_download = None  # type: ignore[assignment]  # noqa: F811
+    HfHubHTTPError = Exception  # type: ignore[misc,assignment]  # noqa: F811
 
 
 @dataclass
