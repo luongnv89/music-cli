@@ -70,15 +70,17 @@ class TestAITrack:
     def test_file_exists_true(self):
         """Test file_exists returns True for existing file."""
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+            tmp_path = f.name
+        try:
             track = AITrack(
                 prompt="test",
-                file_path=f.name,
+                file_path=tmp_path,
                 timestamp="2025-01-01T00:00:00",
                 duration=30,
             )
             assert track.file_exists() is True
-            # Clean up
-            Path(f.name).unlink()
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
 
     def test_display_prompt_short(self):
         """Test display_prompt for short prompts."""
