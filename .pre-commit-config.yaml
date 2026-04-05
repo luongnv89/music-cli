@@ -45,6 +45,22 @@ repos:
         args: [-c, pyproject.toml, -r, music_cli]
         additional_dependencies: ["bandit[toml]"]
 
+  # Fast e2e smoke tests — run only tests that don't require a live daemon.
+  # These complete in a few seconds and catch CLI wiring regressions early.
+  - repo: local
+    hooks:
+      - id: pytest-e2e
+        name: pytest e2e (fast, no daemon)
+        language: system
+        # Run only test_e2e.py; skip the slow ai/youtube/daemon-integration
+        # tests that require external processes.
+        entry: python -m pytest tests/test_e2e.py -x -q --no-header --tb=short
+        types: [python]
+        pass_filenames: false
+        always_run: false
+        # Only trigger when CLI source or e2e tests are modified
+        files: ^(music_cli/cli\.py|music_cli/config\.py|tests/test_e2e\.py)$
+
 # CI configuration
 ci:
   autofix_commit_msg: "style: auto-fix pre-commit hooks"
