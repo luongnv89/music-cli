@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-04-05
+
+### Added
+- Add `mc` alias and short command names for faster CLI usage (CLI v2 Phase 1)
+- Add playback aliases for common actions (CLI v2 Phase 1)
+- Add smart play detection and unified AI command (CLI v2 Phase 2)
+- Add `history` subcommand to view recently played tracks (CLI v2 Phase 2)
+- Add volume validation for playback commands (CLI v2 Phase 2)
+- Add help shortcut and `NO_COLOR` environment variable support (CLI v2 Phase 3)
+- Add one-liner install script (`curl | bash`) for easier installation
+- Add end-to-end tests for all commands with CI matrix for Python 3.12, 3.13, and 3.14
+- Add YouTube replay history tracking for CLI
+
+### Fixed
+- Fix AI timeout increased to 10 minutes and improve URL cleaning for YouTube source
+- Fix Windows `PermissionError` in `test_file_exists_true` test
+- Fix mypy compatibility in environments with and without `huggingface_hub` installed
+- Suppress pre-existing mypy errors with `type: ignore` annotations
+- Resolve CI lint failures and test mock contract bugs
+- Bump `ruff-pre-commit` to v0.11.2 to match CI ruff version
+- Skip `pytest-e2e` in CI pre-commit (language: system requires venv)
+
+### Documentation
+- Update all docs to reflect CLI v2 `mc` commands
+- Restructure README as a landing page to convert visitors into users
+
+### Other Changes
+- Redesign logo with new Pulse Prompt identity
+- Remove ASCII logo from `status` output for cleaner terminal display
+- Remove web module entirely
+- Separate Python and web CI workflows using path filters
+- Add AI/dev tool configs to `.gitignore`
+- Add OSS community health files (CONTRIBUTING, CODE_OF_CONDUCT, etc.)
+- Apply pre-commit auto-fixes
+
 ## [0.8.14] - 2025-01-14
 
 ### Changed

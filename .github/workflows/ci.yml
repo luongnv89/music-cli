@@ -56,7 +56,11 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.12", "3.13", "3.14"]
+        exclude:
+          # 3.14 is pre-release; skip Windows until wheels are widely available
+          - os: windows-latest
+            python-version: "3.14"
 
     steps:
       - uses: actions/checkout@v4
@@ -65,6 +69,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          # Allow pre-release builds for 3.14
+          allow-prereleases: true
 
       - name: Install FFmpeg (Linux)
         if: runner.os == 'Linux'
@@ -83,13 +89,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
-      - name: Run tests
+      - name: Run unit + e2e tests
         run: pytest tests/ -v --cov=music_cli --cov-report=xml --cov-report=term-missing
-        continue-on-error: true
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
-        if: matrix.python-version == '3.11' && matrix.os == 'ubuntu-latest'
+        if: matrix.python-version == '3.12' && matrix.os == 'ubuntu-latest'
         with:
           files: ./coverage.xml
           fail_ci_if_error: false
@@ -136,3 +141,7 @@ jobs:
 
       - name: Run pre-commit
         uses: pre-commit/action@v3.0.1
+        env:
+          # pytest-e2e uses language: system and requires the project venv.
+          # Tests are run by the dedicated test matrix job — skip here.
+          SKIP: pytest-e2e

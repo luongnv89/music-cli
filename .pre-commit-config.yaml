@@ -18,7 +18,7 @@ repos:
 
   # Python linting and formatting with Ruff (fast, replaces black/flake8/isort/etc)
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.3.4
+    rev: v0.11.2
     hooks:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
@@ -44,6 +44,22 @@ repos:
       - id: bandit
         args: [-c, pyproject.toml, -r, music_cli]
         additional_dependencies: ["bandit[toml]"]
+
+  # Fast e2e smoke tests — run only tests that don't require a live daemon.
+  # These complete in a few seconds and catch CLI wiring regressions early.
+  - repo: local
+    hooks:
+      - id: pytest-e2e
+        name: pytest e2e (fast, no daemon)
+        language: system
+        # Run only test_e2e.py; skip the slow ai/youtube/daemon-integration
+        # tests that require external processes.
+        entry: python -m pytest tests/test_e2e.py -x -q --no-header --tb=short
+        types: [python]
+        pass_filenames: false
+        always_run: false
+        # Only trigger when CLI source or e2e tests are modified
+        files: ^(music_cli/cli\.py|music_cli/config\.py|tests/test_e2e\.py)$
 
 # CI configuration
 ci:

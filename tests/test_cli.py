@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from click.testing import CliRunner
 
-from music_cli.cli import main, _detect_play_mode, icon, _is_no_color
+from music_cli.cli import _detect_play_mode, icon, main
 
 
 @pytest.fixture
@@ -58,22 +58,40 @@ class TestHelpOutput:
             # Make sure the old name doesn't appear as a listed command.
             # We check it doesn't appear on a line starting with whitespace (command listing).
             lines = result.output.splitlines()
-            command_lines = [l.strip().split()[0] for l in lines if l.startswith("  ") and l.strip()]
+            command_lines = [
+                line.strip().split()[0] for line in lines if line.startswith("  ") and line.strip()
+            ]
             assert old not in command_lines, f"Old name '{old}' should be hidden from --help"
 
     def test_help_hides_playback_aliases(self, runner):
         result = runner.invoke(main, ["--help"])
         assert result.exit_code == 0
         lines = result.output.splitlines()
-        command_lines = [l.strip().split()[0] for l in lines if l.startswith("  ") and l.strip()]
+        command_lines = [
+            line.strip().split()[0] for line in lines if line.startswith("  ") and line.strip()
+        ]
         for alias in ("s", "pp", "r", "n", "st", "h"):
             assert alias not in command_lines, f"Alias '{alias}' should be hidden from --help"
 
     def test_help_shows_expected_commands(self, runner):
         result = runner.invoke(main, ["--help"])
         assert result.exit_code == 0
-        for cmd in ("play", "stop", "pause", "resume", "next", "status", "history",
-                     "radio", "yt", "mood", "vol", "ai", "daemon", "config"):
+        for cmd in (
+            "play",
+            "stop",
+            "pause",
+            "resume",
+            "next",
+            "status",
+            "history",
+            "radio",
+            "yt",
+            "mood",
+            "vol",
+            "ai",
+            "daemon",
+            "config",
+        ):
             assert cmd in result.output
 
     def test_version(self, runner):
@@ -374,9 +392,7 @@ class TestDeprecatePlayAI:
     @patch("music_cli.cli.ensure_daemon")
     @patch("music_cli.cli.check_ffplay_available", return_value=True)
     def test_play_m_ai_shows_warning(self, mock_ffplay, mock_daemon, runner, mock_daemon_client):
-        mock_daemon_client.play.return_value = {
-            "track": {"title": "AI Track", "source_type": "ai"}
-        }
+        mock_daemon_client.play.return_value = {"track": {"title": "AI Track", "source_type": "ai"}}
         mock_daemon.return_value = mock_daemon_client
         result = runner.invoke(main, ["play", "-m", "ai"])
         assert "Deprecated" in result.output
@@ -395,7 +411,9 @@ class TestDeprecatePlayHistory:
 
     @patch("music_cli.cli.ensure_daemon")
     @patch("music_cli.cli.check_ffplay_available", return_value=True)
-    def test_play_m_history_shows_warning(self, mock_ffplay, mock_daemon, runner, mock_daemon_client):
+    def test_play_m_history_shows_warning(
+        self, mock_ffplay, mock_daemon, runner, mock_daemon_client
+    ):
         mock_daemon.return_value = mock_daemon_client
         result = runner.invoke(main, ["play", "-m", "history", "-i", "3"])
         assert "Deprecated" in result.output
@@ -484,7 +502,9 @@ class TestRadioUpdate:
         result = runner.invoke(main, ["--help"])
         assert result.exit_code == 0
         lines = result.output.splitlines()
-        command_lines = [l.strip().split()[0] for l in lines if l.startswith("  ") and l.strip()]
+        command_lines = [
+            line.strip().split()[0] for line in lines if line.startswith("  ") and line.strip()
+        ]
         assert "update-radios" not in command_lines
 
 
@@ -527,7 +547,9 @@ class TestAIDurationDefault:
 
     @patch("music_cli.cli.ensure_daemon")
     @patch("music_cli.cli.check_ffplay_available", return_value=True)
-    def test_play_duration_default_is_15(self, mock_ffplay, mock_daemon, runner, mock_daemon_client):
+    def test_play_duration_default_is_15(
+        self, mock_ffplay, mock_daemon, runner, mock_daemon_client
+    ):
         """play command sends duration=15 when not explicitly set."""
         mock_daemon.return_value = mock_daemon_client
         result = runner.invoke(main, ["play"])
@@ -588,7 +610,11 @@ class TestVolumeValidation:
         result = runner.invoke(main, ["vol", "-1"])
         assert result.exit_code != 0
         # Click outputs an error about the range
-        assert "not in the range" in result.output.lower() or "invalid" in result.output.lower() or result.exit_code == 2
+        assert (
+            "not in the range" in result.output.lower()
+            or "invalid" in result.output.lower()
+            or result.exit_code == 2
+        )
 
     def test_vol_150_rejected(self, runner):
         result = runner.invoke(main, ["vol", "150"])
@@ -645,9 +671,7 @@ class TestHelpTextUpdated:
         # Check the help body (skip usage line which may contain entry point name)
         body_lines = result.output.splitlines()[1:]
         body = "\n".join(body_lines)
-        assert "music-cli" not in body, (
-            f"Found 'music-cli' in help for {cmd_args}:\n{body}"
-        )
+        assert "music-cli" not in body, f"Found 'music-cli' in help for {cmd_args}:\n{body}"
 
 
 # -------------------------------------------------------------------------
@@ -674,7 +698,9 @@ class TestPhase2Integration:
 
     @patch("music_cli.cli.ensure_daemon")
     @patch("music_cli.cli.check_ffplay_available", return_value=True)
-    def test_play_explicit_mode_overrides_detection(self, mock_ffplay, mock_daemon, runner, mock_daemon_client):
+    def test_play_explicit_mode_overrides_detection(
+        self, mock_ffplay, mock_daemon, runner, mock_daemon_client
+    ):
         """When -m is given explicitly, auto-detection is skipped."""
         mock_daemon.return_value = mock_daemon_client
         result = runner.invoke(main, ["play", "-m", "radio", "-s", "something"])
@@ -847,7 +873,9 @@ class TestNoColorFlag:
 
     @patch("music_cli.cli.ensure_daemon")
     @patch("music_cli.cli.check_ffplay_available", return_value=True)
-    def test_no_color_play_text_fallback(self, mock_ffplay, mock_daemon, runner, mock_daemon_client):
+    def test_no_color_play_text_fallback(
+        self, mock_ffplay, mock_daemon, runner, mock_daemon_client
+    ):
         mock_daemon.return_value = mock_daemon_client
         result = runner.invoke(main, ["--no-color", "play"])
         assert result.exit_code == 0
@@ -862,7 +890,7 @@ class TestIconHelper:
         """Without NO_COLOR, icon returns the symbol."""
         env = os.environ.copy()
         env.pop("NO_COLOR", None)
-        result = runner.invoke(main, ["--help"])  # Just establish a context
+        runner.invoke(main, ["--help"])  # Just establish a context
         # Test icon outside click context using env var
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("NO_COLOR", None)
