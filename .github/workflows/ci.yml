@@ -91,7 +91,6 @@ jobs:
 
       - name: Run unit + e2e tests
         run: pytest tests/ -v --cov=music_cli --cov-report=xml --cov-report=term-missing
-        continue-on-error: true
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
