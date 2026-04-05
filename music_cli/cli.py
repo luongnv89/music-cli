@@ -1605,11 +1605,11 @@ _register_alias(main, "st", "status")
 _register_alias(main, "h", "history")
 
 # Task 1.3: Inside yt group, "cached" -> "list"
-_register_alias(youtube_group, "cached", "list")
+_register_alias(youtube_group, "cached", "list")  # type: ignore[arg-type]
 
 # Task 2.6: "models" -> "model" (old name), "set-default" -> "default" (old name)
-_register_alias(ai_group, "models", "model")
-_register_alias(ai_models_group, "set-default", "default")
+_register_alias(ai_group, "models", "model")  # type: ignore[arg-type]
+_register_alias(ai_models_group, "set-default", "default")  # type: ignore[arg-type]
 
 
 if __name__ == "__main__":

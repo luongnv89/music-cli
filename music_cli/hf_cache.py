@@ -22,9 +22,9 @@ try:
     HF_HUB_AVAILABLE = True
 except ImportError:
     HF_HUB_AVAILABLE = False
-    scan_cache_dir = None
-    snapshot_download = None
-    HfHubHTTPError = Exception
+    scan_cache_dir = None  # type: ignore[assignment]
+    snapshot_download = None  # type: ignore[assignment]
+    HfHubHTTPError = Exception  # type: ignore[misc,assignment]
 
 
 @dataclass
@@ -66,7 +66,7 @@ def get_hf_cache_dir() -> Path | None:
 
     try:
         cache_info = scan_cache_dir()
-        return Path(cache_info.cache_dir)
+        return Path(cache_info.cache_dir)  # type: ignore[attr-defined]
     except Exception as e:
         logger.debug(f"Failed to get cache directory: {e}")
         return None
@@ -111,7 +111,7 @@ def scan_all_cached_models() -> dict[str, CacheInfo]:
                     hf_model_id=repo.repo_id,
                     size_bytes=repo.size_on_disk,
                     size_gb=repo.size_on_disk / (1024 * 1024 * 1024),
-                    last_accessed=repo.last_accessed,
+                    last_accessed=repo.last_accessed,  # type: ignore[arg-type]
                     repo_path=repo.repo_path,
                 )
 
