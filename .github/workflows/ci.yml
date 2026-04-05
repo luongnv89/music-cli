@@ -141,3 +141,7 @@ jobs:
 
       - name: Run pre-commit
         uses: pre-commit/action@v3.0.1
+        env:
+          # pytest-e2e uses language: system and requires the project venv.
+          # Tests are run by the dedicated test matrix job — skip here.
+          SKIP: pytest-e2e
