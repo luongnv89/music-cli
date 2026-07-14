@@ -23,8 +23,8 @@ class LocalSource:
         file_path = Path(path)
 
         if not file_path.is_absolute():
-            # Try relative to music dir
-            file_path = self.music_dir / file_path
+            # Check current working directory first, then fall back to music dir
+            file_path = file_path.resolve() if file_path.exists() else self.music_dir / file_path
 
         if not file_path.exists():
             return None
