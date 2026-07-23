@@ -289,6 +289,25 @@ def _detect_play_mode(source_arg):
     return "radio", source_arg
 
 
+def _resolve_local_path(source: str) -> str:
+    """Resolve a local playback source against the CLI's cwd.
+
+    The daemon is a long-running background process started once with its
+    own cwd (see start_daemon_background) — it is generally not the cwd of
+    the terminal a later `play` command runs in. A still-relative path
+    handed to the daemon therefore gets checked against the *daemon's* cwd,
+    not the user's, and silently misses even when the file is right there.
+    Resolve it to an absolute path here, while we still have the correct
+    cwd, so it survives the trip over IPC unchanged. Leave anything that
+    doesn't exist relative to cwd as-is so the daemon's fallback to the
+    configured music directory keeps working.
+    """
+    path = Path(source)
+    if not path.is_absolute() and path.exists():
+        return str(path.resolve())
+    return source
+
+
 @main.command()
 @click.argument("source", required=False, default=None)
 @click.option(
@@ -365,6 +384,11 @@ def play(source, mode, source_flag, mood, auto, duration, index):
         effective_source = detected_source
     # If mode was explicitly given, keep the old behaviour
     # (effective_source from flag/positional is used as-is)
+
+    # Issue #18: a relative local path must be resolved before it crosses
+    # the IPC boundary to the daemon (see _resolve_local_path).
+    if mode == "local" and effective_source:
+        effective_source = _resolve_local_path(effective_source)
 
     client = ensure_daemon()
 
