@@ -1,12 +1,13 @@
 """Tests for CLI v2 Phase 1, Phase 2 & Phase 3."""
 
 import os
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 from click.testing import CliRunner
 
-from music_cli.cli import _detect_play_mode, icon, main
+from music_cli.cli import _detect_play_mode, _resolve_local_path, icon, main
 
 
 @pytest.fixture
@@ -379,6 +380,90 @@ class TestSmartPlayDetection:
         assert result.exit_code == 0
         call_kwargs = mock_daemon_client.play.call_args
         assert call_kwargs[1]["mode"] == "context" or call_kwargs.kwargs["mode"] == "context"
+
+
+class TestResolveLocalPath:
+    """Unit tests for _resolve_local_path (issue #18)."""
+
+    def test_relative_existing_path_resolved_to_absolute(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        f = Path("song.mp3")
+        f.touch()
+
+        resolved = _resolve_local_path("song.mp3")
+
+        assert resolved == str((tmp_path / "song.mp3").resolve())
+
+    def test_relative_missing_path_returned_unchanged(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+
+        resolved = _resolve_local_path("missing.mp3")
+
+        assert resolved == "missing.mp3"
+
+    def test_absolute_path_returned_unchanged(self, tmp_path):
+        f = tmp_path / "song.mp3"
+        f.touch()
+
+        resolved = _resolve_local_path(str(f))
+
+        assert resolved == str(f)
+
+
+class TestPlayRelativeLocalPath:
+    """`mc play <relative-file>` must send the daemon an absolute path.
+
+    The daemon is a separate long-running process — a relative path sent
+    as-is would be checked against the *daemon's* cwd, not the terminal's,
+    and would silently fail to be found (issue #18).
+    """
+
+    @patch("music_cli.cli.ensure_daemon")
+    @patch("music_cli.cli.check_ffplay_available", return_value=True)
+    def test_play_relative_file_sends_absolute_source(
+        self, mock_ffplay, mock_daemon, runner, mock_daemon_client, tmp_path, monkeypatch
+    ):
+        monkeypatch.chdir(tmp_path)
+        Path("song.mp3").touch()
+        mock_daemon.return_value = mock_daemon_client
+
+        result = runner.invoke(main, ["play", "song.mp3"])
+
+        assert result.exit_code == 0
+        call_kwargs = mock_daemon_client.play.call_args.kwargs
+        assert call_kwargs["mode"] == "local"
+        assert call_kwargs["source"] == str((tmp_path / "song.mp3").resolve())
+
+    @patch("music_cli.cli.ensure_daemon")
+    @patch("music_cli.cli.check_ffplay_available", return_value=True)
+    def test_play_explicit_mode_local_relative_file_sends_absolute_source(
+        self, mock_ffplay, mock_daemon, runner, mock_daemon_client, tmp_path, monkeypatch
+    ):
+        monkeypatch.chdir(tmp_path)
+        Path("song.mp3").touch()
+        mock_daemon.return_value = mock_daemon_client
+
+        result = runner.invoke(main, ["play", "song.mp3", "--mode", "local"])
+
+        assert result.exit_code == 0
+        call_kwargs = mock_daemon_client.play.call_args.kwargs
+        assert call_kwargs["source"] == str((tmp_path / "song.mp3").resolve())
+
+    @patch("music_cli.cli.ensure_daemon")
+    @patch("music_cli.cli.check_ffplay_available", return_value=True)
+    def test_play_explicit_mode_local_missing_file_kept_relative(
+        self, mock_ffplay, mock_daemon, runner, mock_daemon_client, tmp_path, monkeypatch
+    ):
+        # Not found in cwd -> left unchanged so the daemon still falls back
+        # to the configured music directory (today's behavior, preserved).
+        monkeypatch.chdir(tmp_path)
+        mock_daemon.return_value = mock_daemon_client
+
+        result = runner.invoke(main, ["play", "not-in-cwd.mp3", "--mode", "local"])
+
+        assert result.exit_code == 0
+        call_kwargs = mock_daemon_client.play.call_args.kwargs
+        assert call_kwargs["source"] == "not-in-cwd.mp3"
 
 
 # -------------------------------------------------------------------------

@@ -23,8 +23,14 @@ class LocalSource:
         file_path = Path(path)
 
         if not file_path.is_absolute():
-            # Try relative to music dir
-            file_path = self.music_dir / file_path
+            # Prefer a match relative to the current working directory;
+            # resolve it now so the result doesn't depend on cwd staying
+            # the same for the rest of the call chain (e.g. across the
+            # daemon's IPC boundary). Fall back to the configured music dir.
+            if file_path.exists():
+                file_path = file_path.resolve()
+            else:
+                file_path = self.music_dir / file_path
 
         if not file_path.exists():
             return None
