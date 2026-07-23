@@ -193,16 +193,18 @@ install_music_cli() {
 
 # --- Symlink / PATH setup ---
 link_binary() {
-    local venv_bin="$INSTALL_DIR/bin/music-cli"
-    local link_target="$HOME/.local/bin/music-cli"
-
     mkdir -p "$HOME/.local/bin"
 
-    if [ -L "$link_target" ] || [ -f "$link_target" ]; then
-        rm -f "$link_target"
-    fi
-    ln -s "$venv_bin" "$link_target"
-    ok "Linked $link_target -> $venv_bin"
+    for cmd in music-cli mc; do
+        local venv_bin="$INSTALL_DIR/bin/$cmd"
+        local link_target="$HOME/.local/bin/$cmd"
+
+        if [ -L "$link_target" ] || [ -f "$link_target" ]; then
+            rm -f "$link_target"
+        fi
+        ln -s "$venv_bin" "$link_target"
+        ok "Linked $link_target -> $venv_bin"
+    done
 
     # Shell PATH advice
     if ! echo "$PATH" | grep -q "$HOME/.local/bin"; then
