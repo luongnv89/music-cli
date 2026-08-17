@@ -883,6 +883,46 @@ def run_daemon() -> None:
     asyncio.run(daemon.start())
 
 
+def _pid_alive(pid: int) -> bool:
+    """Check if a PID is alive, cross-platform safe (does not kill on Windows).
+
+    On Unix, uses ``os.kill(pid, 0)`` which is a no-op liveness probe.
+    On Windows, uses ``OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION)``
+    to query process existence without requiring ``TerminateProcess``
+    access — this avoids the Windows ``os.kill()`` bug where signal ``0``
+    calls ``TerminateProcess(handle, 0)`` and can kill the process.
+
+    Args:
+        pid: The process ID to check.
+
+    Returns:
+        ``True`` if a process with the given PID exists, ``False`` otherwise.
+    """
+    from .platform import is_unix
+
+    if is_unix():
+        try:
+            os.kill(pid, 0)
+            return True
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            # Process exists but we lack permission to signal it.
+            return True
+    else:
+        # Windows: use ctypes to call OpenProcess with limited rights.
+        import ctypes
+
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        handle = ctypes.windll.kernel32.OpenProcess(
+            PROCESS_QUERY_LIMITED_INFORMATION, False, pid
+        )
+        if handle:
+            ctypes.windll.kernel32.CloseHandle(handle)
+            return True
+        return False
+
+
 def get_daemon_pid() -> int | None:
     """Get the PID of the running daemon.
 
@@ -898,19 +938,27 @@ def get_daemon_pid() -> int | None:
 
     try:
         pid = int(config.pid_file.read_text().strip())
-        os.kill(pid, 0)  # Check if running
-        return pid
-    except (ValueError, ProcessLookupError, PermissionError, OSError):
-        # PID file is stale, clean up
+    except (ValueError, OSError):
         try:
             if config.pid_file.exists():
                 config.pid_file.unlink()
-            # Only clean up socket file on Unix (Windows uses TCP)
-            if is_unix() and config.socket_path.exists():
-                config.socket_path.unlink()
         except OSError:
-            pass  # Best effort cleanup
+            pass
         return None
+
+    if _pid_alive(pid):
+        return pid
+
+    # PID file is stale, clean up
+    try:
+        if config.pid_file.exists():
+            config.pid_file.unlink()
+        # Only clean up socket file on Unix (Windows uses TCP)
+        if is_unix() and config.socket_path.exists():
+            config.socket_path.unlink()
+    except OSError:
+        pass  # Best effort cleanup
+    return None
 
 
 def is_daemon_running() -> bool:
