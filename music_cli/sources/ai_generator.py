@@ -109,6 +109,25 @@ def _get_strategy(model_id: str) -> ModelStrategy | None:
             logger.error(f"Model '{model_id}' not found in configuration")
             return None
 
+        # MiniMax is too large to coexist safely with another model. Evict
+        # incompatible cached strategies before loading the new model so GPU
+        # memory is available before ensure_loaded() allocates model weights.
+        model_type = model_config.model_type
+        for cached_model_id in cache.get_cached_models():
+            if cached_model_id == model_id:
+                continue
+            cached_strategy = cache.get(cached_model_id)
+            if cached_strategy is None:
+                continue
+            cached_type = getattr(getattr(cached_strategy, "config", None), "model_type", None)
+            if cached_type is None:
+                cached_config = models_config.get_model(cached_model_id)
+                cached_type = getattr(cached_config, "model_type", None)
+
+            should_evict = model_type == "minimax_music3" or cached_type == "minimax_music3"
+            if should_evict:
+                cache.remove(cached_model_id)
+
         strategy = ModelRegistry.create_strategy(model_config)
 
         if not strategy.ensure_loaded():

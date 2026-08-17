@@ -117,12 +117,12 @@ class MusicDaemon:
                 raise RequestError("Request timed out") from exc
 
             if not chunk:
-                if not text:
-                    return None
                 try:
-                    decoder.decode(b"", final=True)
+                    text += decoder.decode(b"", final=True)
                 except UnicodeDecodeError as exc:
                     raise RequestError("Invalid UTF-8") from exc
+                if not text:
+                    return None
                 raise RequestError("Incomplete JSON request")
 
             size += len(chunk)

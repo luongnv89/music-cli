@@ -52,6 +52,82 @@ class TestConfig:
         assert config.validate_ai_model("minimax-music3") is True
         assert config.get_ai_models_config().get_model("minimax-music3") is not None
 
+    def test_ai_model_overrides_merge_recursively(self, tmp_path: Path) -> None:
+        """Built-in capabilities survive partial nested model overrides."""
+        (tmp_path / "config.toml").write_text(
+            """
+[ai.models.audioldm-s-full-v2]
+description = "my AudioLDM"
+
+[ai.models.audioldm-s-full-v2.extra_params]
+guidance_scale = 4.0
+
+[ai.models.custom-model]
+hf_model_id = "example/custom-model"
+model_type = "musicgen"
+extra_params = { custom_flag = true }
+""".lstrip()
+        )
+
+        config = Config(config_dir=tmp_path)
+
+        partial = config.get_ai_model_config("audioldm-s-full-v2")
+        assert partial is not None
+        assert partial["hf_model_id"] == "cvssp/audioldm-s-full-v2"
+        assert partial["model_type"] == "audioldm"
+        assert partial["extra_params"] == {
+            "num_inference_steps": 10,
+            "guidance_scale": 4.0,
+        }
+
+        custom = config.get_ai_model_config("custom-model")
+        assert custom == {
+            "hf_model_id": "example/custom-model",
+            "model_type": "musicgen",
+            "extra_params": {"custom_flag": True},
+        }
+
+    def test_ai_model_full_override_wins(self, tmp_path: Path) -> None:
+        """Explicit values in a complete built-in model override take precedence."""
+        (tmp_path / "config.toml").write_text(
+            """
+[ai.models.audioldm-s-full-v2]
+hf_model_id = "example/override"
+model_type = "custom"
+description = "override"
+expected_size_gb = 9.0
+default_duration = 20
+max_duration = 40
+min_duration = 3
+tokens_per_second = 12
+enabled = false
+supports_lyrics = true
+requires_lyrics = true
+
+[ai.models.audioldm-s-full-v2.extra_params]
+num_inference_steps = 99
+guidance_scale = 8.0
+""".lstrip()
+        )
+
+        config = Config(config_dir=tmp_path)
+        model = config.get_ai_model_config("audioldm-s-full-v2")
+
+        assert model == {
+            "hf_model_id": "example/override",
+            "model_type": "custom",
+            "description": "override",
+            "expected_size_gb": 9.0,
+            "default_duration": 20,
+            "max_duration": 40,
+            "min_duration": 3,
+            "tokens_per_second": 12,
+            "enabled": False,
+            "supports_lyrics": True,
+            "requires_lyrics": True,
+            "extra_params": {"num_inference_steps": 99, "guidance_scale": 8.0},
+        }
+
     def test_config_set_and_get(self, tmp_path: Path) -> None:
         """Test setting and getting config values."""
         config = Config(config_dir=tmp_path)

@@ -12,10 +12,11 @@ from music_cli.client import DaemonClient
 from music_cli.config import Config
 from music_cli.daemon import MusicDaemon, RequestError
 from music_cli.player.base import TrackInfo
-from music_cli.sources.ai_generator import AIGenerator
+from music_cli.sources.ai_generator import AIGenerator, _get_strategy
 from music_cli.sources.ai_models import ModelRegistry
 from music_cli.sources.ai_models.minimax_strategy import MiniMaxMusic3Strategy
 from music_cli.sources.ai_models.model_config import ModelConfig
+from music_cli.sources.ai_models.strategy_cache import LRUStrategyCache
 
 
 def minimax_config() -> ModelConfig:
@@ -28,6 +29,98 @@ def minimax_config() -> ModelConfig:
         min_duration=5,
         max_duration=300,
     )
+
+
+def test_minimax_cache_exclusivity_happens_before_loading() -> None:
+    cache = LRUStrategyCache(max_size=3)
+    other = Mock(is_loaded=True)
+    other.config = ModelConfig("other", "example/other", "musicgen")
+    cache.put("other", other)
+    target_config = ModelConfig("custom-minimax", "example/minimax", "minimax_music3")
+    loaded = Mock(is_loaded=True, config=target_config)
+    loaded.ensure_loaded.return_value = True
+
+    def ensure_loaded() -> bool:
+        assert cache.get_cached_models() == []
+        return True
+
+    loaded.ensure_loaded.side_effect = ensure_loaded
+    models_config = Mock()
+    models_config.get_model.return_value = target_config
+    config = Mock()
+    config.get_ai_models_config.return_value = models_config
+
+    with (
+        patch("music_cli.config.get_config", return_value=config),
+        patch("music_cli.sources.ai_generator._get_strategy_cache", return_value=cache),
+        patch(
+            "music_cli.sources.ai_models.ModelRegistry.create_strategy",
+            return_value=loaded,
+        ),
+    ):
+        result = _get_strategy("custom-minimax")
+
+    assert result is loaded
+    other.unload.assert_called_once_with()
+    loaded.ensure_loaded.assert_called_once_with()
+
+
+def test_non_minimax_evicts_cached_minimax_before_loading() -> None:
+    cache = LRUStrategyCache(max_size=3)
+    minimax = Mock(is_loaded=True)
+    minimax.config = ModelConfig("custom-minimax", "example/minimax", "minimax_music3")
+    cache.put("custom-minimax", minimax)
+    other = Mock(is_loaded=True)
+    other.config = ModelConfig("other", "example/other", "musicgen")
+    cache.put("other", other)
+    target_config = ModelConfig("new-model", "example/new", "musicgen")
+    loaded = Mock(is_loaded=True, config=target_config)
+
+    def ensure_loaded() -> bool:
+        assert not cache.contains("custom-minimax")
+        assert cache.contains("other")
+        return True
+
+    loaded.ensure_loaded.side_effect = ensure_loaded
+    models_config = Mock()
+    models_config.get_model.return_value = target_config
+    config = Mock()
+    config.get_ai_models_config.return_value = models_config
+
+    with (
+        patch("music_cli.config.get_config", return_value=config),
+        patch("music_cli.sources.ai_generator._get_strategy_cache", return_value=cache),
+        patch(
+            "music_cli.sources.ai_models.ModelRegistry.create_strategy",
+            return_value=loaded,
+        ),
+    ):
+        result = _get_strategy("new-model")
+
+    assert result is loaded
+    minimax.unload.assert_called_once_with()
+    loaded.ensure_loaded.assert_called_once_with()
+
+
+def test_cached_minimax_is_reused_without_eviction_or_reload() -> None:
+    cache = LRUStrategyCache(max_size=3)
+    minimax = Mock(is_loaded=True)
+    minimax.config = ModelConfig("custom-minimax", "example/minimax", "minimax_music3")
+    cache.put("custom-minimax", minimax)
+    other = Mock(is_loaded=True)
+    other.config = ModelConfig("other", "example/other", "musicgen")
+    cache.put("other", other)
+
+    with (
+        patch("music_cli.sources.ai_generator._get_strategy_cache", return_value=cache),
+        patch("music_cli.sources.ai_models.ModelRegistry.create_strategy") as create,
+    ):
+        result = _get_strategy("custom-minimax")
+
+    assert result is minimax
+    minimax.unload.assert_not_called()
+    other.unload.assert_not_called()
+    create.assert_not_called()
 
 
 def test_minimax_is_a_builtin_model(tmp_path) -> None:
@@ -204,6 +297,23 @@ async def test_daemon_reads_request_larger_than_socket_chunk() -> None:
     parsed = await MusicDaemon._read_request(object.__new__(MusicDaemon), reader)
 
     assert parsed == request
+
+
+@pytest.mark.asyncio
+async def test_daemon_returns_none_for_clean_eof() -> None:
+    reader = MagicMock()
+    reader.read = AsyncMock(return_value=b"")
+
+    assert await MusicDaemon._read_request(object.__new__(MusicDaemon), reader) is None
+
+
+@pytest.mark.asyncio
+async def test_daemon_rejects_incomplete_utf8_at_eof() -> None:
+    reader = MagicMock()
+    reader.read = AsyncMock(side_effect=[b"\xc3", b""])
+
+    with pytest.raises(RequestError, match="Invalid UTF-8"):
+        await MusicDaemon._read_request(object.__new__(MusicDaemon), reader)
 
 
 @pytest.mark.asyncio

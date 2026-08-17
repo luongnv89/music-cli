@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import logging
 import sys
+from collections.abc import Mapping
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +20,20 @@ from . import __version__
 from .platform import get_path_provider
 
 logger = logging.getLogger(__name__)
+
+
+def _recursive_mapping_merge(
+    defaults: Mapping[str, Any], overrides: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Merge mappings without mutating either input."""
+    merged = {key: deepcopy(value) for key, value in defaults.items()}
+    for key, value in overrides.items():
+        default_value = merged.get(key)
+        if isinstance(default_value, Mapping) and isinstance(value, Mapping):
+            merged[key] = _recursive_mapping_merge(default_value, value)
+        else:
+            merged[key] = deepcopy(value)
+    return merged
 
 
 class Config:
@@ -615,10 +631,10 @@ Radio Capital|https://icecast.unitedradio.it/Capital.mp3
             **(default_cache if isinstance(default_cache, dict) else {}),
             **(user_cache if isinstance(user_cache, dict) else {}),
         }
-        merged["models"] = {
-            **(default_models if isinstance(default_models, dict) else {}),
-            **(user_models if isinstance(user_models, dict) else {}),
-        }
+        merged["models"] = _recursive_mapping_merge(
+            default_models if isinstance(default_models, Mapping) else {},
+            user_models if isinstance(user_models, Mapping) else {},
+        )
         merged.update(
             {key: value for key, value in user_ai.items() if key not in {"cache", "models"}}
         )
