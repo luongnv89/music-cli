@@ -607,9 +607,9 @@ Radio Capital|https://icecast.unitedradio.it/Capital.mp3
             user_ai = {}
 
         merged: dict[str, Any] = dict(default_ai)
-        default_cache = default_ai.get("cache", {})
+        default_cache: dict[str, Any] = default_ai.get("cache", {})
         user_cache = user_ai.get("cache", {})
-        default_models = default_ai.get("models", {})
+        default_models: dict[str, Any] = default_ai.get("models", {})
         user_models = user_ai.get("models", {})
         merged["cache"] = {
             **(default_cache if isinstance(default_cache, dict) else {}),

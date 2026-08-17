@@ -1,6 +1,7 @@
 """Background daemon for music-cli."""
 
 import asyncio
+import codecs
 import json
 import logging
 import os
@@ -21,6 +22,14 @@ from .sources.youtube import YouTubeSource, is_youtube_available
 from .youtube_history import get_youtube_history
 
 logger = logging.getLogger(__name__)
+
+REQUEST_CHUNK_SIZE = 4096
+MAX_REQUEST_SIZE = 1024 * 1024
+REQUEST_READ_TIMEOUT = 5.0
+
+
+class RequestError(ValueError):
+    """An invalid, incomplete, or oversized daemon request."""
 
 
 class MusicDaemon:
@@ -90,6 +99,60 @@ class MusicDaemon:
 
         logger.info("Daemon stopped")
 
+    async def _read_request(self, reader: asyncio.StreamReader) -> dict | None:
+        """Read one complete JSON request without relying on socket boundaries."""
+        decoder = codecs.getincrementaldecoder("utf-8")()
+        text = ""
+        json_decoder = json.JSONDecoder()
+        size = 0
+        deadline = asyncio.get_running_loop().time() + REQUEST_READ_TIMEOUT
+
+        while True:
+            remaining = deadline - asyncio.get_running_loop().time()
+            if remaining <= 0:
+                raise RequestError("Request timed out")
+            try:
+                chunk = await asyncio.wait_for(reader.read(REQUEST_CHUNK_SIZE), remaining)
+            except asyncio.TimeoutError as exc:
+                raise RequestError("Request timed out") from exc
+
+            if not chunk:
+                if not text:
+                    return None
+                try:
+                    decoder.decode(b"", final=True)
+                except UnicodeDecodeError as exc:
+                    raise RequestError("Invalid UTF-8") from exc
+                raise RequestError("Incomplete JSON request")
+
+            size += len(chunk)
+            if size > MAX_REQUEST_SIZE:
+                raise RequestError(f"Request too large (maximum {MAX_REQUEST_SIZE} bytes)")
+
+            try:
+                text += decoder.decode(chunk)
+            except UnicodeDecodeError as exc:
+                raise RequestError("Invalid UTF-8") from exc
+
+            stripped = text.lstrip()
+            if not stripped:
+                continue
+
+            try:
+                request, end = json_decoder.raw_decode(stripped)
+            except json.JSONDecodeError as exc:
+                # Errors at the end of the current buffer may be resolved by a
+                # later chunk (for example, a closing brace or split string).
+                if exc.pos >= len(stripped) or exc.msg.startswith("Unterminated string"):
+                    continue
+                raise RequestError("Invalid JSON") from exc
+
+            if not isinstance(request, dict):
+                raise RequestError("Request must be a JSON object")
+            if stripped[end:].strip():
+                raise RequestError("Invalid JSON")
+            return request
+
     async def _handle_client(
         self,
         reader: asyncio.StreamReader,
@@ -97,16 +160,15 @@ class MusicDaemon:
     ) -> None:
         """Handle a client connection."""
         try:
-            data = await reader.read(4096)
-            if not data:
-                return
-
             try:
-                request = json.loads(data.decode())
-            except json.JSONDecodeError:
-                response = {"error": "Invalid JSON"}
+                request = await self._read_request(reader)
+            except RequestError as exc:
+                response = {"error": str(exc)}
                 writer.write(json.dumps(response).encode())
                 await writer.drain()
+                return
+
+            if request is None:
                 return
 
             command = request.get("command", "")

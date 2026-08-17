@@ -1,6 +1,7 @@
 """Contract tests for the MiniMax Music 3 integration."""
 
 import asyncio
+import json
 from types import ModuleType, SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
@@ -9,7 +10,7 @@ import pytest
 
 from music_cli.client import DaemonClient
 from music_cli.config import Config
-from music_cli.daemon import MusicDaemon
+from music_cli.daemon import MusicDaemon, RequestError
 from music_cli.player.base import TrackInfo
 from music_cli.sources.ai_generator import AIGenerator
 from music_cli.sources.ai_models import ModelRegistry
@@ -191,3 +192,57 @@ def test_generate_audio_requires_non_empty_lyrics() -> None:
 
     with pytest.raises(ValueError, match="non-empty lyrics"):
         strategy.generate_audio("description", 60, lyrics="  ")
+
+
+@pytest.mark.asyncio
+async def test_daemon_reads_request_larger_than_socket_chunk() -> None:
+    request = {"command": "ai_play", "args": {"lyrics": "x" * 5000}}
+    data = json.dumps(request).encode()
+    reader = MagicMock()
+    reader.read = AsyncMock(side_effect=[data[:4096], data[4096:]])
+
+    parsed = await MusicDaemon._read_request(object.__new__(MusicDaemon), reader)
+
+    assert parsed == request
+
+
+@pytest.mark.asyncio
+async def test_daemon_reads_request_with_split_utf8_sequence() -> None:
+    request = {"command": "ai_play", "args": {"lyrics": "café"}}
+    data = json.dumps(request, ensure_ascii=False).encode()
+    split = data.index("é".encode()) + 1
+    reader = MagicMock()
+    reader.read = AsyncMock(side_effect=[data[:split], data[split:]])
+
+    parsed = await MusicDaemon._read_request(object.__new__(MusicDaemon), reader)
+
+    assert parsed == request
+
+
+@pytest.mark.asyncio
+async def test_daemon_rejects_malformed_and_oversized_requests() -> None:
+    daemon = object.__new__(MusicDaemon)
+    malformed_reader = MagicMock()
+    malformed_reader.read = AsyncMock(return_value=b'{"command": ]}')
+    oversized_reader = MagicMock()
+    oversized_reader.read = AsyncMock(return_value=b"x" * (1024 * 1024 + 1))
+
+    with pytest.raises(RequestError, match="Invalid JSON"):
+        await daemon._read_request(malformed_reader)
+    with pytest.raises(RequestError, match="Request too large"):
+        await daemon._read_request(oversized_reader)
+
+
+@pytest.mark.asyncio
+async def test_daemon_times_out_incomplete_request() -> None:
+    daemon = object.__new__(MusicDaemon)
+    reader = MagicMock()
+
+    async def delayed_read(_: int) -> bytes:
+        await asyncio.sleep(0.02)
+        return b""
+
+    reader.read = delayed_read
+    with patch("music_cli.daemon.REQUEST_READ_TIMEOUT", 0.001):
+        with pytest.raises(RequestError, match="Request timed out"):
+            await daemon._read_request(reader)

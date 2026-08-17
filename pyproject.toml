@@ -53,10 +53,11 @@ ai = [
 minimax = [
     "torch>=2.0",
     "diffusers @ git+https://github.com/huggingface/diffusers@dafe3733fcfdbf3c48915fe77be3aef65b5d6a2d",
-    "transformers>=4.31,<4.51",
+    "transformers>=4.51,<5",
     "accelerate>=0.20",
     "scipy>=1.10",
     "soundfile>=0.12",
+    "numpy>=1.24",
 ]
 youtube = [
     "yt-dlp>=2023.1.0",
@@ -70,6 +71,7 @@ dev = [
     "mypy>=1.0",
     "bandit>=1.7",
     "pre-commit>=3.0",
+    "numpy>=1.24",
 ]
 
 [project.scripts]
