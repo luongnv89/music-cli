@@ -170,6 +170,9 @@ class FFplayPlayer(Player):
                     "yt-dlp | ffplay pipe exited immediately (returncode=%s).",
                     self._process.returncode,
                 )
+                # Reset process bookkeeping so the direct-URL fallback starts clean
+                self._process = None
+                self._is_process_group = False
                 return False
 
             self._state = PlayerState.PLAYING
