@@ -5,8 +5,6 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-import numpy as np
-
 from .model_strategy import ModelStrategy
 
 logger = logging.getLogger(__name__)
@@ -81,6 +79,8 @@ class AudioLDMStrategy(ModelStrategy):
             RuntimeError: If model is not loaded.
             Exception: If generation fails.
         """
+        import numpy as np
+
         if not self.is_loaded:
             raise RuntimeError(f"Model {self.model_id} is not loaded")
 
