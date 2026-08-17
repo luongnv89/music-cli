@@ -20,6 +20,7 @@ class AITrack:
     timestamp: str
     duration: int
     model: str = "musicgen-small"
+    lyrics: str | None = None
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
@@ -29,6 +30,7 @@ class AITrack:
             "timestamp": self.timestamp,
             "duration": self.duration,
             "model": self.model,
+            "lyrics": self.lyrics,
         }
 
     @classmethod
@@ -40,6 +42,7 @@ class AITrack:
             timestamp=data.get("timestamp", ""),
             duration=data.get("duration", 30),
             model=data.get("model", "musicgen-small"),
+            lyrics=data.get("lyrics"),
         )
 
     def file_exists(self) -> bool:
@@ -102,6 +105,7 @@ class AITracksManager:
         file_path: str,
         duration: int,
         model: str = "musicgen-small",
+        lyrics: str | None = None,
     ) -> AITrack:
         """Add a new AI track.
 
@@ -110,6 +114,7 @@ class AITracksManager:
             file_path: Path to the generated audio file.
             duration: Duration in seconds.
             model: Model name used for generation.
+            lyrics: Lyrics used for lyrics-conditioned generation, if any.
 
         Returns:
             The newly created AITrack.
@@ -120,6 +125,7 @@ class AITracksManager:
             timestamp=datetime.now().isoformat(),
             duration=duration,
             model=model,
+            lyrics=lyrics,
         )
 
         tracks = self._load_tracks()

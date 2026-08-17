@@ -1011,13 +1011,23 @@ def ai_list():
     ),
     help="Mood for context-aware generation",
 )
-@click.option("--duration", "-d", default=15, help="Duration in seconds (5-60)")
+@click.option(
+    "--duration",
+    "-d",
+    default=15,
+    type=click.IntRange(min=2, max=300),
+    help="Duration in seconds (model-specific; MiniMax supports 5-300)",
+)
 @click.option(
     "--model",
     "-m",
-    help="Model to use (e.g., musicgen-small, musicgen-medium). See 'mc ai model'",
+    help="Model to use (e.g., musicgen-small, minimax-music3). See 'mc ai model'",
 )
-def ai_play(prompt, mood, duration, model):
+@click.option(
+    "--lyrics",
+    help="Lyrics for lyrics-conditioned models such as minimax-music3",
+)
+def ai_play(prompt, mood, duration, model, lyrics):
     """Generate and play AI music.
 
     \b
@@ -1033,6 +1043,7 @@ def ai_play(prompt, mood, duration, model):
       mc ai play --mood focus              # With mood
       mc ai play -d 60                     # 60 second track
       mc ai play -m musicgen-medium        # Use specific model
+      mc ai play -m minimax-music3 --lyrics "[Verse]..."  # Lyrics-conditioned song
     """
     client = ensure_daemon()
 
@@ -1051,7 +1062,13 @@ def ai_play(prompt, mood, duration, model):
     animation.start()
 
     try:
-        response = client.ai_play(prompt=prompt, duration=duration, mood=mood, model=model)
+        response = client.ai_play(
+            prompt=prompt,
+            duration=duration,
+            mood=mood,
+            model=model,
+            lyrics=lyrics,
+        )
 
         animation.stop()
 
@@ -1179,6 +1196,7 @@ def ai_models_list():
         "musicgen": "MusicGen (Meta) - Music generation",
         "audioldm": "AudioLDM (CVSSP) - Sound effects & ambient audio",
         "bark": "Bark (Suno) - Speech synthesis & audio",
+        "minimax_music3": "MiniMax Music 3 - Lyrics-conditioned music",
     }
 
     current_type = None

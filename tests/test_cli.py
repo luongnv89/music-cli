@@ -655,6 +655,24 @@ class TestAIDurationDefault:
         call_kwargs = mock_daemon_client.ai_play.call_args[1]
         assert call_kwargs["duration"] == 15
 
+    @patch("music_cli.cli.ensure_daemon")
+    def test_ai_play_forwards_lyrics(self, mock_daemon, runner, mock_daemon_client):
+        mock_daemon_client.ai_play.return_value = {
+            "track": {"title": "AI Track", "metadata": {"model": "minimax-music3"}},
+            "prompt": "acoustic pop",
+        }
+        mock_daemon.return_value = mock_daemon_client
+
+        result = runner.invoke(
+            main,
+            ["ai", "play", "-m", "minimax-music3", "--lyrics", "[Verse] hello"],
+        )
+
+        assert result.exit_code == 0
+        call_kwargs = mock_daemon_client.ai_play.call_args.kwargs
+        assert call_kwargs["model"] == "minimax-music3"
+        assert call_kwargs["lyrics"] == "[Verse] hello"
+
 
 # -------------------------------------------------------------------------
 # 2.8 — mood MOOD plays directly

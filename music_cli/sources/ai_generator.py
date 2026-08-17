@@ -41,10 +41,14 @@ def is_ai_available() -> bool:
     try:
         import scipy  # noqa: F401
         import torch  # noqa: F401
-        from transformers import AutoProcessor, MusicgenForConditionalGeneration  # noqa: F401
+        try:
+            from transformers import AutoProcessor, MusicgenForConditionalGeneration  # noqa: F401
+        except ImportError:
+            # MiniMax Music 3 uses Diffusers and does not require MusicGen.
+            import diffusers  # noqa: F401
 
         _AI_AVAILABLE = True
-        logger.info("AI music generation is available (using HuggingFace Transformers)")
+        logger.info("AI music generation dependencies are available")
     except ImportError as e:
         _AI_AVAILABLE = False
         logger.info(f"AI music generation not available: {e}")
@@ -192,6 +196,7 @@ class AIGenerator:
         filename: str | None = None,
         add_looping: bool = True,
         model_id: str | None = None,
+        lyrics: str | None = None,
     ) -> TrackInfo | None:
         """Generate music from a text prompt.
 
@@ -202,6 +207,8 @@ class AIGenerator:
             add_looping: If True, append looping instructions to prompt.
             model_id: Model to use (e.g., 'musicgen-small').
                      If None, uses the configured default.
+            lyrics: Optional lyrics for lyrics-conditioned models. Models that
+                    require lyrics reject an omitted or empty value.
 
         Returns:
             TrackInfo for the generated audio, or None if generation failed.
@@ -213,6 +220,18 @@ class AIGenerator:
         # Use default model if not specified
         if model_id is None:
             model_id = self.get_default_model()
+
+        # Validate lyrics capabilities before loading a potentially large model.
+        configured_model = self._config.get_ai_models_config().get_model(model_id)
+        if configured_model is None:
+            logger.error("Model '%s' is not configured or enabled", model_id)
+            return None
+        if lyrics is not None and not configured_model.supports_lyrics:
+            logger.error("Model '%s' does not support lyrics", model_id)
+            return None
+        if configured_model.requires_lyrics and (not lyrics or not lyrics.strip()):
+            logger.error("Model '%s' requires non-empty lyrics", model_id)
+            return None
 
         # Get or create strategy for this model
         strategy = _get_strategy(model_id)
@@ -234,12 +253,20 @@ class AIGenerator:
 
             logger.info(f"Generating {duration}s with {model_id}: {enhanced_prompt[:50]}...")
 
-            # Generate audio using strategy
-            audio, sample_rate = strategy.generate_audio(enhanced_prompt, duration)
+            # Generate audio using strategy. Omit the optional keyword when it
+            # is unused so third-party strategies with the legacy two-argument
+            # method remain compatible.
+            generation_kwargs = {}
+            if lyrics is not None:
+                generation_kwargs["lyrics"] = lyrics
+            audio, sample_rate = strategy.generate_audio(
+                enhanced_prompt, duration, **generation_kwargs
+            )
 
-            # Generate filename if not provided
+            # Generate filename if not provided. Lyrics are part of the identity
+            # so two songs with the same prompt cannot collide.
             if filename is None:
-                hash_input = f"{prompt}{time.time()}"
+                hash_input = f"{prompt}\0{lyrics or ''}{time.time()}"
                 short_hash = hashlib.md5(  # noqa: S324
                     hash_input.encode(), usedforsecurity=False
                 ).hexdigest()[:8]
@@ -260,6 +287,7 @@ class AIGenerator:
                     "duration": duration,
                     "model": model_id,
                     "hf_model_id": model_config.hf_model_id,
+                    "lyrics": lyrics,
                 },
             )
 
@@ -276,6 +304,7 @@ class AIGenerator:
         temporal_prompt: str | None = None,
         duration: int = 30,
         model_id: str | None = None,
+        lyrics: str | None = None,
     ) -> TrackInfo | None:
         """Generate context-appropriate music.
 
@@ -299,7 +328,7 @@ class AIGenerator:
             prompts.append("ambient background music")
 
         full_prompt = ", ".join(prompts)
-        return self.generate(full_prompt, duration, model_id=model_id)
+        return self.generate(full_prompt, duration, model_id=model_id, lyrics=lyrics)
 
     def cleanup_old_files(self, max_age_hours: int = 24) -> int:
         """Clean up old generated files.
@@ -329,14 +358,19 @@ def get_ai_install_instructions() -> str:
     """Get instructions for installing AI dependencies."""
     return """
 AI music generation requires additional dependencies.
-Install them with:
+Install the standard model support with:
 
     pip install 'coder-music-cli[ai]'
 
-Or install manually:
+For MiniMax Music 3, install its isolated runtime instead:
+
+    pip install 'coder-music-cli[minimax]'
+
+Or install the standard dependencies manually:
 
     pip install torch transformers scipy
 
-Note: This requires significant disk space (~5GB) and RAM (~8GB minimum).
-The first generation will download the MusicGen model (~1.5GB).
+MiniMax Music 3 additionally requires the pinned Diffusers integration,
+CUDA, bfloat16 support, and at least 24GB of VRAM. Model weights download on
+first use.
 """

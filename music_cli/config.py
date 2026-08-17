@@ -96,6 +96,20 @@ class Config:
                     "tokens_per_second": 50,
                     "enabled": True,
                 },
+                # MiniMax models (MiniMaxAI) - lyrics-conditioned music generation
+                "minimax-music3": {
+                    "hf_model_id": "MiniMaxAI/MiniMax-Music3",
+                    "model_type": "minimax_music3",
+                    "description": "Long-form lyrics-conditioned music generation",
+                    "expected_size_gb": 24.0,
+                    "default_duration": 60,
+                    "max_duration": 300,
+                    "min_duration": 5,
+                    "tokens_per_second": 25,
+                    "enabled": True,
+                    "supports_lyrics": True,
+                    "requires_lyrics": True,
+                },
                 # AudioLDM models (CVSSP) - General audio/sound effects
                 "audioldm-s-full-v2": {
                     "hf_model_id": "cvssp/audioldm-s-full-v2",
@@ -578,44 +592,53 @@ Radio Capital|https://icecast.unitedradio.it/Capital.mp3
 
     # AI Models Configuration Methods
 
-    def get_ai_models_config(self):
-        """Get AI models configuration.
+    def _get_ai_config_data(self) -> dict[str, Any]:
+        """Return built-in AI defaults merged with the user's configuration.
 
-        Returns:
-            AIModelsConfig instance with all model configurations.
+        Older config files are not rewritten on read, but they still receive
+        newly supported model entries in memory. User-defined models and
+        settings override the built-in defaults.
         """
+        default_ai = self.DEFAULT_CONFIG.get("ai", {})
+        user_ai = self.get("ai", {})
+        if not isinstance(default_ai, dict):
+            default_ai = {}
+        if not isinstance(user_ai, dict):
+            user_ai = {}
+
+        merged: dict[str, Any] = dict(default_ai)
+        default_cache = default_ai.get("cache", {})
+        user_cache = user_ai.get("cache", {})
+        default_models = default_ai.get("models", {})
+        user_models = user_ai.get("models", {})
+        merged["cache"] = {
+            **(default_cache if isinstance(default_cache, dict) else {}),
+            **(user_cache if isinstance(user_cache, dict) else {}),
+        }
+        merged["models"] = {
+            **(default_models if isinstance(default_models, dict) else {}),
+            **(user_models if isinstance(user_models, dict) else {}),
+        }
+        merged.update({key: value for key, value in user_ai.items() if key not in {"cache", "models"}})
+        return merged
+
+    def get_ai_models_config(self):
+        """Get AI models configuration with new defaults merged in."""
         from .sources.ai_models import AIModelsConfig
 
-        ai_config = self.get("ai", {})
-        # Fall back to DEFAULT_CONFIG if user's config doesn't have ai section
-        if not ai_config or not ai_config.get("models"):
-            ai_config = self.DEFAULT_CONFIG.get("ai", {})
-        return AIModelsConfig.from_dict(ai_config)
+        return AIModelsConfig.from_dict(self._get_ai_config_data())
 
     def get_ai_model_config(self, model_id: str | None = None) -> dict[str, Any] | None:
-        """Get configuration for a specific AI model.
-
-        Args:
-            model_id: Model ID (e.g., 'musicgen-small').
-                     If None, returns default model config.
-
-        Returns:
-            Model config dict or None if not found.
-        """
+        """Get configuration for a specific AI model."""
         if model_id is None:
             model_id = self.get_default_ai_model()
 
-        models: dict[str, Any] = self.get("ai.models", {})
-        # Fall back to DEFAULT_CONFIG if user's config doesn't have ai.models
-        if not models:
-            ai_config = self.DEFAULT_CONFIG.get("ai", {})
-            if isinstance(ai_config, dict):
-                models = ai_config.get("models", {})
-        return models.get(model_id)
+        models = self._get_ai_config_data().get("models", {})
+        return models.get(model_id) if isinstance(models, dict) else None
 
     def get_default_ai_model(self) -> str:
         """Get the default AI model ID."""
-        return self.get("ai.default_model", "musicgen-small")
+        return self._get_ai_config_data().get("default_model", "musicgen-small")
 
     def set_default_ai_model(self, model_id: str) -> None:
         """Set the default AI model.
@@ -634,37 +657,25 @@ Radio Capital|https://icecast.unitedradio.it/Capital.mp3
         Returns:
             List of model IDs.
         """
-        models: dict[str, Any] = self.get("ai.models", {})
-        # Fall back to DEFAULT_CONFIG if user's config doesn't have ai.models
-        if not models:
-            ai_config = self.DEFAULT_CONFIG.get("ai", {})
-            if isinstance(ai_config, dict):
-                models = ai_config.get("models", {})
+        models = self._get_ai_config_data().get("models", {})
+        if not isinstance(models, dict):
+            return []
         if enabled_only:
-            return [mid for mid, m in models.items() if m.get("enabled", True)]
+            return [mid for mid, model in models.items() if model.get("enabled", True)]
         return list(models.keys())
 
     def validate_ai_model(self, model_id: str) -> bool:
-        """Check if a model ID is configured and enabled.
-
-        Args:
-            model_id: Model ID to validate.
-
-        Returns:
-            True if model exists and is enabled.
-        """
-        models: dict[str, Any] = self.get("ai.models", {})
-        # Fall back to DEFAULT_CONFIG if user's config doesn't have ai.models
-        if not models:
-            ai_config = self.DEFAULT_CONFIG.get("ai", {})
-            if isinstance(ai_config, dict):
-                models = ai_config.get("models", {})
+        """Check if a model ID is configured and enabled."""
+        models = self._get_ai_config_data().get("models", {})
+        if not isinstance(models, dict):
+            return False
         model = models.get(model_id)
-        return model is not None and model.get("enabled", True)
+        return isinstance(model, dict) and model.get("enabled", True)
 
     def get_ai_cache_max_models(self) -> int:
         """Get the maximum number of AI models to keep in memory."""
-        return self.get("ai.cache.max_models", 2)
+        cache = self._get_ai_config_data().get("cache", {})
+        return cache.get("max_models", 2) if isinstance(cache, dict) else 2
 
     def get_youtube_cache_config(self) -> dict[str, Any]:
         """Get YouTube cache configuration."""

@@ -19,6 +19,7 @@ class TestAITrack:
             timestamp="2025-01-01T12:00:00",
             duration=30,
             model="musicgen-small",
+            lyrics="[Verse] hello",
         )
         result = track.to_dict()
 
@@ -27,6 +28,7 @@ class TestAITrack:
         assert result["timestamp"] == "2025-01-01T12:00:00"
         assert result["duration"] == 30
         assert result["model"] == "musicgen-small"
+        assert result["lyrics"] == "[Verse] hello"
 
     def test_from_dict(self):
         """Test AITrack deserialization from dict."""

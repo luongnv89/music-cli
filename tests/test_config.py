@@ -32,6 +32,26 @@ class TestConfig:
         assert config.get("nonexistent.key", "default") == "default"
         assert config.get("nonexistent.key") is None
 
+    def test_new_ai_models_are_available_in_existing_configs(self, tmp_path: Path) -> None:
+        """Existing users receive newly supported built-in AI models in memory."""
+        (tmp_path / "config.toml").write_text(
+            """
+[ai]
+ default_model = "musicgen-small"
+
+[ai.models.musicgen-small]
+ hf_model_id = "facebook/musicgen-small"
+ model_type = "musicgen"
+ enabled = true
+""".lstrip()
+        )
+
+        config = Config(config_dir=tmp_path)
+
+        assert "minimax-music3" in config.list_ai_models(enabled_only=True)
+        assert config.validate_ai_model("minimax-music3") is True
+        assert config.get_ai_models_config().get_model("minimax-music3") is not None
+
     def test_config_set_and_get(self, tmp_path: Path) -> None:
         """Test setting and getting config values."""
         config = Config(config_dir=tmp_path)

@@ -49,6 +49,15 @@ ai = [
     "tqdm>=4.64",
     "accelerate>=0.20",
 ]
+# MiniMax Music 3 requires the official diffusers integration until PR #14456 merges.
+minimax = [
+    "torch>=2.0",
+    "diffusers @ git+https://github.com/huggingface/diffusers@dafe3733fcfdbf3c48915fe77be3aef65b5d6a2d",
+    "transformers>=4.31,<4.51",
+    "accelerate>=0.20",
+    "scipy>=1.10",
+    "soundfile>=0.12",
+]
 youtube = [
     "yt-dlp>=2023.1.0",
 ]

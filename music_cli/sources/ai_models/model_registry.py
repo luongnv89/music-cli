@@ -113,11 +113,13 @@ def _register_built_in_strategies() -> None:
     """
     from .audioldm_strategy import AudioLDMStrategy
     from .bark_strategy import BarkStrategy
+    from .minimax_strategy import MiniMaxMusic3Strategy
     from .musicgen_strategy import MusicGenStrategy
 
     ModelRegistry.register("musicgen", MusicGenStrategy)
     ModelRegistry.register("audioldm", AudioLDMStrategy)
     ModelRegistry.register("bark", BarkStrategy)
+    ModelRegistry.register("minimax_music3", MiniMaxMusic3Strategy)
 
 
 # Register built-in strategies on module import

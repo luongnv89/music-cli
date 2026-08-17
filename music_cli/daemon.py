@@ -407,6 +407,7 @@ class MusicDaemon:
             duration: Duration in seconds (default: 30).
             mood: Mood to use for context-based generation.
             model: Model ID to use (optional). If not provided, uses default.
+            lyrics: Optional lyrics for lyrics-conditioned models.
         """
         try:
             from .sources.ai_generator import AIGenerator, is_ai_available
@@ -421,11 +422,20 @@ class MusicDaemon:
             duration = args.get("duration", 5)
             mood = args.get("mood")
             model_id = args.get("model")
+            lyrics = args.get("lyrics")
 
             # Validate model if specified
             if model_id and not self.config.validate_ai_model(model_id):
                 available = ", ".join(self.config.list_ai_models(enabled_only=True))
                 return {"error": f"Unknown or disabled model: '{model_id}'. Available: {available}"}
+
+            selected_model = self.config.get_ai_models_config().get_model(model_id)
+            if selected_model is None:
+                return {"error": "No enabled AI model is configured"}
+            if lyrics is not None and not selected_model.supports_lyrics:
+                return {"error": f"Model '{selected_model.id}' does not support lyrics"}
+            if selected_model.requires_lyrics and (not lyrics or not lyrics.strip()):
+                return {"error": f"Model '{selected_model.id}' requires non-empty lyrics"}
 
             # Update mood if provided
             if mood:
@@ -452,7 +462,7 @@ class MusicDaemon:
 
             # Generate the track with specified model
             generator = AIGenerator(output_dir=self.config.ai_music_dir, config=self.config)
-            track = generator.generate(prompt, duration, model_id=model_id)
+            track = generator.generate(prompt, duration, model_id=model_id, lyrics=lyrics)
 
             if not track:
                 return {"error": "Failed to generate AI music"}
@@ -464,6 +474,7 @@ class MusicDaemon:
                 file_path=track.source,
                 duration=duration,
                 model=model_used,
+                lyrics=lyrics,
             )
 
             # Log to history
@@ -536,6 +547,7 @@ class MusicDaemon:
                     track_entry.prompt,
                     track_entry.duration,
                     model_id=model_id,
+                    lyrics=track_entry.lyrics,
                 )
 
                 if not track:

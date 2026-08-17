@@ -38,6 +38,8 @@ class ModelConfig:
     min_duration: int = 5
     tokens_per_second: int = 50
     enabled: bool = True
+    supports_lyrics: bool = False
+    requires_lyrics: bool = False
     extra_params: dict[str, Any] = field(default_factory=dict)
 
     def clamp_duration(self, duration: int) -> int:
@@ -84,6 +86,8 @@ class ModelConfig:
             min_duration=data.get("min_duration", 5),
             tokens_per_second=data.get("tokens_per_second", 50),
             enabled=data.get("enabled", True),
+            supports_lyrics=data.get("supports_lyrics", False),
+            requires_lyrics=data.get("requires_lyrics", False),
             extra_params=data.get("extra_params", {}),
         )
 
@@ -103,6 +107,8 @@ class ModelConfig:
             "min_duration": self.min_duration,
             "tokens_per_second": self.tokens_per_second,
             "enabled": self.enabled,
+            "supports_lyrics": self.supports_lyrics,
+            "requires_lyrics": self.requires_lyrics,
         }
         if self.extra_params:
             result["extra_params"] = self.extra_params
@@ -271,6 +277,20 @@ DEFAULT_AI_MODELS_CONFIG: dict[str, Any] = {
             "min_duration": 5,
             "tokens_per_second": 50,
             "enabled": True,
+        },
+        # MiniMax models (MiniMaxAI) - lyrics-conditioned music generation
+        "minimax-music3": {
+            "hf_model_id": "MiniMaxAI/MiniMax-Music3",
+            "model_type": "minimax_music3",
+            "description": "Long-form lyrics-conditioned music generation",
+            "expected_size_gb": 24.0,
+            "default_duration": 60,
+            "max_duration": 300,
+            "min_duration": 5,
+            "tokens_per_second": 25,
+            "enabled": True,
+            "supports_lyrics": True,
+            "requires_lyrics": True,
         },
         # AudioLDM models (CVSSP) - General audio/sound effects
         "audioldm-s-full-v2": {

@@ -66,12 +66,14 @@ class ModelStrategy(ABC):
         self,
         prompt: str,
         duration: int,
+        lyrics: str | None = None,
     ) -> tuple[np.ndarray, int]:
         """Generate audio from a text prompt.
 
         Args:
             prompt: Text description of the audio to generate.
             duration: Duration in seconds (already clamped to model limits).
+            lyrics: Optional lyrics for models that support lyric conditioning.
 
         Returns:
             Tuple of (audio_array, sample_rate) where audio_array is a

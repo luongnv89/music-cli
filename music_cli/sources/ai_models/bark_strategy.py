@@ -73,6 +73,7 @@ class BarkStrategy(ModelStrategy):
         self,
         prompt: str,
         duration: int,
+        lyrics: str | None = None,
     ) -> tuple[np.ndarray, int]:
         """Generate audio from a text prompt using Bark.
 

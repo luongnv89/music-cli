@@ -183,6 +183,7 @@ class DaemonClient:
         duration: int = 5,
         mood: str | None = None,
         model: str | None = None,
+        lyrics: str | None = None,
     ) -> dict:
         """Generate and play AI music.
 
@@ -191,6 +192,7 @@ class DaemonClient:
             duration: Duration in seconds.
             mood: Mood for context-based generation.
             model: Model ID to use (e.g., 'musicgen-small'). If None, uses default.
+            lyrics: Optional lyrics for lyrics-conditioned models.
 
         Returns:
             Response dict with track info or error.
@@ -202,6 +204,8 @@ class DaemonClient:
             args["mood"] = mood
         if model:
             args["model"] = model
+        if lyrics is not None:
+            args["lyrics"] = lyrics
         return self.send_command("ai_play", args, timeout=AI_TIMEOUT)
 
     def ai_replay(self, index: int, regenerate: bool = False) -> dict:
