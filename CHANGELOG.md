@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-08-17
+
+### Fixed
+- Fix `mc ai model` crashes when AI extras are not installed by lazily importing concrete AI strategy classes, allowing core AI model types to load without optional dependencies ([#29](https://github.com/luongnv89/music-cli/pull/29)).
+- Fix playback state reporting when `ffplay` exits immediately by verifying spawned processes remain alive before declaring playback active and cleaning up failed startup state, including YouTube pipe playback ([#30](https://github.com/luongnv89/music-cli/pull/30)).
+
+**Full Changelog**: https://github.com/luongnv89/music-cli/compare/v0.10.0...v0.10.1
+
 ## [0.10.0] - 2026-08-17
 
 ### Added
