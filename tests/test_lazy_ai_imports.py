@@ -10,11 +10,8 @@ GitHub issue: #27
 
 import subprocess
 import sys
-
 from types import ModuleType
 from unittest.mock import patch
-
-import pytest
 
 
 def _make_numpy_blocker() -> ModuleType:
@@ -27,9 +24,7 @@ def _make_numpy_blocker() -> ModuleType:
             return None
 
         def load_module(self, name: str):
-            raise ModuleNotFoundError(
-                f"No module named '{name}' (blocked for lazy-import testing)"
-            )
+            raise ModuleNotFoundError(f"No module named '{name}' (blocked for lazy-import testing)")
 
     return _NumpyBlocker()
 
@@ -41,7 +36,7 @@ class TestLazyImportsNoNumpy:
         """ModelConfig can be imported without numpy."""
         blocker = _make_numpy_blocker()
         with patch.object(__import__("sys"), "meta_path", [blocker] + __import__("sys").meta_path):
-            from music_cli.sources.ai_models.model_config import ModelConfig, AIModelsConfig
+            from music_cli.sources.ai_models.model_config import AIModelsConfig, ModelConfig
 
             cfg = ModelConfig(
                 id="test",
@@ -49,7 +44,9 @@ class TestLazyImportsNoNumpy:
                 model_type="musicgen",
             )
             assert cfg.id == "test"
-            assert AIModelsConfig.from_dict({"default_model": "test", "models": {"test": cfg.to_dict()}})
+            assert AIModelsConfig.from_dict(
+                {"default_model": "test", "models": {"test": cfg.to_dict()}}
+            )
 
     def test_model_strategy_imports_without_numpy(self) -> None:
         """ModelStrategy (ABC) can be imported without numpy."""
@@ -65,8 +62,6 @@ class TestLazyImportsNoNumpy:
         with patch.object(__import__("sys"), "meta_path", [blocker] + __import__("sys").meta_path):
             from music_cli.sources.ai_models.strategy_cache import (
                 LRUStrategyCache,
-                get_strategy_cache,
-                clear_global_cache,
             )
 
             cache = LRUStrategyCache(max_size=2)
@@ -78,12 +73,10 @@ class TestLazyImportsNoNumpy:
         with patch.object(__import__("sys"), "meta_path", [blocker] + __import__("sys").meta_path):
             from music_cli.sources.ai_models import (
                 AIModelsConfig,
+                LRUStrategyCache,
                 ModelConfig,
                 ModelRegistry,
                 ModelStrategy,
-                LRUStrategyCache,
-                clear_global_cache,
-                get_strategy_cache,
             )
 
             assert ModelConfig
