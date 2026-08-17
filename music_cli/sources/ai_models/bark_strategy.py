@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
-
-import numpy as np
+from typing import TYPE_CHECKING, Any
 
 from .model_strategy import ModelStrategy
+
+if TYPE_CHECKING:
+    import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +90,8 @@ class BarkStrategy(ModelStrategy):
             RuntimeError: If model is not loaded.
             Exception: If generation fails.
         """
+        import numpy as np
+
         if not self.is_loaded:
             raise RuntimeError(f"Model {self.model_id} is not loaded")
 

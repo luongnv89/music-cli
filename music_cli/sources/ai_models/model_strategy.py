@@ -6,9 +6,9 @@ import logging
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
-import numpy as np
-
 if TYPE_CHECKING:
+    import numpy as np
+
     from .model_config import ModelConfig
 
 logger = logging.getLogger(__name__)

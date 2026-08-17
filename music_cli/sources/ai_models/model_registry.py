@@ -57,6 +57,12 @@ class ModelRegistry:
         return False
 
     @classmethod
+    def _ensure_strategies_registered(cls) -> None:
+        """Ensure built-in strategies are registered (lazy import)."""
+        if not cls._strategies:
+            _register_built_in_strategies()
+
+    @classmethod
     def create_strategy(cls, config: ModelConfig) -> ModelStrategy:
         """Create a strategy instance for a model configuration.
 
@@ -69,6 +75,7 @@ class ModelRegistry:
         Raises:
             ValueError: If no strategy is registered for the model type.
         """
+        cls._ensure_strategies_registered()
         strategy_class = cls._strategies.get(config.model_type)
         if strategy_class is None:
             available = ", ".join(cls._strategies.keys()) or "none"
@@ -86,6 +93,7 @@ class ModelRegistry:
         Returns:
             List of registered model type identifiers.
         """
+        cls._ensure_strategies_registered()
         return list(cls._strategies.keys())
 
     @classmethod
@@ -98,6 +106,7 @@ class ModelRegistry:
         Returns:
             True if a strategy is registered for this type.
         """
+        cls._ensure_strategies_registered()
         return model_type in cls._strategies
 
     @classmethod
@@ -109,7 +118,9 @@ class ModelRegistry:
 def _register_built_in_strategies() -> None:
     """Register built-in model strategies.
 
-    This function is called automatically when the module is imported.
+    This function is called lazily when strategies are first needed,
+    so that missing numpy or other AI extras do not prevent the
+    ai_models package from being imported.
     """
     from .audioldm_strategy import AudioLDMStrategy
     from .bark_strategy import BarkStrategy
@@ -120,7 +131,3 @@ def _register_built_in_strategies() -> None:
     ModelRegistry.register("audioldm", AudioLDMStrategy)
     ModelRegistry.register("bark", BarkStrategy)
     ModelRegistry.register("minimax_music3", MiniMaxMusic3Strategy)
-
-
-# Register built-in strategies on module import
-_register_built_in_strategies()

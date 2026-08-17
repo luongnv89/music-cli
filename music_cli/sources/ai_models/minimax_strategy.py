@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
-
-import numpy as np
+from typing import TYPE_CHECKING, Any
 
 from .model_strategy import ModelStrategy
+
+if TYPE_CHECKING:
+    import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +75,8 @@ class MiniMaxMusic3Strategy(ModelStrategy):
         The official pipeline accepts the music description as ``prompt`` and
         lyrics separately, returning audio in its ``audios`` output list.
         """
+        import numpy as np
+
         if not self.is_loaded:
             raise RuntimeError(f"Model {self.model_id} is not loaded")
         if not lyrics or not lyrics.strip():
