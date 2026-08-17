@@ -101,6 +101,19 @@ class FFplayPlayer(Player):
                 stderr=asyncio.subprocess.DEVNULL,
             )
 
+            # Verify ffplay actually started (macOS audio init can fail silently)
+            # Give the process a brief moment to initialize, then check if it's
+            # still alive. If it exited immediately, the monitor task will set
+            # STOPPED — return False so the CLI reports the failure.
+            await asyncio.sleep(0.1)
+            if self._process.poll() is not None:
+                logger.warning(
+                    "ffplay exited immediately (returncode=%s). "
+                    "Audio device may be unavailable or ffplay failed to start.",
+                    self._process.returncode,
+                )
+                return False
+
             self._state = PlayerState.PLAYING
             self._paused = False
             # Reset controller state for new playback
@@ -149,6 +162,15 @@ class FFplayPlayer(Player):
                 preexec_fn=os.setsid,
             )
             self._is_process_group = True
+
+            # Verify the pipe process actually started
+            await asyncio.sleep(0.1)
+            if self._process.poll() is not None:
+                logger.warning(
+                    "yt-dlp | ffplay pipe exited immediately (returncode=%s).",
+                    self._process.returncode,
+                )
+                return False
 
             self._state = PlayerState.PLAYING
             self._paused = False
