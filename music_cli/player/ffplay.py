@@ -103,8 +103,8 @@ class FFplayPlayer(Player):
 
             # Verify ffplay actually started (macOS audio init can fail silently)
             # Give the process a brief moment to initialize, then check if it's
-            # still alive. If it exited immediately, the monitor task will set
-            # STOPPED — return False so the CLI reports the failure.
+            # still alive. If it exited immediately, clean up the failed
+            # startup and return False so the CLI reports the failure.
             await asyncio.sleep(0.1)
             if self._process.returncode is not None:
                 logger.warning(
@@ -112,6 +112,10 @@ class FFplayPlayer(Player):
                     "Audio device may be unavailable or ffplay failed to start.",
                     self._process.returncode,
                 )
+                await self._cleanup_failed_start()
+                self._state = PlayerState.STOPPED
+                self._current_track = None
+                self._paused = False
                 return False
 
             self._state = PlayerState.PLAYING
@@ -170,9 +174,8 @@ class FFplayPlayer(Player):
                     "yt-dlp | ffplay pipe exited immediately (returncode=%s).",
                     self._process.returncode,
                 )
-                # Reset process bookkeeping so the direct-URL fallback starts clean
-                self._process = None
-                self._is_process_group = False
+                # Keep the track and loading state for the direct-URL fallback.
+                await self._cleanup_failed_start()
                 return False
 
             self._state = PlayerState.PLAYING
@@ -187,6 +190,28 @@ class FFplayPlayer(Player):
             logger.error(f"Failed to start YouTube playback: {e}")
             self._state = PlayerState.ERROR
             return False
+
+    async def _cleanup_failed_start(self) -> None:
+        """Clear and reap a subprocess that failed during startup."""
+        process = self._process
+        is_process_group = self._is_process_group
+        self._process = None
+        self._is_process_group = False
+
+        if process is None:
+            return
+
+        try:
+            if is_process_group:
+                os.killpg(process.pid, signal.SIGTERM)
+            await process.wait()
+        except (ProcessLookupError, OSError):
+            # The process may have exited between the return-code check and
+            # cleanup. Waiting again reaps it when the first operation raced.
+            try:
+                await process.wait()
+            except (ProcessLookupError, OSError):
+                pass
 
     async def _monitor_playback(self) -> None:
         """Monitor the ffplay process and handle completion."""
