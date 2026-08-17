@@ -153,15 +153,20 @@ class TestFFplayPlayerImmediateExit:
         with patch.object(asyncio, "create_subprocess_shell", new_callable=AsyncMock) as mock_shell:
             mock_shell.return_value = mock_process
 
-            with patch("music_cli.player.ffplay.shutil.which", return_value="/usr/bin/yt-dlp"):
-                track = TrackInfo(
-                    source="https://youtube.com/watch?v=xxx",
-                    source_type="youtube",
-                    title="YouTube Track",
-                    metadata={"youtube_url": "https://youtube.com/watch?v=xxx"},
-                )
+            with patch.object(
+                asyncio, "create_subprocess_exec", new_callable=AsyncMock
+            ) as mock_exec:
+                mock_exec.return_value = mock_process
 
-                result = await player.play(track)
+                with patch("music_cli.player.ffplay.shutil.which", return_value="/usr/bin/yt-dlp"):
+                    track = TrackInfo(
+                        source="https://youtube.com/watch?v=xxx",
+                        source_type="youtube",
+                        title="YouTube Track",
+                        metadata={"youtube_url": "https://youtube.com/watch?v=xxx"},
+                    )
+
+                    result = await player.play(track)
 
             assert result is True
             assert player.state == PlayerState.PLAYING
