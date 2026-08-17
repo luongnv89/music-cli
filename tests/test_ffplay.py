@@ -19,23 +19,24 @@ class TestFFplayPlayerImmediateExit:
     CLI thought it was "playing".
 
     The fix adds a 0.1s verification delay after spawning ffplay: if
-    poll() returns a non-None exit code, play() returns False instead.
+    the process has already exited (returncode is not None), play()
+    returns False instead.
     """
 
     @pytest.mark.asyncio
-    async def test_play_returns_false_when_ffplay_exits_immediately(self) -> None:
+    async def test_play_returns_false_when_ffplay_exits_immediately(self, tmp_path) -> None:
         """play() returns False when ffplay process exits before verification."""
         player = FFplayPlayer()
 
         mock_process = MagicMock()
-        mock_process.poll.return_value = 1  # exited immediately
+        mock_process.returncode = 1  # exited immediately
         mock_process.pid = 12345
 
         with patch.object(asyncio, "create_subprocess_exec", new_callable=AsyncMock) as mock_exec:
             mock_exec.return_value = mock_process
 
             track = TrackInfo(
-                source="/tmp/test.mp3",
+                source=str(tmp_path / "test.mp3"),
                 source_type="local",
                 title="Test Track",
             )
@@ -47,19 +48,19 @@ class TestFFplayPlayerImmediateExit:
             assert player.state != PlayerState.PLAYING
 
     @pytest.mark.asyncio
-    async def test_play_succeeds_when_ffplay_stays_alive(self) -> None:
+    async def test_play_succeeds_when_ffplay_stays_alive(self, tmp_path) -> None:
         """play() returns True when ffplay process stays running."""
         player = FFplayPlayer()
 
         mock_process = MagicMock()
-        mock_process.poll.return_value = None  # still running
+        mock_process.returncode = None  # still running
         mock_process.pid = 12345
 
         with patch.object(asyncio, "create_subprocess_exec", new_callable=AsyncMock) as mock_exec:
             mock_exec.return_value = mock_process
 
             track = TrackInfo(
-                source="/tmp/test.mp3",
+                source=str(tmp_path / "test.mp3"),
                 source_type="local",
                 title="Test Track",
             )
@@ -70,7 +71,7 @@ class TestFFplayPlayerImmediateExit:
             assert player.state == PlayerState.PLAYING
 
     @pytest.mark.asyncio
-    async def test_play_handles_process_exception(self) -> None:
+    async def test_play_handles_process_exception(self, tmp_path) -> None:
         """play() returns False when create_subprocess_exec raises."""
         player = FFplayPlayer()
 
@@ -78,7 +79,7 @@ class TestFFplayPlayerImmediateExit:
             mock_exec.side_effect = FileNotFoundError("ffplay not found")
 
             track = TrackInfo(
-                source="/tmp/test.mp3",
+                source=str(tmp_path / "test.mp3"),
                 source_type="local",
                 title="Test Track",
             )
@@ -89,18 +90,18 @@ class TestFFplayPlayerImmediateExit:
             assert player.state == PlayerState.ERROR
 
     @pytest.mark.asyncio
-    async def test_status_reflects_play_result(self) -> None:
+    async def test_status_reflects_play_result(self, tmp_path) -> None:
         """get_status() returns correct state after play() failure."""
         player = FFplayPlayer()
 
         mock_process = MagicMock()
-        mock_process.poll.return_value = 1  # exited immediately
+        mock_process.returncode = 1  # exited immediately
 
         with patch.object(asyncio, "create_subprocess_exec", new_callable=AsyncMock) as mock_exec:
             mock_exec.return_value = mock_process
 
             track = TrackInfo(
-                source="/tmp/test.mp3",
+                source=str(tmp_path / "test.mp3"),
                 source_type="local",
                 title="Test Track",
             )
@@ -117,20 +118,26 @@ class TestFFplayPlayerImmediateExit:
         player = FFplayPlayer()
 
         mock_process = MagicMock()
-        mock_process.poll.return_value = 1  # exited immediately
+        mock_process.returncode = 1  # exited immediately
         mock_process.pid = 12345
 
         with patch.object(asyncio, "create_subprocess_shell", new_callable=AsyncMock) as mock_shell:
             mock_shell.return_value = mock_process
 
-            track = TrackInfo(
-                source="https://youtube.com/watch?v=xxx",
-                source_type="youtube",
-                title="YouTube Track",
-                metadata={"youtube_url": "https://youtube.com/watch?v=xxx"},
-            )
+            with patch.object(
+                asyncio, "create_subprocess_exec", new_callable=AsyncMock
+            ) as mock_exec:
+                mock_exec.return_value = mock_process
 
-            result = await player.play(track)
+                with patch("music_cli.player.ffplay.shutil.which", return_value="/usr/bin/yt-dlp"):
+                    track = TrackInfo(
+                        source="https://youtube.com/watch?v=xxx",
+                        source_type="youtube",
+                        title="YouTube Track",
+                        metadata={"youtube_url": "https://youtube.com/watch?v=xxx"},
+                    )
+
+                    result = await player.play(track)
 
             assert result is False
 
@@ -140,20 +147,21 @@ class TestFFplayPlayerImmediateExit:
         player = FFplayPlayer()
 
         mock_process = MagicMock()
-        mock_process.poll.return_value = None  # still running
+        mock_process.returncode = None  # still running
         mock_process.pid = 12345
 
         with patch.object(asyncio, "create_subprocess_shell", new_callable=AsyncMock) as mock_shell:
             mock_shell.return_value = mock_process
 
-            track = TrackInfo(
-                source="https://youtube.com/watch?v=xxx",
-                source_type="youtube",
-                title="YouTube Track",
-                metadata={"youtube_url": "https://youtube.com/watch?v=xxx"},
-            )
+            with patch("music_cli.player.ffplay.shutil.which", return_value="/usr/bin/yt-dlp"):
+                track = TrackInfo(
+                    source="https://youtube.com/watch?v=xxx",
+                    source_type="youtube",
+                    title="YouTube Track",
+                    metadata={"youtube_url": "https://youtube.com/watch?v=xxx"},
+                )
 
-            result = await player.play(track)
+                result = await player.play(track)
 
             assert result is True
             assert player.state == PlayerState.PLAYING

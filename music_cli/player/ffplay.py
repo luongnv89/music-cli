@@ -106,7 +106,7 @@ class FFplayPlayer(Player):
             # still alive. If it exited immediately, the monitor task will set
             # STOPPED — return False so the CLI reports the failure.
             await asyncio.sleep(0.1)
-            if self._process.poll() is not None:
+            if self._process.returncode is not None:
                 logger.warning(
                     "ffplay exited immediately (returncode=%s). "
                     "Audio device may be unavailable or ffplay failed to start.",
@@ -165,7 +165,7 @@ class FFplayPlayer(Player):
 
             # Verify the pipe process actually started
             await asyncio.sleep(0.1)
-            if self._process.poll() is not None:
+            if self._process.returncode is not None:
                 logger.warning(
                     "yt-dlp | ffplay pipe exited immediately (returncode=%s).",
                     self._process.returncode,
