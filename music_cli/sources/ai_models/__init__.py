@@ -38,15 +38,11 @@ from .strategy_cache import LRUStrategyCache, clear_global_cache, get_strategy_c
 
 __all__ = [
     "AIModelsConfig",
-    "AudioLDMStrategy",
-    "BarkStrategy",
     "DEFAULT_AI_MODELS_CONFIG",
     "LRUStrategyCache",
     "ModelConfig",
     "ModelRegistry",
     "ModelStrategy",
-    "MiniMaxMusic3Strategy",
-    "MusicGenStrategy",
     "clear_global_cache",
     "get_strategy_cache",
 ]
