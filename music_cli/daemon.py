@@ -913,10 +913,8 @@ def _pid_alive(pid: int) -> bool:
         # Windows: use ctypes to call OpenProcess with limited rights.
         import ctypes
 
-        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
-        handle = ctypes.windll.kernel32.OpenProcess(
-            PROCESS_QUERY_LIMITED_INFORMATION, False, pid
-        )
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000  # noqa: N806
+        handle = ctypes.windll.kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
         if handle:
             ctypes.windll.kernel32.CloseHandle(handle)
             return True

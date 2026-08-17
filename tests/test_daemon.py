@@ -1,11 +1,7 @@
 """Tests for the daemon module, especially cross-platform PID checking."""
 
-import os
-import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from music_cli.daemon import _pid_alive, get_daemon_pid
 
