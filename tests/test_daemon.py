@@ -87,14 +87,15 @@ class TestGetDaemonPid:
 
         with patch("music_cli.daemon.get_config") as mock_config:
             with patch("music_cli.daemon._pid_alive", return_value=False):
-                mock_cfg = MagicMock()
-                mock_cfg.pid_file = pid_file
-                mock_cfg.socket_path = socket_path
-                mock_config.return_value = mock_cfg
-                result = get_daemon_pid()
-                assert result is None
-                assert not pid_file.exists()
-                assert not socket_path.exists()
+                with patch("music_cli.platform.is_unix", return_value=True):
+                    mock_cfg = MagicMock()
+                    mock_cfg.pid_file = pid_file
+                    mock_cfg.socket_path = socket_path
+                    mock_config.return_value = mock_cfg
+                    result = get_daemon_pid()
+                    assert result is None
+                    assert not pid_file.exists()
+                    assert not socket_path.exists()
 
     def test_live_pid_returns_pid(self, tmp_path: Path) -> None:
         """When PID file points to a live process, return the PID."""
