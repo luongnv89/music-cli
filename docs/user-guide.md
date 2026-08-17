@@ -450,8 +450,8 @@ Softly the world begins to breathe' \
 ```
 
 The model requires non-empty lyrics, CUDA, `bfloat16`, and approximately 24 GB
-of VRAM. The optional dependency pins the immutable Diffusers commit required
-by the model card until the upstream integration is released. Automated tests
+of VRAM. The optional dependency uses the released Diffusers 0.39.x series,
+which includes ModularPipeline support. Automated tests
 mock loading and generation arguments; they do not download model weights or
 verify real inference.
 

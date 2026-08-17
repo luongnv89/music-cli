@@ -390,7 +390,7 @@ Or install the standard dependencies manually:
 
     pip install torch transformers scipy
 
-MiniMax Music 3 additionally requires the pinned Diffusers integration,
+MiniMax Music 3 additionally requires Diffusers 0.39.x,
 CUDA, bfloat16 support, and at least 24GB of VRAM. Model weights download on
 first use.
 """

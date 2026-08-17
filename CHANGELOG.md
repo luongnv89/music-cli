@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Fix cross-platform daemon PID liveness checks on Windows by replacing the unsafe `os.kill(pid, 0)` probe while preserving Unix checks and stale-PID cleanup ([#26](https://github.com/luongnv89/music-cli/pull/26)).
+- Make the MiniMax optional dependency PyPI-compatible by targeting the released Diffusers 0.39.x ModularPipeline integration.
 
 ### Changed
 - Ignore generated Python bytecode and local issue-resolution state in source control.

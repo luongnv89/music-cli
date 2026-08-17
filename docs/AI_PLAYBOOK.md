@@ -574,9 +574,8 @@ MiniMaxAI model reference: [MiniMaxAI/MiniMax-Music3](https://huggingface.co/Min
 It generates complete songs from a detailed music description and non-empty
 lyrics, including section tags such as `[Verse]` and `[Chorus]`.
 
-Install its isolated optional dependencies (the Diffusers integration is pinned
-to the immutable commit documented by the model card until Diffusers PR #14456
-is merged):
+Install its isolated optional dependencies. The extra pins Diffusers to the
+0.39.x series, which includes the released ModularPipeline integration:
 
 ```bash
 pip install 'coder-music-cli[minimax]'
