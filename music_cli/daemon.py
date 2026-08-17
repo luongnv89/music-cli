@@ -467,12 +467,13 @@ class MusicDaemon:
             if not track:
                 return {"error": "Failed to generate AI music"}
 
-            # Save to AI tracks with model info
+            # Save the effective clamped duration and lyrics for replay.
             model_used = track.metadata.get("model", "musicgen-small")
+            effective_duration = int(track.metadata.get("duration", duration))
             self.ai_tracks.add_track(
                 prompt=prompt,
                 file_path=track.source,
-                duration=duration,
+                duration=effective_duration,
                 model=model_used,
                 lyrics=lyrics,
             )

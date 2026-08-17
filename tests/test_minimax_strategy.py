@@ -2,7 +2,7 @@
 
 import asyncio
 from types import ModuleType, SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import numpy as np
 import pytest
@@ -10,6 +10,7 @@ import pytest
 from music_cli.client import DaemonClient
 from music_cli.config import Config
 from music_cli.daemon import MusicDaemon
+from music_cli.player.base import TrackInfo
 from music_cli.sources.ai_generator import AIGenerator
 from music_cli.sources.ai_models import ModelRegistry
 from music_cli.sources.ai_models.minimax_strategy import MiniMaxMusic3Strategy
@@ -131,6 +132,46 @@ def test_generator_rejects_whitespace_lyrics_before_loading(tmp_path) -> None:
         assert generator.generate("description", model_id="minimax-music3", lyrics="  ") is None
 
     get_strategy.assert_not_called()
+
+
+def test_daemon_persists_effective_duration_and_lyrics(tmp_path) -> None:
+    daemon = object.__new__(MusicDaemon)
+    daemon.config = Config(config_dir=tmp_path)
+    daemon.ai_tracks = MagicMock()
+    daemon.history = MagicMock()
+    daemon.player = MagicMock()
+    daemon.player.play = AsyncMock(return_value=True)
+    daemon.temporal = MagicMock()
+    daemon.temporal.get_time_period.return_value.value = "afternoon"
+    daemon._current_mood = None
+    generated = TrackInfo(
+        source=str(tmp_path / "minimax.wav"),
+        source_type="ai",
+        title="AI track",
+        metadata={"model": "minimax-music3", "duration": 5},
+    )
+    generator = MagicMock()
+    generator.generate.return_value = generated
+
+    with (
+        patch("music_cli.sources.ai_generator.is_ai_available", return_value=True),
+        patch("music_cli.sources.ai_generator.AIGenerator", return_value=generator),
+    ):
+        response = asyncio.run(
+            daemon._cmd_ai_play(
+                {
+                    "model": "minimax-music3",
+                    "prompt": "description",
+                    "duration": 2,
+                    "lyrics": "lyrics",
+                }
+            )
+        )
+
+    assert response["status"] == "playing"
+    saved = daemon.ai_tracks.add_track.call_args.kwargs
+    assert saved["duration"] == 5
+    assert saved["lyrics"] == "lyrics"
 
 
 def test_daemon_rejects_whitespace_lyrics_before_generation(tmp_path) -> None:
