@@ -70,7 +70,7 @@ mc ai model
 
 ## Model Selection Guide
 
-mc supports **9 AI models** across 3 families. Choose based on your use case:
+mc supports **9 AI models** across 4 families. Choose based on your use case:
 
 ### MusicGen Models (Music Generation)
 
@@ -96,7 +96,6 @@ Best for: **Nature sounds, ambient soundscapes, sound effects**
 | Model | Size | Duration | Best For |
 |-------|------|----------|----------|
 | `audioldm-s-full-v2` | ~1.5 GB | 2-30s | Sound effects (recommended) |
-| `audioldm-m-full` | ~2 GB | 2-30s | Medium quality audio |
 | `audioldm-l-full` | ~3 GB | 2-30s | High quality audio |
 
 **Example prompts:**
@@ -129,6 +128,7 @@ Best for: **Announcements, greetings, short narrations**
 | Quick background music | `musicgen-small` |
 | Best quality music | `musicgen-large` |
 | Sound effects & ambiance | `audioldm-s-full-v2` |
+| Lyrics-conditioned songs | `minimax-music3` |
 | Quick speech | `bark-small` |
 | Best speech quality | `bark` |
 
@@ -587,7 +587,10 @@ at least 24 GB VRAM for the standard example. Use it with:
 
 ```bash
 mc ai play -m minimax-music3 -p "Genre: acoustic pop, warm and intimate" \
-  --lyrics "[Verse]\nMorning light filtering through the pine\n[Chorus]\nSoftly the world begins to breathe" \
+  --lyrics '[Verse]
+Morning light filtering through the pine
+[Chorus]
+Softly the world begins to breathe' \
   -d 60
 ```
 

@@ -123,6 +123,9 @@ pip install 'coder-music-cli[youtube]'
 # AI music generation (~5GB — PyTorch + Transformers + Diffusers)
 pip install 'coder-music-cli[ai]'
 
+# MiniMax Music 3 (~24GB VRAM; CUDA/bfloat16 required)
+pip install 'coder-music-cli[minimax]'
+
 # Both
 pip install 'coder-music-cli[youtube,ai]'
 ```
@@ -150,7 +153,7 @@ The base install is tiny. The `[ai]` extra downloads ~5GB (PyTorch + HuggingFace
 music-cli is not a replacement for your music library. It's a lightweight, terminal-native player for background music while coding. No browser tabs, no electron apps, no accounts.
 
 **Is it actively maintained?**
-Yes. The latest release is v0.9.1. Check the [changelog](CHANGELOG.md) for recent updates.
+Yes. The latest release is v0.10.0. Check the [changelog](CHANGELOG.md) for recent updates.
 
 **Can I add my own radio stations?**
 Absolutely. Run `mc radio add` or edit `~/.config/music-cli/radios.txt` directly. Format: `Station Name|stream-url`.
@@ -502,7 +505,7 @@ Context: morning / weekday
 
 "Music gives a soul to the universe, wings to the mind, flight to the imagination." - Plato
 
-Version: 0.9.1
+Version: 0.10.0
 GitHub: https://github.com/luongnv89/music-cli
 ```
 

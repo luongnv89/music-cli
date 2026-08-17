@@ -7,9 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-08-17
+
 ### Added
-- Add optional MiniMax Music 3 lyrics-conditioned generation via the official `MiniMaxAI/MiniMax-Music3` model and Diffusers pipeline.
-- Add lyrics propagation, capability-aware model validation, mocked integration tests, and MiniMax runtime documentation.
+- Add MiniMax Music 3 lyrics-conditioned generation via the official `MiniMaxAI/MiniMax-Music3` model and Diffusers pipeline, with CLI model selection, lyrics propagation, capability validation, replay metadata, tests, and documentation ([#25](https://github.com/luongnv89/music-cli/pull/25)).
+
+### Fixed
+- Fix cross-platform daemon PID liveness checks on Windows by replacing the unsafe `os.kill(pid, 0)` probe while preserving Unix checks and stale-PID cleanup ([#26](https://github.com/luongnv89/music-cli/pull/26)).
+
+### Changed
+- Ignore generated Python bytecode and local issue-resolution state in source control.
+
+**Full Changelog**: https://github.com/luongnv89/music-cli/compare/v0.9.1...v0.10.0
 
 ## [0.9.1] - 2026-07-23
 

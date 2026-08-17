@@ -215,6 +215,7 @@ music-cli supports Linux, macOS, and Windows 10+ through a platform abstraction 
 | **Pause/Resume** | SIGSTOP/SIGCONT signals | stdin 'p' command to ffplay |
 | **Config Dir** | `~/.config/music-cli/` | `%LOCALAPPDATA%\music-cli\` |
 | **Daemon Spawn** | `start_new_session=True` | `CREATE_NEW_PROCESS_GROUP` |
+| **PID Liveness** | `os.kill(pid, 0)` | `OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION)` |
 | **Shutdown** | SIGTERM signal | IPC shutdown command |
 
 ### Platform Module Structure

@@ -102,6 +102,7 @@ pip install 'coder-music-cli[ai]'
 | `mc ai list` | List all AI-generated tracks |
 | `mc ai play` | Generate and play AI music |
 | `mc ai play -p "prompt"` | Generate with custom prompt |
+| `mc ai play --lyrics "<lyrics>"` | Generate lyrics-conditioned music |
 | `mc ai replay <num>` | Replay a track by number |
 | `mc ai remove <num>` | Remove a track |
 | `mc ai model` | List available AI models |
@@ -366,6 +367,7 @@ mc ai remove 2                          # Delete track #2
 | `audioldm-l-full` | AudioLDM | High-quality audio generation | ~2GB |
 | `bark` | Bark | Speech synthesis, audio with voice | ~5GB |
 | `bark-small` | Bark | Faster speech synthesis | ~1.5GB |
+| `minimax-music3` | MiniMax Music 3 | Lyrics-conditioned songs | ~24GB |
 
 For detailed prompt writing tips and recipes, see the [AI Playbook](AI_PLAYBOOK.md).
 
@@ -397,6 +399,9 @@ rm ~/.config/music-cli/music-cli.pid
 # Manual cleanup (Windows - PowerShell)
 Remove-Item "$env:LOCALAPPDATA\music-cli\music-cli.pid"
 ```
+
+Daemon status checks use a platform-safe PID liveness probe. Stale PID state is
+removed automatically, and the Unix socket is cleaned up when applicable.
 
 ### No Sound
 
@@ -437,7 +442,10 @@ Diffusers pipeline for lyrics-conditioned song generation:
 ```bash
 pip install 'coder-music-cli[minimax]'
 mc ai play -m minimax-music3 -p "Acoustic pop with warm guitar" \
-  --lyrics "[Verse]\nMorning light filtering through the pine\n[Chorus]\nSoftly the world begins to breathe" \
+  --lyrics '[Verse]
+Morning light filtering through the pine
+[Chorus]
+Softly the world begins to breathe' \
   -d 60
 ```
 
