@@ -5,8 +5,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from music_cli.player.ffplay import FFplayPlayer
 from music_cli.player.base import PlayerState, TrackInfo
+from music_cli.player.ffplay import FFplayPlayer
 
 
 class TestFFplayPlayerImmediateExit:
@@ -31,9 +31,7 @@ class TestFFplayPlayerImmediateExit:
         mock_process.poll.return_value = 1  # exited immediately
         mock_process.pid = 12345
 
-        with patch.object(
-            asyncio, "create_subprocess_exec", new_callable=AsyncMock
-        ) as mock_exec:
+        with patch.object(asyncio, "create_subprocess_exec", new_callable=AsyncMock) as mock_exec:
             mock_exec.return_value = mock_process
 
             track = TrackInfo(
@@ -57,9 +55,7 @@ class TestFFplayPlayerImmediateExit:
         mock_process.poll.return_value = None  # still running
         mock_process.pid = 12345
 
-        with patch.object(
-            asyncio, "create_subprocess_exec", new_callable=AsyncMock
-        ) as mock_exec:
+        with patch.object(asyncio, "create_subprocess_exec", new_callable=AsyncMock) as mock_exec:
             mock_exec.return_value = mock_process
 
             track = TrackInfo(
@@ -78,9 +74,7 @@ class TestFFplayPlayerImmediateExit:
         """play() returns False when create_subprocess_exec raises."""
         player = FFplayPlayer()
 
-        with patch.object(
-            asyncio, "create_subprocess_exec", new_callable=AsyncMock
-        ) as mock_exec:
+        with patch.object(asyncio, "create_subprocess_exec", new_callable=AsyncMock) as mock_exec:
             mock_exec.side_effect = FileNotFoundError("ffplay not found")
 
             track = TrackInfo(
@@ -102,9 +96,7 @@ class TestFFplayPlayerImmediateExit:
         mock_process = MagicMock()
         mock_process.poll.return_value = 1  # exited immediately
 
-        with patch.object(
-            asyncio, "create_subprocess_exec", new_callable=AsyncMock
-        ) as mock_exec:
+        with patch.object(asyncio, "create_subprocess_exec", new_callable=AsyncMock) as mock_exec:
             mock_exec.return_value = mock_process
 
             track = TrackInfo(
@@ -128,9 +120,7 @@ class TestFFplayPlayerImmediateExit:
         mock_process.poll.return_value = 1  # exited immediately
         mock_process.pid = 12345
 
-        with patch.object(
-            asyncio, "create_subprocess_shell", new_callable=AsyncMock
-        ) as mock_shell:
+        with patch.object(asyncio, "create_subprocess_shell", new_callable=AsyncMock) as mock_shell:
             mock_shell.return_value = mock_process
 
             track = TrackInfo(
@@ -153,9 +143,7 @@ class TestFFplayPlayerImmediateExit:
         mock_process.poll.return_value = None  # still running
         mock_process.pid = 12345
 
-        with patch.object(
-            asyncio, "create_subprocess_shell", new_callable=AsyncMock
-        ) as mock_shell:
+        with patch.object(asyncio, "create_subprocess_shell", new_callable=AsyncMock) as mock_shell:
             mock_shell.return_value = mock_process
 
             track = TrackInfo(
