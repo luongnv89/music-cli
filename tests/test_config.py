@@ -34,8 +34,7 @@ class TestConfig:
 
     def test_new_ai_models_are_available_in_existing_configs(self, tmp_path: Path) -> None:
         """Existing users receive newly supported built-in AI models in memory."""
-        (tmp_path / "config.toml").write_text(
-            """
+        (tmp_path / "config.toml").write_text("""
 [ai]
  default_model = "musicgen-small"
 
@@ -43,8 +42,7 @@ class TestConfig:
  hf_model_id = "facebook/musicgen-small"
  model_type = "musicgen"
  enabled = true
-""".lstrip()
-        )
+""".lstrip())
 
         config = Config(config_dir=tmp_path)
 

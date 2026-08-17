@@ -215,9 +215,10 @@ class TestBareInvocation:
         result = runner.invoke(main, [])
         # We accept exit_code 1 because the daemon likely isn't running in test,
         # but it must not be exit_code 2 (Click usage error).
-        assert result.exit_code in (0, 1), (
-            f"Bare invocation crashed with exit code {result.exit_code}: {result.output}"
-        )
+        assert result.exit_code in (
+            0,
+            1,
+        ), f"Bare invocation crashed with exit code {result.exit_code}: {result.output}"
 
     def test_bare_invocation_attempts_status(self, runner):
         """Bare invocation should try to show status (connect to daemon)."""

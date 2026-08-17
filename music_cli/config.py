@@ -619,7 +619,9 @@ Radio Capital|https://icecast.unitedradio.it/Capital.mp3
             **(default_models if isinstance(default_models, dict) else {}),
             **(user_models if isinstance(user_models, dict) else {}),
         }
-        merged.update({key: value for key, value in user_ai.items() if key not in {"cache", "models"}})
+        merged.update(
+            {key: value for key, value in user_ai.items() if key not in {"cache", "models"}}
+        )
         return merged
 
     def get_ai_models_config(self):

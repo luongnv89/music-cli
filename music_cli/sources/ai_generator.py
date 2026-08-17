@@ -41,6 +41,7 @@ def is_ai_available() -> bool:
     try:
         import scipy  # noqa: F401
         import torch  # noqa: F401
+
         try:
             from transformers import AutoProcessor, MusicgenForConditionalGeneration  # noqa: F401
         except ImportError:

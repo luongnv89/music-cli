@@ -33,8 +33,7 @@ class MiniMaxMusic3Strategy(ModelStrategy):
             from diffusers import ModularPipeline
         except ImportError as exc:
             raise ImportError(
-                "MiniMax Music 3 requires Diffusers ModularPipeline; "
-                "install the 'minimax' extra"
+                "MiniMax Music 3 requires Diffusers ModularPipeline; install the 'minimax' extra"
             ) from exc
 
         if not callable(getattr(ModularPipeline, "from_pretrained", None)):
@@ -48,9 +47,7 @@ class MiniMaxMusic3Strategy(ModelStrategy):
                 "CPU inference is not supported"
             )
         if not hasattr(torch, "bfloat16"):
-            raise RuntimeError(
-                "MiniMax Music 3 requires a PyTorch build with bfloat16 support"
-            )
+            raise RuntimeError("MiniMax Music 3 requires a PyTorch build with bfloat16 support")
 
         logger.info("Loading MiniMax Music 3 model (%s)...", self.model_id)
         pipeline = ModularPipeline.from_pretrained(self.model_id)  # nosec B615

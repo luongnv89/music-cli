@@ -67,9 +67,7 @@ def test_load_model_uses_official_pipeline_contract() -> None:
     modular_pipeline = Mock()
     modular_pipeline.from_pretrained.return_value = pipeline
     fake_diffusers = SimpleNamespace(ModularPipeline=modular_pipeline)
-    fake_torch = SimpleNamespace(
-        bfloat16=object(), cuda=SimpleNamespace(is_available=lambda: True)
-    )
+    fake_torch = SimpleNamespace(bfloat16=object(), cuda=SimpleNamespace(is_available=lambda: True))
 
     with patch.dict("sys.modules", {"diffusers": fake_diffusers, "torch": fake_torch}):
         loaded, processor = MiniMaxMusic3Strategy(minimax_config()).load_model()
