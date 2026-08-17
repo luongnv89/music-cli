@@ -184,15 +184,18 @@ class AITracksManager:
 
         return removed
 
-    def update_file_path(self, index: int, new_file_path: str) -> bool:
-        """Update the file path for a track (used after regeneration).
+    def update_file_path(
+        self,
+        index: int,
+        new_file_path: str,
+        duration: int | None = None,
+        model: str | None = None,
+        lyrics: str | None = None,
+    ) -> bool:
+        """Update a track after regeneration.
 
-        Args:
-            index: 1-based index of the track.
-            new_file_path: New path to the audio file.
-
-        Returns:
-            True if updated, False if track not found.
+        Optional metadata is updated when supplied so clamped durations and
+        lyrics-conditioned inputs remain accurate across replays.
         """
         tracks = self._load_tracks()
         # Convert to reversed index
@@ -200,8 +203,15 @@ class AITracksManager:
         if not (0 <= reversed_index < len(tracks)):
             return False
 
-        tracks[reversed_index].file_path = new_file_path
-        tracks[reversed_index].timestamp = datetime.now().isoformat()
+        track = tracks[reversed_index]
+        track.file_path = new_file_path
+        if duration is not None:
+            track.duration = duration
+        if model is not None:
+            track.model = model
+        if lyrics is not None:
+            track.lyrics = lyrics
+        track.timestamp = datetime.now().isoformat()
         self._save_tracks(tracks)
         return True
 

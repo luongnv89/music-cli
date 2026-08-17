@@ -217,13 +217,22 @@ class TestAITracksManager:
         manager.add_track("track2", "/old/path2.wav", 30)
 
         # Update track at index 1 (newest = track2)
-        result = manager.update_file_path(1, "/new/path2.wav")
+        result = manager.update_file_path(
+            1,
+            "/new/path2.wav",
+            duration=45,
+            model="minimax-music3",
+            lyrics="[Verse] hello",
+        )
         assert result is True
 
         # Verify the update
         track = manager.get_by_index(1)
         assert track is not None
         assert track.file_path == "/new/path2.wav"
+        assert track.duration == 45
+        assert track.model == "minimax-music3"
+        assert track.lyrics == "[Verse] hello"
 
         # Verify track1 is unchanged
         track1 = manager.get_by_index(2)

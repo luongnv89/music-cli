@@ -554,8 +554,14 @@ class MusicDaemon:
                 if not track:
                     return {"error": "Failed to regenerate AI music"}
 
-                # Update the track entry with new file path
-                self.ai_tracks.update_file_path(index, track.source)
+                # Update the path and effective metadata after regeneration.
+                self.ai_tracks.update_file_path(
+                    index,
+                    track.source,
+                    duration=int(track.metadata.get("duration", track_entry.duration)),
+                    model=track.metadata.get("model", model_id),
+                    lyrics=track.metadata.get("lyrics", track_entry.lyrics),
+                )
 
                 # Play the regenerated track
                 success = await self.player.play(track)
