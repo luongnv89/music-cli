@@ -579,7 +579,7 @@ class TestAiCommand:
     def test_ai_play_help(self, runner: CliRunner) -> None:
         result = runner.invoke(main, ["ai", "play", "--help"])
         assert result.exit_code == 0
-        for flag in ("--prompt", "-p", "--mood", "-M", "--duration", "-d", "--model"):
+        for flag in ("--prompt", "-p", "--mood", "-M", "--duration", "-d", "--model", "--lyrics"):
             assert flag in result.output, f"Missing {flag!r} in ai play --help"
 
     def test_ai_replay(self, runner: CliRunner) -> None:

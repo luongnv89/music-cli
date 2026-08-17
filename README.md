@@ -156,7 +156,7 @@ Yes. The latest release is v0.9.1. Check the [changelog](CHANGELOG.md) for recen
 Absolutely. Run `mc radio add` or edit `~/.config/music-cli/radios.txt` directly. Format: `Station Name|stream-url`.
 
 **What AI models are supported?**
-MusicGen (small/medium/large/melody), AudioLDM (small/large), and Bark (standard/small). See the [AI Playbook](docs/AI_PLAYBOOK.md) for examples and tips.
+MusicGen (small/medium/large/melody), AudioLDM (small/large), Bark (standard/small), and the optional lyrics-conditioned MiniMax Music 3 model. See the [AI Playbook](docs/AI_PLAYBOOK.md) for examples and tips.
 
 ## Start Coding with Music
 
@@ -206,6 +206,7 @@ mc yt play N                # replay cached track
 mc yt remove N / clear      # manage cache
 
 mc ai play [-p PROMPT]      # generate AI music
+mc ai play --lyrics LYRICS  # lyrics-conditioned models such as MiniMax Music 3
 mc ai / mc ai list          # list generated tracks
 mc ai replay N              # replay generated track
 mc ai model                 # list/download/delete/default models
@@ -333,6 +334,7 @@ mc ai remove 2                          # Delete track #2
 | `audioldm-l-full` | AudioLDM | High-quality audio generation | ~2GB |
 | `bark` | Bark | Speech synthesis, audio with voice | ~5GB |
 | `bark-small` | Bark | Faster speech synthesis | ~1.5GB |
+| `minimax-music3` | MiniMax Music 3 | Lyrics-conditioned songs | ~24GB |
 
 ### AI Command Suite
 
@@ -349,7 +351,7 @@ mc ai remove 2                          # Delete track #2
 | `mc ai remove <num>` | Delete track and audio file |
 
 ### AI Features
-- **Multiple models** — MusicGen, AudioLDM, and Bark model families
+- **Multiple models** — MusicGen, AudioLDM, Bark, and optional MiniMax Music 3
 - **Smart caching** — LRU cache keeps up to 2 models in memory (configurable)
 - **Download progress** — Progress bar shown during model downloads
 - **GPU memory management** — Automatic cleanup when switching models
@@ -362,6 +364,7 @@ mc ai remove 2                          # Delete track #2
 ### AI Requirements
 - ~5GB disk space minimum (PyTorch + Transformers + Diffusers)
 - ~8GB RAM minimum for generation (16GB recommended for larger models)
+- MiniMax Music 3 uses `pip install 'coder-music-cli[minimax]'`, requires CUDA, bfloat16, and approximately 24GB VRAM
 - Models are downloaded on first use
 
 ### AI Configuration

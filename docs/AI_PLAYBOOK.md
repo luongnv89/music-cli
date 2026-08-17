@@ -567,6 +567,38 @@ Solutions:
 
 ---
 
+## MiniMax Music 3 (Lyrics-Conditioned)
+
+MiniMax Music 3 is available as `minimax-music3` and uses the official
+MiniMaxAI model reference: [MiniMaxAI/MiniMax-Music3](https://huggingface.co/MiniMaxAI/MiniMax-Music3).
+It generates complete songs from a detailed music description and non-empty
+lyrics, including section tags such as `[Verse]` and `[Chorus]`.
+
+Install its isolated optional dependencies (the Diffusers integration is pinned
+to the immutable commit documented by the model card until Diffusers PR #14456
+is merged):
+
+```bash
+pip install 'coder-music-cli[minimax]'
+```
+
+The official pipeline requires a CUDA-capable GPU, `bfloat16`, and a GPU with
+at least 24 GB VRAM for the standard example. Use it with:
+
+```bash
+mc ai play -m minimax-music3 -p "Genre: acoustic pop, warm and intimate" \
+  --lyrics "[Verse]\nMorning light filtering through the pine\n[Chorus]\nSoftly the world begins to breathe" \
+  -d 60
+```
+
+MiniMax Music 3 rejects missing or blank lyrics. Existing models do not accept
+lyrics, so the CLI reports an error instead of silently discarding them. The
+repository's automated tests mock the pipeline contract and never download
+weights, access Hugging Face, or require a GPU; real inference remains an
+optional manual validation step.
+
+---
+
 ## Next Steps
 
 - Explore different models for your workflow

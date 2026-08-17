@@ -1,6 +1,7 @@
 """Background daemon for music-cli."""
 
 import asyncio
+import codecs
 import json
 import logging
 import os
@@ -21,6 +22,91 @@ from .sources.youtube import YouTubeSource, is_youtube_available
 from .youtube_history import get_youtube_history
 
 logger = logging.getLogger(__name__)
+
+REQUEST_CHUNK_SIZE = 4096
+MAX_REQUEST_SIZE = 1024 * 1024
+REQUEST_READ_TIMEOUT = 5.0
+
+
+class RequestError(ValueError):
+    """An invalid, incomplete, or oversized daemon request."""
+
+
+class _JSONRequestFramer:
+    """Incrementally find the end of a top-level JSON object."""
+
+    _ESCAPES = frozenset('"\\/bfnrt')
+    _HEX_DIGITS = frozenset("0123456789abcdefABCDEF")
+
+    def __init__(self) -> None:
+        self._chunks: list[str] = []
+        self._stack: list[str] = []
+        self._started = False
+        self._in_string = False
+        self._escaped = False
+        self._unicode_digits = 0
+        self._complete = False
+
+    def feed(self, text: str) -> bool:
+        """Consume decoded text and return whether the object is complete."""
+        self._chunks.append(text)
+
+        for char in text:
+            if self._complete:
+                if not char.isspace():
+                    raise RequestError("Invalid JSON")
+                continue
+
+            if self._in_string:
+                if self._unicode_digits:
+                    if char not in self._HEX_DIGITS:
+                        raise RequestError("Invalid JSON")
+                    self._unicode_digits -= 1
+                elif self._escaped:
+                    if char == "u":
+                        self._unicode_digits = 4
+                        self._escaped = False
+                    elif char in self._ESCAPES:
+                        self._escaped = False
+                    else:
+                        raise RequestError("Invalid JSON")
+                elif char == "\\":
+                    self._escaped = True
+                elif char == '"':
+                    self._in_string = False
+                elif ord(char) < 0x20:
+                    raise RequestError("Invalid JSON")
+                continue
+
+            if not self._started:
+                if char.isspace():
+                    continue
+                if char != "{":
+                    raise RequestError("Request must be a JSON object")
+                self._started = True
+                self._stack.append("}")
+                continue
+
+            if char == '"':
+                self._in_string = True
+            elif char in "{[":
+                self._stack.append("}" if char == "{" else "]")
+            elif char in "}]":
+                if not self._stack or self._stack[-1] != char:
+                    raise RequestError("Invalid JSON")
+                self._stack.pop()
+                if not self._stack:
+                    self._complete = True
+
+        return self._complete
+
+    def finish(self) -> None:
+        """Reject a stream that ended before a complete object was found."""
+        if not self._complete:
+            raise RequestError("Incomplete JSON request")
+
+    def text(self) -> str:
+        return "".join(self._chunks)
 
 
 class MusicDaemon:
@@ -90,6 +176,59 @@ class MusicDaemon:
 
         logger.info("Daemon stopped")
 
+    async def _read_request(self, reader: asyncio.StreamReader) -> dict | None:
+        """Read one complete JSON request without relying on socket boundaries."""
+        decoder = codecs.getincrementaldecoder("utf-8")()
+        framer = _JSONRequestFramer()
+        size = 0
+        deadline = asyncio.get_running_loop().time() + REQUEST_READ_TIMEOUT
+
+        while True:
+            remaining = deadline - asyncio.get_running_loop().time()
+            if remaining <= 0:
+                raise RequestError("Request timed out")
+            try:
+                chunk = await asyncio.wait_for(reader.read(REQUEST_CHUNK_SIZE), remaining)
+            except asyncio.TimeoutError as exc:
+                raise RequestError("Request timed out") from exc
+
+            if not chunk:
+                try:
+                    text = decoder.decode(b"", final=True)
+                except UnicodeDecodeError as exc:
+                    raise RequestError("Invalid UTF-8") from exc
+                if text:
+                    framer.feed(text)
+                if size == 0:
+                    return None
+                framer.finish()
+                break
+
+            size += len(chunk)
+            if size > MAX_REQUEST_SIZE:
+                raise RequestError(f"Request too large (maximum {MAX_REQUEST_SIZE} bytes)")
+
+            try:
+                text = decoder.decode(chunk)
+            except UnicodeDecodeError as exc:
+                raise RequestError("Invalid UTF-8") from exc
+
+            complete = framer.feed(text) if text else False
+            # A split UTF-8 sequence may still be pending after the closing
+            # brace. Read on so invalid trailing bytes are not mistaken for a
+            # complete request.
+            pending_utf8, _ = decoder.getstate()
+            if complete and not pending_utf8:
+                break
+
+        try:
+            request = json.loads(framer.text())
+        except json.JSONDecodeError as exc:
+            raise RequestError("Invalid JSON") from exc
+        if not isinstance(request, dict):
+            raise RequestError("Request must be a JSON object")
+        return request
+
     async def _handle_client(
         self,
         reader: asyncio.StreamReader,
@@ -97,16 +236,15 @@ class MusicDaemon:
     ) -> None:
         """Handle a client connection."""
         try:
-            data = await reader.read(4096)
-            if not data:
-                return
-
             try:
-                request = json.loads(data.decode())
-            except json.JSONDecodeError:
-                response = {"error": "Invalid JSON"}
+                request = await self._read_request(reader)
+            except RequestError as exc:
+                response = {"error": str(exc)}
                 writer.write(json.dumps(response).encode())
                 await writer.drain()
+                return
+
+            if request is None:
                 return
 
             command = request.get("command", "")
@@ -407,6 +545,7 @@ class MusicDaemon:
             duration: Duration in seconds (default: 30).
             mood: Mood to use for context-based generation.
             model: Model ID to use (optional). If not provided, uses default.
+            lyrics: Optional lyrics for lyrics-conditioned models.
         """
         try:
             from .sources.ai_generator import AIGenerator, is_ai_available
@@ -421,11 +560,20 @@ class MusicDaemon:
             duration = args.get("duration", 5)
             mood = args.get("mood")
             model_id = args.get("model")
+            lyrics = args.get("lyrics")
 
             # Validate model if specified
             if model_id and not self.config.validate_ai_model(model_id):
                 available = ", ".join(self.config.list_ai_models(enabled_only=True))
                 return {"error": f"Unknown or disabled model: '{model_id}'. Available: {available}"}
+
+            selected_model = self.config.get_ai_models_config().get_model(model_id)
+            if selected_model is None:
+                return {"error": "No enabled AI model is configured"}
+            if lyrics is not None and not selected_model.supports_lyrics:
+                return {"error": f"Model '{selected_model.id}' does not support lyrics"}
+            if selected_model.requires_lyrics and (not lyrics or not lyrics.strip()):
+                return {"error": f"Model '{selected_model.id}' requires non-empty lyrics"}
 
             # Update mood if provided
             if mood:
@@ -452,18 +600,20 @@ class MusicDaemon:
 
             # Generate the track with specified model
             generator = AIGenerator(output_dir=self.config.ai_music_dir, config=self.config)
-            track = generator.generate(prompt, duration, model_id=model_id)
+            track = generator.generate(prompt, duration, model_id=model_id, lyrics=lyrics)
 
             if not track:
                 return {"error": "Failed to generate AI music"}
 
-            # Save to AI tracks with model info
+            # Save the effective clamped duration and lyrics for replay.
             model_used = track.metadata.get("model", "musicgen-small")
+            effective_duration = int(track.metadata.get("duration", duration))
             self.ai_tracks.add_track(
                 prompt=prompt,
                 file_path=track.source,
-                duration=duration,
+                duration=effective_duration,
                 model=model_used,
+                lyrics=lyrics,
             )
 
             # Log to history
@@ -536,13 +686,20 @@ class MusicDaemon:
                     track_entry.prompt,
                     track_entry.duration,
                     model_id=model_id,
+                    lyrics=track_entry.lyrics,
                 )
 
                 if not track:
                     return {"error": "Failed to regenerate AI music"}
 
-                # Update the track entry with new file path
-                self.ai_tracks.update_file_path(index, track.source)
+                # Update the path and effective metadata after regeneration.
+                self.ai_tracks.update_file_path(
+                    index,
+                    track.source,
+                    duration=int(track.metadata.get("duration", track_entry.duration)),
+                    model=track.metadata.get("model", model_id),
+                    lyrics=track.metadata.get("lyrics", track_entry.lyrics),
+                )
 
                 # Play the regenerated track
                 success = await self.player.play(track)

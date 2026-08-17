@@ -428,6 +428,25 @@ mc ai model
 - 16GB recommended for larger models (`musicgen-large`, `bark`)
 - LRU cache limits in-memory usage (default: 2 models)
 
+## MiniMax Music 3
+
+The optional `minimax-music3` model uses the official
+[MiniMaxAI/MiniMax-Music3](https://huggingface.co/MiniMaxAI/MiniMax-Music3)
+Diffusers pipeline for lyrics-conditioned song generation:
+
+```bash
+pip install 'coder-music-cli[minimax]'
+mc ai play -m minimax-music3 -p "Acoustic pop with warm guitar" \
+  --lyrics "[Verse]\nMorning light filtering through the pine\n[Chorus]\nSoftly the world begins to breathe" \
+  -d 60
+```
+
+The model requires non-empty lyrics, CUDA, `bfloat16`, and approximately 24 GB
+of VRAM. The optional dependency pins the immutable Diffusers commit required
+by the model card until the upstream integration is released. Automated tests
+mock loading and generation arguments; they do not download model weights or
+verify real inference.
+
 ## Tips
 
 - **Autostart**: Add `mc daemon start` to your shell profile

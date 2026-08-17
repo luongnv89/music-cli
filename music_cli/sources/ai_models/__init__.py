@@ -33,6 +33,7 @@ Example usage:
 
 from .audioldm_strategy import AudioLDMStrategy
 from .bark_strategy import BarkStrategy
+from .minimax_strategy import MiniMaxMusic3Strategy
 from .model_config import DEFAULT_AI_MODELS_CONFIG, AIModelsConfig, ModelConfig
 from .model_registry import ModelRegistry
 from .model_strategy import ModelStrategy
@@ -48,6 +49,7 @@ __all__ = [
     "ModelConfig",
     "ModelRegistry",
     "ModelStrategy",
+    "MiniMaxMusic3Strategy",
     "MusicGenStrategy",
     "clear_global_cache",
     "get_strategy_cache",

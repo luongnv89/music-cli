@@ -11,7 +11,6 @@ from dataclasses import dataclass
 
 from . import hf_cache
 from .config import Config
-from .sources.ai_models import ModelConfig
 
 logger = logging.getLogger(__name__)
 
@@ -72,13 +71,7 @@ class ModelManager:
             List of ModelInfo objects with complete model information,
             sorted by model type then model ID.
         """
-        models_config = self._config.get("ai.models", {})
-
-        # Fall back to DEFAULT_CONFIG if user's config doesn't have ai.models
-        if not models_config:
-            from .sources.ai_models import DEFAULT_AI_MODELS_CONFIG
-
-            models_config = DEFAULT_AI_MODELS_CONFIG.get("models", {})
+        models_config = self._config.get_ai_models_config().models
 
         default_model = self._config.get_default_ai_model()
 
@@ -86,8 +79,7 @@ class ModelManager:
         cache_info = hf_cache.scan_all_cached_models()
 
         result = []
-        for model_id, model_data in models_config.items():
-            model = ModelConfig.from_dict(model_id, model_data)
+        for model_id, model in models_config.items():
             hf_model_id = model.hf_model_id
 
             # Check if downloaded
@@ -111,7 +103,7 @@ class ModelManager:
             )
 
         # Sort by model_type, then by id
-        type_order = {"musicgen": 0, "audioldm": 1, "bark": 2}
+        type_order = {"musicgen": 0, "audioldm": 1, "bark": 2, "minimax_music3": 3}
         result.sort(key=lambda m: (type_order.get(m.model_type, 99), m.id))
 
         return result

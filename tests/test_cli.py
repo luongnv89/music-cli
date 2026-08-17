@@ -215,9 +215,10 @@ class TestBareInvocation:
         result = runner.invoke(main, [])
         # We accept exit_code 1 because the daemon likely isn't running in test,
         # but it must not be exit_code 2 (Click usage error).
-        assert result.exit_code in (0, 1), (
-            f"Bare invocation crashed with exit code {result.exit_code}: {result.output}"
-        )
+        assert result.exit_code in (
+            0,
+            1,
+        ), f"Bare invocation crashed with exit code {result.exit_code}: {result.output}"
 
     def test_bare_invocation_attempts_status(self, runner):
         """Bare invocation should try to show status (connect to daemon)."""
@@ -654,6 +655,24 @@ class TestAIDurationDefault:
         assert result.exit_code == 0
         call_kwargs = mock_daemon_client.ai_play.call_args[1]
         assert call_kwargs["duration"] == 15
+
+    @patch("music_cli.cli.ensure_daemon")
+    def test_ai_play_forwards_lyrics(self, mock_daemon, runner, mock_daemon_client):
+        mock_daemon_client.ai_play.return_value = {
+            "track": {"title": "AI Track", "metadata": {"model": "minimax-music3"}},
+            "prompt": "acoustic pop",
+        }
+        mock_daemon.return_value = mock_daemon_client
+
+        result = runner.invoke(
+            main,
+            ["ai", "play", "-m", "minimax-music3", "--lyrics", "[Verse] hello"],
+        )
+
+        assert result.exit_code == 0
+        call_kwargs = mock_daemon_client.ai_play.call_args.kwargs
+        assert call_kwargs["model"] == "minimax-music3"
+        assert call_kwargs["lyrics"] == "[Verse] hello"
 
 
 # -------------------------------------------------------------------------
