@@ -330,6 +330,37 @@ async def test_daemon_reads_request_with_split_utf8_sequence() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("literal", ["true", "1e+3"])
+async def test_daemon_reads_request_with_split_json_literal(literal: str) -> None:
+    request = {"command": "ping", "args": {"value": json.loads(literal)}}
+    if literal == "1e+3":
+        data = b'{"command":"ping","args":{"value":1e+3}}'
+    else:
+        data = json.dumps(request).encode()
+    split = data.index(literal.encode()) + 2
+    reader = MagicMock()
+    reader.read = AsyncMock(side_effect=[data[:split], data[split:]])
+
+    parsed = await MusicDaemon._read_request(object.__new__(MusicDaemon), reader)
+
+    assert parsed == request
+
+
+@pytest.mark.asyncio
+async def test_daemon_reads_request_with_split_unicode_escape() -> None:
+    request = {"command": "ping", "args": {"lyrics": "é"}}
+    data = json.dumps(request).encode()
+    escape = b"\\u00e9"
+    split = data.index(escape) + len(escape) - 2
+    reader = MagicMock()
+    reader.read = AsyncMock(side_effect=[data[:split], data[split:]])
+
+    parsed = await MusicDaemon._read_request(object.__new__(MusicDaemon), reader)
+
+    assert parsed == request
+
+
+@pytest.mark.asyncio
 async def test_daemon_rejects_malformed_and_oversized_requests() -> None:
     daemon = object.__new__(MusicDaemon)
     malformed_reader = MagicMock()

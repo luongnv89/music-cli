@@ -32,6 +32,83 @@ class RequestError(ValueError):
     """An invalid, incomplete, or oversized daemon request."""
 
 
+class _JSONRequestFramer:
+    """Incrementally find the end of a top-level JSON object."""
+
+    _ESCAPES = frozenset('"\\/bfnrt')
+    _HEX_DIGITS = frozenset("0123456789abcdefABCDEF")
+
+    def __init__(self) -> None:
+        self._chunks: list[str] = []
+        self._stack: list[str] = []
+        self._started = False
+        self._in_string = False
+        self._escaped = False
+        self._unicode_digits = 0
+        self._complete = False
+
+    def feed(self, text: str) -> bool:
+        """Consume decoded text and return whether the object is complete."""
+        self._chunks.append(text)
+
+        for char in text:
+            if self._complete:
+                if not char.isspace():
+                    raise RequestError("Invalid JSON")
+                continue
+
+            if self._in_string:
+                if self._unicode_digits:
+                    if char not in self._HEX_DIGITS:
+                        raise RequestError("Invalid JSON")
+                    self._unicode_digits -= 1
+                elif self._escaped:
+                    if char == "u":
+                        self._unicode_digits = 4
+                        self._escaped = False
+                    elif char in self._ESCAPES:
+                        self._escaped = False
+                    else:
+                        raise RequestError("Invalid JSON")
+                elif char == "\\":
+                    self._escaped = True
+                elif char == '"':
+                    self._in_string = False
+                elif ord(char) < 0x20:
+                    raise RequestError("Invalid JSON")
+                continue
+
+            if not self._started:
+                if char.isspace():
+                    continue
+                if char != "{":
+                    raise RequestError("Request must be a JSON object")
+                self._started = True
+                self._stack.append("}")
+                continue
+
+            if char == '"':
+                self._in_string = True
+            elif char in "{[":
+                self._stack.append("}" if char == "{" else "]")
+            elif char in "}]":
+                if not self._stack or self._stack[-1] != char:
+                    raise RequestError("Invalid JSON")
+                self._stack.pop()
+                if not self._stack:
+                    self._complete = True
+
+        return self._complete
+
+    def finish(self) -> None:
+        """Reject a stream that ended before a complete object was found."""
+        if not self._complete:
+            raise RequestError("Incomplete JSON request")
+
+    def text(self) -> str:
+        return "".join(self._chunks)
+
+
 class MusicDaemon:
     """Background daemon that handles music playback."""
 
@@ -102,8 +179,7 @@ class MusicDaemon:
     async def _read_request(self, reader: asyncio.StreamReader) -> dict | None:
         """Read one complete JSON request without relying on socket boundaries."""
         decoder = codecs.getincrementaldecoder("utf-8")()
-        text = ""
-        json_decoder = json.JSONDecoder()
+        framer = _JSONRequestFramer()
         size = 0
         deadline = asyncio.get_running_loop().time() + REQUEST_READ_TIMEOUT
 
@@ -118,40 +194,40 @@ class MusicDaemon:
 
             if not chunk:
                 try:
-                    text += decoder.decode(b"", final=True)
+                    text = decoder.decode(b"", final=True)
                 except UnicodeDecodeError as exc:
                     raise RequestError("Invalid UTF-8") from exc
-                if not text:
+                if text:
+                    framer.feed(text)
+                if size == 0:
                     return None
-                raise RequestError("Incomplete JSON request")
+                framer.finish()
+                break
 
             size += len(chunk)
             if size > MAX_REQUEST_SIZE:
                 raise RequestError(f"Request too large (maximum {MAX_REQUEST_SIZE} bytes)")
 
             try:
-                text += decoder.decode(chunk)
+                text = decoder.decode(chunk)
             except UnicodeDecodeError as exc:
                 raise RequestError("Invalid UTF-8") from exc
 
-            stripped = text.lstrip()
-            if not stripped:
-                continue
+            complete = framer.feed(text) if text else False
+            # A split UTF-8 sequence may still be pending after the closing
+            # brace. Read on so invalid trailing bytes are not mistaken for a
+            # complete request.
+            pending_utf8, _ = decoder.getstate()
+            if complete and not pending_utf8:
+                break
 
-            try:
-                request, end = json_decoder.raw_decode(stripped)
-            except json.JSONDecodeError as exc:
-                # Errors at the end of the current buffer may be resolved by a
-                # later chunk (for example, a closing brace or split string).
-                if exc.pos >= len(stripped) or exc.msg.startswith("Unterminated string"):
-                    continue
-                raise RequestError("Invalid JSON") from exc
-
-            if not isinstance(request, dict):
-                raise RequestError("Request must be a JSON object")
-            if stripped[end:].strip():
-                raise RequestError("Invalid JSON")
-            return request
+        try:
+            request = json.loads(framer.text())
+        except json.JSONDecodeError as exc:
+            raise RequestError("Invalid JSON") from exc
+        if not isinstance(request, dict):
+            raise RequestError("Request must be a JSON object")
+        return request
 
     async def _handle_client(
         self,
