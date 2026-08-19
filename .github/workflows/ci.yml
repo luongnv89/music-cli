@@ -166,4 +166,4 @@ jobs:
         uses: ludeeus/action-shellcheck@2.0.0
         with:
           severity: warning
-          additional_paths: install.sh
+          additional_files: install.sh
