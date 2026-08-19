@@ -62,7 +62,11 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        python-version: ["3.12", "3.13", "3.14"]
+        # Cover every version requires-python (>=3.10) admits — the matrix and
+        # the declaration must agree (#39). 3.10 and 3.11 are EOL-ish but still
+        # in the declared support range; narrowing requires-python is F-DEP-001
+        # (decided in P2), not this task.
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
         exclude:
           # 3.14 is pre-release; skip Windows until wheels are widely available
           - os: windows-latest
