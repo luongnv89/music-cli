@@ -146,14 +146,14 @@ def is_model_downloaded(hf_model_id: str) -> bool:
     return get_model_cache_info(hf_model_id) is not None
 
 
-def download_model(hf_model_id: str, resume: bool = True) -> bool:
+def download_model(hf_model_id: str) -> bool:
     """Download a model from HuggingFace Hub.
 
-    Uses snapshot_download which automatically shows progress bars.
+    Uses snapshot_download which automatically shows progress bars and
+    resumes interrupted downloads.
 
     Args:
         hf_model_id: HuggingFace model ID to download.
-        resume: Whether to resume interrupted downloads.
 
     Returns:
         True if download succeeded, False otherwise.
@@ -163,11 +163,7 @@ def download_model(hf_model_id: str, resume: bool = True) -> bool:
         return False
 
     try:
-        # snapshot_download automatically shows progress via tqdm
-        snapshot_download(
-            repo_id=hf_model_id,
-            resume_download=resume,
-        )
+        snapshot_download(repo_id=hf_model_id)
         return True
     except HfHubHTTPError as e:
         logger.error(f"HTTP error downloading {hf_model_id}: {e}")

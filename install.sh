@@ -187,7 +187,10 @@ install_music_cli() {
     fi
 
     step "Installing $pkg from PyPI"
-    "$venv_pip" install --quiet "$pkg"
+    # Upgrade an existing venv as well as installing into a new one. Without
+    # --upgrade, pip can leave an older music-cli package in place and the
+    # linked mc command will keep running stale code.
+    "$venv_python" -m pip install --quiet --upgrade "$pkg"
     ok "Installed $pkg"
 }
 
