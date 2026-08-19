@@ -54,8 +54,15 @@ source venv/bin/activate        # Linux/macOS
 # Install with all dev dependencies
 pip install -e ".[dev]"
 
-# Install pre-commit hooks
+# Install pre-commit hooks (required — CI and the local gate must agree)
 pre-commit install
+```
+
+**Bootstrap check — is the gate armed?** After setup, confirm the hook is installed
+or CI and your local results will diverge:
+
+```bash
+[ -f .git/hooks/pre-commit ] && echo "pre-commit armed" || echo "NOT armed — run: pre-commit install"
 ```
 
 ### Optional extras

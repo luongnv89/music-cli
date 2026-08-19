@@ -23,7 +23,6 @@ set -euo pipefail
 TOOL_NAME="music-cli"
 PYPI_PACKAGE="coder-music-cli"
 REPO="luongnv89/music-cli"
-BRANCH="main"
 
 EXTRAS="${EXTRAS:-}"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/share/music-cli}"
@@ -235,12 +234,12 @@ verify_installation() {
 
 # --- Entry Point ---
 main() {
-    printf "\n${BOLD}${GREEN}music-cli installer${NC}\n"
-    printf "${CYAN}  Code. Listen. Iterate.${NC}\n\n"
-    printf "  Repo    : https://github.com/$REPO\n"
-    printf "  PyPI    : https://pypi.org/project/$PYPI_PACKAGE\n"
-    printf "  Extras  : ${EXTRAS:-none}\n"
-    printf "  Dest    : $INSTALL_DIR\n\n"
+    printf '\n%s%smusic-cli installer%s\n' "$BOLD" "$GREEN" "$NC"
+    printf '%s  Code. Listen. Iterate.%s\n\n' "$CYAN" "$NC"
+    printf '  Repo    : https://github.com/%s\n' "$REPO"
+    printf '  PyPI    : https://pypi.org/project/%s\n' "$PYPI_PACKAGE"
+    printf '  Extras  : %s\n' "${EXTRAS:-none}"
+    printf '  Dest    : %s\n\n' "$INSTALL_DIR"
 
     local os pm sudo_cmd python
     os="$(detect_os)"
@@ -280,27 +279,27 @@ main() {
     # ── Done ─────────────────────────────────────────────────
     verify_installation
 
-    printf "\n${BOLD}${GREEN}============================================${NC}\n"
+    printf '\n%s%s============================================%s\n' "$BOLD" "$GREEN" "$NC"
     ok "Installation complete!"
-    printf "${BOLD}${GREEN}============================================${NC}\n\n"
-    printf "  Get started:\n\n"
-    printf "    ${CYAN}music-cli play${NC}              # context-aware radio\n"
-    printf "    ${CYAN}music-cli play --mood focus${NC} # focus music\n"
-    printf "    ${CYAN}music-cli status${NC}            # what's playing\n"
-    printf "    ${CYAN}music-cli --help${NC}            # all commands\n\n"
+    printf '%s%s============================================%s\n\n' "$BOLD" "$GREEN" "$NC"
+    printf '  Get started:\n\n'
+    printf '    %smusic-cli play%s              # context-aware radio\n' "$CYAN" "$NC"
+    printf '    %smusic-cli play --mood focus%s # focus music\n' "$CYAN" "$NC"
+    printf '    %smusic-cli status%s            # what'"'"'s playing\n' "$CYAN" "$NC"
+    printf '    %smusic-cli --help%s            # all commands\n\n' "$CYAN" "$NC"
 
     if [ -n "$EXTRAS" ]; then
-        printf "  Extras installed: ${YELLOW}$EXTRAS${NC}\n"
+        printf '  Extras installed: %s%s%s\n' "$YELLOW" "$EXTRAS" "$NC"
         if echo "$EXTRAS" | grep -q "ai"; then
-            printf "    AI models are downloaded on first use (~1.5–6 GB each).\n"
-            printf "    Try: ${CYAN}music-cli ai play --mood focus${NC}\n"
+            printf '    AI models are downloaded on first use (~1.5–6 GB each).\n'
+            printf '    Try: %smusic-cli ai play --mood focus%s\n' "$CYAN" "$NC"
         fi
         if echo "$EXTRAS" | grep -q "youtube"; then
-            printf "    YouTube streaming is ready.\n"
-            printf "    Try: ${CYAN}music-cli play -m youtube -s \"<URL>\"${NC}\n"
+            printf '    YouTube streaming is ready.\n'
+            printf '    Try: %smusic-cli play -m youtube -s "<URL>"%s\n' "$CYAN" "$NC"
         fi
     fi
-    printf "\n"
+    printf '\n'
 }
 
 main "$@"
