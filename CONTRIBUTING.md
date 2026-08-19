@@ -135,6 +135,13 @@ chore(deps): bump yt-dlp to 2024.12.0
 6. **Address feedback** in new commits (do not force-push during review)
 7. **Squash on merge** is used — your commits will be squashed to one
 
+### Red `main` is an incident
+
+A red `main` blocks all merges until fixed. If `ci.yml` on `main` is red, treat it
+as a stop-the-line incident, not the status quo: nobody merges new work, and the
+first priority is restoring green (revert, fix, or a fast-follow repair). PRs may
+still open against `main`, but they do not merge until `main` is green again.
+
 ### PR checklist (also in the template)
 
 - [ ] Code follows the style guidelines
