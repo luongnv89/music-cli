@@ -36,6 +36,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install ruff mypy bandit[toml]
           pip install click tomli tomli-w types-click
+          # Install numpy so the same stubs a developer has are present in CI;
+          # without it mypy skips the numpy stubs entirely and masks crashes
+          # like issue #37, so local and CI results would diverge.
+          pip install "numpy>=1.24"
 
       - name: Check formatting with Ruff
         run: ruff format --check --diff music_cli/
@@ -44,7 +48,9 @@ jobs:
         run: ruff check music_cli/
 
       - name: Type check with mypy
-        run: mypy music_cli/ --ignore-missing-imports
+        # Run through pyproject.toml's [tool.mypy] config — no inline flags —
+        # so local (`.venv/bin/mypy music_cli`) and CI produce the same result.
+        run: mypy music_cli
 
       - name: Security scan with Bandit
         run: bandit -c pyproject.toml -r music_cli/
