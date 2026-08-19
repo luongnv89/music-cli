@@ -2,6 +2,7 @@
 
 import asyncio
 import signal
+import sys
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -33,6 +34,17 @@ class FakeProcess:
     def kill(self) -> None:
         self.returncode = -9
         self._finished.set()
+
+
+# The YouTube-pipe feature uses os.setsid (preexec_fn) and os.killpg for
+# process-group management, both Unix-only. Production code short-circuits
+# this path on Windows (see FFplayPlayer._play_youtube_pipe), so the three
+# tests below patch os.killpg — which does not exist on Windows — and must
+# be skipped there rather than patched into existence.
+SKIP_WINDOWS_YOUTUBE_PIPE = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="YouTube pipe uses Unix-only os.killpg/os.setsid; Windows falls back to direct URL",
+)
 
 
 class TestFFplayPlayerImmediateExit:
@@ -153,6 +165,7 @@ class TestFFplayPlayerImmediateExit:
 
             await player.stop()
 
+    @SKIP_WINDOWS_YOUTUBE_PIPE
     @pytest.mark.asyncio
     async def test_youtube_pipe_failure_falls_back_to_direct_url(self) -> None:
         """A failed YouTube pipe is cleaned up before direct URL fallback."""
@@ -186,6 +199,7 @@ class TestFFplayPlayerImmediateExit:
 
         assert pipe_process.wait_calls == 1
 
+    @SKIP_WINDOWS_YOUTUBE_PIPE
     @pytest.mark.asyncio
     async def test_youtube_pipe_exits_immediately_and_fallback_fails(self) -> None:
         """A failed pipe and failed fallback leave no stale playback state."""
@@ -218,6 +232,7 @@ class TestFFplayPlayerImmediateExit:
         assert direct_process.wait_calls == 1
         mock_killpg.assert_called_once_with(12345, signal.SIGTERM)
 
+    @SKIP_WINDOWS_YOUTUBE_PIPE
     @pytest.mark.asyncio
     async def test_youtube_pipe_stays_alive_returns_true(self) -> None:
         """YouTube pipe playback returns True when the pipe stays running."""
