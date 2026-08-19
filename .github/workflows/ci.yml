@@ -155,3 +155,15 @@ jobs:
           # pytest-e2e uses language: system and requires the project venv.
           # Tests are run by the dedicated test matrix job — skip here.
           SKIP: pytest-e2e
+
+  shellcheck:
+    name: Shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run shellcheck against install.sh
+        uses: ludeeus/action-shellcheck@2.0.0
+        with:
+          severity: warning
+          additional_paths: install.sh
