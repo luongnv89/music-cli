@@ -163,11 +163,10 @@ def download_model(hf_model_id: str, resume: bool = True) -> bool:
         return False
 
     try:
-        # snapshot_download automatically shows progress via tqdm
-        snapshot_download(
-            repo_id=hf_model_id,
-            resume_download=resume,
-        )
+        # HuggingFace Hub resumes interrupted snapshots automatically. The
+        # old resume_download argument was removed in huggingface_hub 1.0;
+        # keep resume in this function's API for callers on older versions.
+        snapshot_download(repo_id=hf_model_id)
         return True
     except HfHubHTTPError as e:
         logger.error(f"HTTP error downloading {hf_model_id}: {e}")
