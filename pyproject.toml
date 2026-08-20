@@ -27,6 +27,8 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Multimedia :: Sound/Audio :: Players",
 ]
 
@@ -36,31 +38,30 @@ dependencies = [
     "tomli-w>=1.0",
     # Media controller dependencies (platform-specific)
     "pyobjc-framework-MediaPlayer>=10.0; sys_platform == 'darwin'",
-    "dbus-next>=0.2.3; sys_platform == 'linux'",
-    "winrt-Windows.Media.Playback>=2.0.0; sys_platform == 'win32'",
 ]
 
 [project.optional-dependencies]
 ai = [
     "torch>=2.0",
     "transformers>=4.31,<4.51",
-    "diffusers>=0.15.0",
+    # Floor matches the diffusers-based strategies in music_cli.sources.ai_models
+    # (ModularPipeline requires 0.39.x; see the minimax extra below).
+    "diffusers>=0.39.0",
     "scipy>=1.10",
     "tqdm>=4.64",
-    "accelerate>=0.20",
 ]
 # MiniMax Music 3 requires Diffusers ModularPipeline (released in 0.39.x).
 minimax = [
     "torch>=2.0",
     "diffusers>=0.39.0,<0.40.0",
     "transformers>=4.51,<5",
-    "accelerate>=0.20",
     "scipy>=1.10",
-    "soundfile>=0.12",
     "numpy>=1.24",
 ]
 youtube = [
-    "yt-dlp>=2023.1.0",
+    # yt-dlp extractors rot quickly; older releases can no longer fetch from
+    # YouTube. 2026.7.4 is the newest release verified to extract successfully.
+    "yt-dlp>=2026.7.4",
 ]
 dev = [
     "pytest>=7.0",
