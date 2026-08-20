@@ -12,7 +12,7 @@ coverage==7.15.2
 distlib==0.4.3
 filelock==3.32.0
 identify==2.6.19
-mypy==2.3.0
+mypy==2.3.1
 packaging==26.2
 pathspec==1.1.1
 pip-audit==2.10.1
@@ -23,7 +23,7 @@ pytest-asyncio==1.4.0
 pytest-cov==7.1.0
 pytest==9.1.1
 PyYAML==6.0.3
-ruff==0.15.22
+ruff==0.16.4
 # Pinned above the vulnerable 79.0.1 the runner image pre-installs: fixes
 # PYSEC-2026-3447 / CVE-2026-59890 (MANIFEST.in exclude bypass via Unicode
 # normalization), first fixed in 83.0.0. The audit job installs this explicitly
