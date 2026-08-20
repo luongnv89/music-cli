@@ -172,9 +172,7 @@ class TestWindowsScriptsLayout:
             assert link.is_symlink()
             assert _resolve(link) == _resolve(scripts_dir / cmd)
 
-    def test_missing_interpreter_fails_with_actionable_message(
-        self, sandbox
-    ) -> None:
+    def test_missing_interpreter_fails_with_actionable_message(self, sandbox) -> None:
         proc = _run_installer(sandbox, FAKE_VENV_LAYOUT="none")
 
         assert proc.returncode != 0
