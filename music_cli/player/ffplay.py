@@ -154,6 +154,9 @@ class FFplayPlayer(Player):
         try:
             # Use shell pipe: yt-dlp streams to ffplay
             # Format priority: audio-only, format 91 (lowest quality for live), or best available
+            # Security: create_subprocess_shell is a reviewed exception (see SECURITY.md,
+            # "Security Best Practices for Contributors") — the pipeline requires a shell
+            # and all interpolated values are shlex.quote()d.
             cmd = (
                 f"{shlex.quote(yt_dlp_path)} -f 'bestaudio/91/best' -q -o - {shlex.quote(youtube_url)} | "
                 f"ffplay -nodisp -loglevel quiet -volume {self._volume} -"

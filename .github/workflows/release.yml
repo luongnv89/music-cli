@@ -50,10 +50,15 @@ jobs:
           name: dist
           path: dist/
 
+      - name: Generate installer checksum
+        run: sha256sum install.sh > install.sh.sha256
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: dist/*
+          files: |
+            dist/*
+            install.sh.sha256
           generate_release_notes: true
           draft: false
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
