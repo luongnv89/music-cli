@@ -38,7 +38,8 @@ class TestConfig:
 
     def test_new_ai_models_are_available_in_existing_configs(self, tmp_path: Path) -> None:
         """Existing users receive newly supported built-in AI models in memory."""
-        (tmp_path / "config.toml").write_text("""
+        (tmp_path / "config.toml").write_text(
+            """
 [ai]
  default_model = "musicgen-small"
 
@@ -46,7 +47,8 @@ class TestConfig:
  hf_model_id = "facebook/musicgen-small"
  model_type = "musicgen"
  enabled = true
-""".lstrip())
+""".lstrip()
+        )
 
         config = Config(config_dir=tmp_path)
 
@@ -56,7 +58,8 @@ class TestConfig:
 
     def test_ai_model_overrides_merge_recursively(self, tmp_path: Path) -> None:
         """Built-in capabilities survive partial nested model overrides."""
-        (tmp_path / "config.toml").write_text("""
+        (tmp_path / "config.toml").write_text(
+            """
 [ai.models.audioldm-s-full-v2]
 description = "my AudioLDM"
 
@@ -67,7 +70,8 @@ guidance_scale = 4.0
 hf_model_id = "example/custom-model"
 model_type = "musicgen"
 extra_params = { custom_flag = true }
-""".lstrip())
+""".lstrip()
+        )
 
         config = Config(config_dir=tmp_path)
 
@@ -89,7 +93,8 @@ extra_params = { custom_flag = true }
 
     def test_ai_model_full_override_wins(self, tmp_path: Path) -> None:
         """Explicit values in a complete built-in model override take precedence."""
-        (tmp_path / "config.toml").write_text("""
+        (tmp_path / "config.toml").write_text(
+            """
 [ai.models.audioldm-s-full-v2]
 hf_model_id = "example/override"
 model_type = "custom"
@@ -106,7 +111,8 @@ requires_lyrics = true
 [ai.models.audioldm-s-full-v2.extra_params]
 num_inference_steps = 99
 guidance_scale = 8.0
-""".lstrip())
+""".lstrip()
+        )
 
         config = Config(config_dir=tmp_path)
         model = config.get_ai_model_config("audioldm-s-full-v2")
