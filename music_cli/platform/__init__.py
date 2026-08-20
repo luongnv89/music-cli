@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from .paths import PathProvider
     from .player_control import PlayerController
 
+
 class Platform(Enum):
     """Supported platforms."""
 
