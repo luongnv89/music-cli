@@ -19,7 +19,16 @@ class LocalSource:
         self.music_dir = music_dir
 
     def get_track(self, path: str) -> TrackInfo | None:
-        """Get track info for a specific file path."""
+        """Get track info for a specific file path.
+
+        Playback is confined to ``music_dir``: the requested path is
+        fully resolved (following symlinks) and must land inside the
+        configured music directory. Anything outside it — including a
+        symlink inside ``music_dir`` pointing elsewhere — returns
+        ``None``. This prevents local IPC clients from making the
+        daemon open arbitrary audio files on the filesystem.
+        Out-of-tree playback is intentionally not supported (no opt-in).
+        """
         file_path = Path(path)
 
         if not file_path.is_absolute():
@@ -31,6 +40,14 @@ class LocalSource:
                 file_path = file_path.resolve()
             else:
                 file_path = self.music_dir / file_path
+
+        # Resolve before the boundary check so a symlink inside
+        # music_dir cannot smuggle in a target outside of it.
+        file_path = file_path.resolve()
+        boundary = self.music_dir.resolve()
+
+        if not file_path.is_relative_to(boundary):
+            return None
 
         if not file_path.exists():
             return None
