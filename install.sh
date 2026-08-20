@@ -18,6 +18,8 @@ set -euo pipefail
 #   INSTALL_DIR     Virtual-env install location (default: ~/.local/share/music-cli)
 #   PYTHON          Path to python interpreter to use (default: auto-detected)
 #   SKIP_FFMPEG     Set to 1 to skip FFmpeg installation check
+#   FORCE_LINK      Set to 1 to overwrite existing commands in ~/.local/bin
+#                   that were not installed by this script (e.g. GNU 'mc')
 # ============================================================================
 
 TOOL_NAME="music-cli"
@@ -27,6 +29,7 @@ REPO="luongnv89/music-cli"
 EXTRAS="${EXTRAS:-}"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/share/music-cli}"
 SKIP_FFMPEG="${SKIP_FFMPEG:-0}"
+FORCE_LINK="${FORCE_LINK:-0}"
 
 # --- Color Output ---
 RED='\033[0;31m'
@@ -168,16 +171,29 @@ install_pip_if_needed() {
 }
 
 # --- Main music-cli Install ---
+detect_venv_bin_dir() {
+    # Windows venvs use Scripts/, POSIX venvs use bin/. Detect after the
+    # venv exists instead of hardcoding either layout.
+    if [ -x "$INSTALL_DIR/bin/python" ] || [ -x "$INSTALL_DIR/bin/python.exe" ]; then
+        echo "$INSTALL_DIR/bin"
+    elif [ -x "$INSTALL_DIR/Scripts/python" ] || [ -x "$INSTALL_DIR/Scripts/python.exe" ]; then
+        echo "$INSTALL_DIR/Scripts"
+    else
+        die "No python interpreter found in $INSTALL_DIR (expected bin/ or Scripts/)"
+    fi
+}
+
 install_music_cli() {
     local python="$1"
 
     step "Creating isolated environment at $INSTALL_DIR"
     "$python" -m venv "$INSTALL_DIR"
-    local venv_python="$INSTALL_DIR/bin/python"
-    local venv_pip="$INSTALL_DIR/bin/pip"
+    local venv_bin_dir
+    venv_bin_dir="$(detect_venv_bin_dir)"
+    local venv_python="$venv_bin_dir/python"
 
     step "Upgrading pip inside venv"
-    "$venv_pip" install --quiet --upgrade pip
+    "$venv_python" -m pip install --quiet --upgrade pip
 
     # Build extras specifier
     local pkg="$PYPI_PACKAGE"
@@ -195,14 +211,37 @@ install_music_cli() {
 
 # --- Symlink / PATH setup ---
 link_binary() {
+    local venv_bin_dir
+    venv_bin_dir="$(detect_venv_bin_dir)"
+    local install_root
+    install_root="$(cd "$INSTALL_DIR" && pwd)"
     mkdir -p "$HOME/.local/bin"
 
     for cmd in music-cli mc; do
-        local venv_bin="$INSTALL_DIR/bin/$cmd"
+        local venv_bin="$venv_bin_dir/$cmd"
         local link_target="$HOME/.local/bin/$cmd"
 
-        if [ -L "$link_target" ] || [ -f "$link_target" ]; then
-            rm -f "$link_target"
+        if [ -L "$link_target" ] || [ -e "$link_target" ]; then
+            # Only replace links that resolve into our own install dir.
+            # Anything else (e.g. GNU Midnight Commander's 'mc') is not
+            # ours to delete.
+            local resolved=""
+            resolved="$(readlink -f "$link_target" 2>/dev/null || true)"
+            case "$resolved" in
+                "$install_root"/*)
+                    rm -f "$link_target"
+                    ;;
+                *)
+                    if [ "$FORCE_LINK" = "1" ]; then
+                        warn "FORCE_LINK=1 — replacing existing $link_target"
+                        rm -f "$link_target"
+                    else
+                        warn "Found existing $link_target not managed by this installer — leaving it in place."
+                        warn "Re-run with FORCE_LINK=1 to replace it with the music-cli '$cmd'."
+                        continue
+                    fi
+                    ;;
+            esac
         fi
         ln -s "$venv_bin" "$link_target"
         ok "Linked $link_target -> $venv_bin"
@@ -221,7 +260,9 @@ link_binary() {
 
 # --- Verification ---
 verify_installation() {
-    local venv_bin="$INSTALL_DIR/bin/music-cli"
+    local venv_bin_dir
+    venv_bin_dir="$(detect_venv_bin_dir)"
+    local venv_bin="$venv_bin_dir/music-cli"
     step "Verifying installation"
     if [ -x "$venv_bin" ]; then
         local ver
