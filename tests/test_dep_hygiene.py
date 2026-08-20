@@ -27,8 +27,13 @@ def _load_pyproject() -> dict:
 
 def _declared_names(deps: list[str]) -> set[str]:
     return {
-        dep.split("[", 1)[0].split(">", 1)[0].split("=", 1)[0].split("<", 1)[0]
-        .split(";", 1)[0].strip().lower()
+        dep.split("[", 1)[0]
+        .split(">", 1)[0]
+        .split("=", 1)[0]
+        .split("<", 1)[0]
+        .split(";", 1)[0]
+        .strip()
+        .lower()
         for dep in deps
     }
 
@@ -136,9 +141,7 @@ def test_classifiers_match_requires_python_and_ci_matrix() -> None:
         if c.startswith("Programming Language :: Python :: 3.")
     ]
     classifier_versions = {(int(v.split(".")[0]), int(v.split(".")[1])) for v in classifiers}
-    matrix_versions = {
-        (int(v.split(".")[0]), int(v.split(".")[1])) for v in _ci_matrix_versions()
-    }
+    matrix_versions = {(int(v.split(".")[0]), int(v.split(".")[1])) for v in _ci_matrix_versions()}
 
     assert classifier_versions == matrix_versions, (
         f"classifiers {sorted(classifier_versions)} != CI matrix {sorted(matrix_versions)}"
