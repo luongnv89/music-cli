@@ -53,10 +53,11 @@ class BarkStrategy(ModelStrategy):
         torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
-        processor = AutoProcessor.from_pretrained(self.model_id)
+        processor = AutoProcessor.from_pretrained(self.model_id, revision=self.config.revision)
         model = BarkModel.from_pretrained(
             self.model_id,
             torch_dtype=torch_dtype,
+            revision=self.config.revision,
         )
         model = model.to(device)
 

@@ -39,8 +39,11 @@ class MusicGenStrategy(ModelStrategy):
 
         logger.info(f"Loading MusicGen model ({self.model_id})...")
 
-        processor = AutoProcessor.from_pretrained(self.model_id)  # nosec B615
-        model = MusicgenForConditionalGeneration.from_pretrained(self.model_id)  # nosec B615
+        processor = AutoProcessor.from_pretrained(self.model_id, revision=self.config.revision)
+        model = MusicgenForConditionalGeneration.from_pretrained(
+            self.model_id,
+            revision=self.config.revision,
+        )
 
         return model, processor
 
