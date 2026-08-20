@@ -163,6 +163,7 @@ def mycommand():
 ```python
 from ..player.base import TrackInfo
 
+
 class MySource:
     def get_track(self, query: str) -> TrackInfo | None:
         # Implementation
@@ -184,6 +185,7 @@ elif mode == "mysource":
 1. Create `player/myplayer.py` extending `Player`:
 ```python
 from .base import Player, PlayerState, TrackInfo
+
 
 class MyPlayer(Player):
     async def play(self, track: TrackInfo) -> bool:
@@ -209,11 +211,10 @@ class MyPlayer(Player):
 
 Use type hints for function signatures:
 ```python
-def get_track(self, path: str) -> TrackInfo | None:
-    ...
+def get_track(self, path: str) -> TrackInfo | None: ...
 
-async def play(self, track: TrackInfo) -> bool:
-    ...
+
+async def play(self, track: TrackInfo) -> bool: ...
 ```
 
 ### Docstrings
@@ -277,6 +278,7 @@ Use pytest fixtures for common setup:
 @pytest.fixture
 def config(tmp_path):
     return Config(config_dir=tmp_path)
+
 
 def test_with_config(config):
     assert config.get("player.volume") == 80
