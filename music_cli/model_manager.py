@@ -32,6 +32,7 @@ class ModelInfo:
         is_default: Whether this is the default model.
         enabled: Whether the model is enabled.
         max_duration: Maximum generation duration in seconds.
+        revision: Pinned HuggingFace commit SHA (None if unpinned).
     """
 
     id: str
@@ -44,6 +45,7 @@ class ModelInfo:
     is_default: bool
     enabled: bool
     max_duration: int
+    revision: str | None = None
 
 
 class ModelManager:
@@ -99,6 +101,7 @@ class ModelManager:
                     is_default=(model_id == default_model),
                     enabled=model.enabled,
                     max_duration=model.max_duration,
+                    revision=model.revision,
                 )
             )
 

@@ -100,7 +100,7 @@ class ModelConfig:
         Returns:
             Dictionary representation of the model config.
         """
-        result = {
+        result: dict[str, Any] = {
             "hf_model_id": self.hf_model_id,
             "model_type": self.model_type,
             "description": self.description,
