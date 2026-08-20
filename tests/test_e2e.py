@@ -332,9 +332,9 @@ class TestVolCommand:
         with patch("music_cli.cli.ensure_daemon", return_value=mock_client):
             result = runner.invoke(main, ["vol", level])
             # Should not succeed silently — exit code != 0
-            assert result.exit_code != 0, (
-                f"vol {level} should be rejected but exited 0:\n{result.output}"
-            )
+            assert (
+                result.exit_code != 0
+            ), f"vol {level} should be rejected but exited 0:\n{result.output}"
 
     def test_volume_alias(self, runner: CliRunner, mock_client: MagicMock) -> None:
         with patch("music_cli.cli.ensure_daemon", return_value=mock_client):
@@ -647,9 +647,9 @@ class TestConfigCommand:
     def test_config_output_contains_path(self, runner: CliRunner) -> None:
         result = runner.invoke(main, ["config"])
         output_lower = result.output.lower()
-        assert any(kw in output_lower for kw in ("config", "path", "music-cli", "~")), (
-            f"config output looks wrong:\n{result.output}"
-        )
+        assert any(
+            kw in output_lower for kw in ("config", "path", "music-cli", "~")
+        ), f"config output looks wrong:\n{result.output}"
 
 
 # ===========================================================================
