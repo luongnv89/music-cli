@@ -11,8 +11,18 @@ def test_download_model_uses_supported_snapshot_download(monkeypatch) -> None:
     monkeypatch.setattr(hf_cache, "HF_HUB_AVAILABLE", True)
     monkeypatch.setattr(hf_cache, "snapshot_download", snapshot_download)
 
+    assert hf_cache.download_model("example/model", revision="abc123") is True
+    snapshot_download.assert_called_once_with(repo_id="example/model", revision="abc123")
+
+
+def test_download_model_defaults_to_unpinned_revision(monkeypatch) -> None:
+    """Without a registry pin the download still succeeds with revision=None."""
+    snapshot_download = Mock()
+    monkeypatch.setattr(hf_cache, "HF_HUB_AVAILABLE", True)
+    monkeypatch.setattr(hf_cache, "snapshot_download", snapshot_download)
+
     assert hf_cache.download_model("example/model") is True
-    snapshot_download.assert_called_once_with(repo_id="example/model")
+    snapshot_download.assert_called_once_with(repo_id="example/model", revision=None)
 
 
 def test_download_model_returns_false_when_hub_is_unavailable(monkeypatch) -> None:

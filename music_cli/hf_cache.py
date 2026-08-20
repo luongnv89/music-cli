@@ -146,7 +146,7 @@ def is_model_downloaded(hf_model_id: str) -> bool:
     return get_model_cache_info(hf_model_id) is not None
 
 
-def download_model(hf_model_id: str) -> bool:
+def download_model(hf_model_id: str, revision: str | None = None) -> bool:
     """Download a model from HuggingFace Hub.
 
     Uses snapshot_download which automatically shows progress bars and
@@ -154,6 +154,7 @@ def download_model(hf_model_id: str) -> bool:
 
     Args:
         hf_model_id: HuggingFace model ID to download.
+        revision: Pinned commit SHA to download (from the model registry).
 
     Returns:
         True if download succeeded, False otherwise.
@@ -163,7 +164,7 @@ def download_model(hf_model_id: str) -> bool:
         return False
 
     try:
-        snapshot_download(repo_id=hf_model_id)
+        snapshot_download(repo_id=hf_model_id, revision=revision)
         return True
     except HfHubHTTPError as e:
         logger.error(f"HTTP error downloading {hf_model_id}: {e}")

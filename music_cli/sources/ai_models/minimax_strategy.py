@@ -51,7 +51,7 @@ class MiniMaxMusic3Strategy(ModelStrategy):
             raise RuntimeError("MiniMax Music 3 requires a PyTorch build with bfloat16 support")
 
         logger.info("Loading MiniMax Music 3 model (%s)...", self.model_id)
-        pipeline = ModularPipeline.from_pretrained(self.model_id)  # nosec B615
+        pipeline = ModularPipeline.from_pretrained(self.model_id, revision=self.config.revision)
         if not callable(getattr(pipeline, "load_components", None)):
             raise RuntimeError(
                 "Installed MiniMax pipeline is missing load_components; "

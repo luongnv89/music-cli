@@ -173,7 +173,7 @@ class ModelManager:
             return True, f"Model '{model_id}' is already downloaded ({size})"
 
         # Download the model
-        success = hf_cache.download_model(model.hf_model_id)
+        success = hf_cache.download_model(model.hf_model_id, revision=model.revision)
         if success:
             return True, f"Successfully downloaded '{model_id}'"
         else:

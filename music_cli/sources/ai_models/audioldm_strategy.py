@@ -56,6 +56,7 @@ class AudioLDMStrategy(ModelStrategy):
         pipeline = AudioLDMPipeline.from_pretrained(
             self.model_id,
             torch_dtype=torch_dtype,
+            revision=self.config.revision,
         )
         pipeline = pipeline.to(device)
 

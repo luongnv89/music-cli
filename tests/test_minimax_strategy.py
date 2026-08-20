@@ -24,6 +24,7 @@ def minimax_config() -> ModelConfig:
         id="minimax-music3",
         hf_model_id="MiniMaxAI/MiniMax-Music3",
         model_type="minimax_music3",
+        revision="fbdf52fbaaca799592917417eb05f1899f1255ec",
         supports_lyrics=True,
         requires_lyrics=True,
         min_duration=5,
@@ -168,7 +169,9 @@ def test_load_model_uses_official_pipeline_contract() -> None:
 
     assert loaded is pipeline
     assert processor is None
-    modular_pipeline.from_pretrained.assert_called_once_with("MiniMaxAI/MiniMax-Music3")
+    modular_pipeline.from_pretrained.assert_called_once_with(
+        "MiniMaxAI/MiniMax-Music3", revision="fbdf52fbaaca799592917417eb05f1899f1255ec"
+    )
     pipeline.load_components.assert_called_once_with(dtype=fake_torch.bfloat16)
     pipeline.to.assert_called_once_with("cuda")
 
