@@ -8,12 +8,20 @@ rather than on the script's source text (F-TEST-003).
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 INSTALLER = Path(__file__).parents[1] / "install.sh"
+
+pytestmark = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="install.sh targets POSIX shells; Windows installs go through WSL, "
+    "whose bash stub on CI runners cannot run it",
+)
 
 FAKE_PYTHON_SHIM = """\
 #!/usr/bin/env bash
@@ -85,8 +93,10 @@ def _run_installer(sandbox: dict, **extra_env: str) -> subprocess.CompletedProce
         }
     )
     env.update(extra_env)
+    bash = shutil.which("bash")
+    assert bash is not None, "bash is required to run install.sh"
     return subprocess.run(
-        ["bash", str(INSTALLER)],
+        [bash, str(INSTALLER)],
         env=env,
         capture_output=True,
         text=True,
@@ -155,7 +165,7 @@ class TestMcClobbering:
 
         assert second.returncode == 0, second.stderr
         assert link.is_symlink()
-        assert os.readlink(link) == str(stale_target)
+        assert link.readlink() == stale_target
 
 
 class TestWindowsScriptsLayout:
@@ -182,11 +192,8 @@ class TestWindowsScriptsLayout:
 
 def test_shellcheck_passes() -> None:
     """shellcheck install.sh must exit 0 (issue #50 acceptance)."""
-    try:
-        subprocess.run(["shellcheck", "--version"], capture_output=True, check=True)
-    except FileNotFoundError:
+    shellcheck = shutil.which("shellcheck")
+    if shellcheck is None:
         pytest.skip("shellcheck is not installed")
-    proc = subprocess.run(
-        ["shellcheck", str(INSTALLER)], capture_output=True, text=True, check=False
-    )
+    proc = subprocess.run([shellcheck, str(INSTALLER)], capture_output=True, text=True, check=False)
     assert proc.returncode == 0, proc.stdout + proc.stderr
