@@ -91,7 +91,7 @@ mc status           # What's playing + an inspirational quote
 
 ## Get Started in 30 Seconds
 
-### Quick Install (recommended)
+### Quick Install
 
 Download and inspect the script first, then run it (recommended):
 
@@ -145,7 +145,7 @@ pip install 'coder-music-cli[youtube,ai]'
 Every release publishes a SHA-256 checksum for `install.sh` as a release asset (`install.sh.sha256`). To verify the script you downloaded matches the released one:
 
 ```bash
-# Download the script and its checksum for the release tag, e.g. v0.10.1
+# Download the script and its checksum from the latest release
 curl -fsSLO https://github.com/luongnv89/music-cli/releases/latest/download/install.sh
 curl -fsSLO https://github.com/luongnv89/music-cli/releases/latest/download/install.sh.sha256
 
