@@ -54,7 +54,7 @@ mc status           # What's playing + an inspirational quote
 
 1. **Install** — one command, no config files to write.
    ```bash
-   curl -sSL https://raw.githubusercontent.com/luongnv89/music-cli/main/install.sh | bash
+   curl -fsSL https://raw.githubusercontent.com/luongnv89/music-cli/main/install.sh | bash
    ```
 2. **Play** — pick a mode: radio, local files, YouTube, or AI.
    ```bash
@@ -91,10 +91,20 @@ mc status           # What's playing + an inspirational quote
 
 ## Get Started in 30 Seconds
 
-### Quick Install (recommended)
+### Quick Install
+
+Download and inspect the script first, then run it (recommended):
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/luongnv89/music-cli/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/luongnv89/music-cli/main/install.sh -o install.sh
+less install.sh   # review
+bash install.sh
+```
+
+Or pipe it straight into bash:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/luongnv89/music-cli/main/install.sh | bash
 ```
 
 Or with wget:
@@ -130,13 +140,19 @@ pip install 'coder-music-cli[minimax]'
 pip install 'coder-music-cli[youtube,ai]'
 ```
 
-Prefer to inspect the install script first?
+### Verify the Installer Checksum
+
+Every release publishes a SHA-256 checksum for `install.sh` as a release asset (`install.sh.sha256`). To verify the script you downloaded matches the released one:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/luongnv89/music-cli/main/install.sh -o install.sh
-less install.sh   # review
-bash install.sh
+# Download the script and its checksum from the latest release
+curl -fsSLO https://github.com/luongnv89/music-cli/releases/latest/download/install.sh
+curl -fsSLO https://github.com/luongnv89/music-cli/releases/latest/download/install.sh.sha256
+
+sha256sum -c install.sh.sha256   # must print: install.sh: OK
 ```
+
+If verification fails, do not run the script — re-download or report it via [SECURITY.md](SECURITY.md).
 
 ## FAQ
 
@@ -166,7 +182,7 @@ MusicGen (small/medium/large/melody), AudioLDM (small/large), Bark (standard/sma
 You're one command away from a focus soundtrack that never interrupts you. No signups, no ads, no browser tabs. MIT licensed, open source, and built for developers who live in the terminal.
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/luongnv89/music-cli/main/install.sh | bash && mc play -M focus
+curl -fsSL https://raw.githubusercontent.com/luongnv89/music-cli/main/install.sh | bash && mc play -M focus
 ```
 
 [**Install music-cli →**](#get-started-in-30-seconds)
