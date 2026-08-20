@@ -15,6 +15,7 @@ identify==2.6.19
 mypy==2.3.0
 packaging==26.2
 pathspec==1.1.1
+pip-audit==2.10.1
 platformdirs==4.11.0
 pluggy==1.6.0
 pre-commit==4.6.1
@@ -23,6 +24,11 @@ pytest-cov==7.1.0
 pytest==9.1.1
 PyYAML==6.0.3
 ruff==0.15.22
+# Pinned above the vulnerable 79.0.1 the runner image pre-installs: fixes
+# PYSEC-2026-3447 / CVE-2026-59890 (MANIFEST.in exclude bypass via Unicode
+# normalization), first fixed in 83.0.0. The audit job installs this explicitly
+# (constraints alone do not upgrade a pre-installed, non-required package).
+setuptools==83.0.0
 tomli-w==1.2.0
 tomli==2.4.1
 twine==7.0.0
