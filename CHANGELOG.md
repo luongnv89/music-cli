@@ -10,8 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Add `pip-audit` to the `dev` extra and a `Dependency Audit` CI job that runs `pip-audit --strict -f json` and uploads the machine-readable report, establishing the advisory baseline for milestone `M1` ([#44](https://github.com/luongnv89/music-cli/issues/44)).
 
+### Fixed
+- Pin `setuptools==83.0.0` in `constraints-dev.txt` and install it in the audit CI job, resolving `PYSEC-2026-3447` / `CVE-2026-59890` (a `MANIFEST.in` exclude bypass via Unicode normalization) that the baseline scan surfaced in the runner's pre-installed `setuptools==79.0.1` ([#44](https://github.com/luongnv89/music-cli/issues/44)).
+
 ### Security
-- Establish the `pip-audit` advisory baseline: a recorded audit of the installed environment reports **0 High or Critical advisories**, making `M1`'s exit condition measurable ([#44](https://github.com/luongnv89/music-cli/issues/44)).
+- Establish the `pip-audit` advisory baseline: the initial recorded audit surfaced one advisory (`setuptools` 79.0.1, `PYSEC-2026-3447` / `CVE-2026-59890`), which is fixed in this PR by pinning `setuptools==83.0.0`; a re-run reports **0 High or Critical advisories**, making `M1`'s exit condition measurable ([#44](https://github.com/luongnv89/music-cli/issues/44)).
 
 ## [0.10.1] - 2026-08-17
 

@@ -79,6 +79,10 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+          # Install the pinned setuptools (fixes PYSEC-2026-3447 /
+          # CVE-2026-59890) before the editable install so pip-audit scans
+          # the fixed version, not the runner's pre-installed 79.0.1.
+          pip install -c constraints-dev.txt setuptools==83.0.0
           pip install -c constraints-dev.txt -e ".[dev]"
 
       - name: Run pip-audit (fail on High/Critical)
