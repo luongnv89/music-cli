@@ -60,6 +60,40 @@ jobs:
       - name: Security scan with Bandit
         run: bandit -c pyproject.toml -r music_cli/
 
+  audit:
+    name: Dependency Audit (pip-audit)
+    runs-on: ubuntu-latest
+    # Establishes the advisory baseline for milestone M1 (issue #44). pip-audit
+    # scans the installed environment for known vulnerabilities; M1's exit
+    # condition ("0 High or Critical advisories") is only measurable once this
+    # runs. The job fails on High/Critical advisories and uploads the
+    # machine-readable JSON report as an artifact for traceability.
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -c constraints-dev.txt -e ".[dev]"
+
+      - name: Run pip-audit (fail on High/Critical)
+        # `--strict` makes pip-audit return a non-zero exit code when
+        # vulnerabilities are found, so CI fails the moment an advisory lands.
+        # `-f json -o pip-audit-report.json` writes the machine-readable report.
+        run: pip-audit --strict -f json -o pip-audit-report.json
+
+      - name: Upload pip-audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-audit-report
+          path: pip-audit-report.json
+
   test:
     name: Test (Python ${{ matrix.python-version }} / ${{ matrix.os }})
     runs-on: ${{ matrix.os }}

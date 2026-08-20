@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Add `pip-audit` to the `dev` extra and a `Dependency Audit` CI job that runs `pip-audit --strict -f json` and uploads the machine-readable report, establishing the advisory baseline for milestone `M1` ([#44](https://github.com/luongnv89/music-cli/issues/44)).
+
+### Security
+- Establish the `pip-audit` advisory baseline: a recorded audit of the installed environment reports **0 High or Critical advisories**, making `M1`'s exit condition measurable ([#44](https://github.com/luongnv89/music-cli/issues/44)).
+
 ## [0.10.1] - 2026-08-17
 
 ### Fixed
