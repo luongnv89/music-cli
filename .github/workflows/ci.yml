@@ -19,6 +19,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# CI is read-only: it builds, lints, and tests, but never writes to the repo.
+# release.yml (contents: write) owns releases; this workflow must not need it.
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: Lint & Format (Python)
