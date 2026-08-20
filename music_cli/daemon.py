@@ -130,7 +130,7 @@ class MusicDaemon:
         self._running = False
         self._current_mood: Mood | None = None
         self._auto_play = False  # For infinite/context-aware mode
-        self._auth_token = ""  # Issued in start(); empty rejects every request
+        self._auth_token: str | None = None  # Issued in start(); None rejects every request
 
     def _issue_auth_token(self) -> str:
         """Generate a fresh auth token and persist it owner-only.
@@ -265,10 +265,11 @@ class MusicDaemon:
 
             # Authenticate before dispatching any command handler
             token = request.get("token")
+            auth_token = self._auth_token
             if (
-                not self._auth_token
+                not auth_token
                 or not isinstance(token, str)
-                or not hmac.compare_digest(token, self._auth_token)
+                or not hmac.compare_digest(token, auth_token)
             ):
                 logger.warning("Rejected request with missing or invalid token")
                 response = {"error": "Unauthorized"}

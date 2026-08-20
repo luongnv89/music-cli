@@ -1,7 +1,10 @@
 """Tests for configuration module."""
 
+import os
 import stat
 from pathlib import Path
+
+import pytest
 
 from music_cli.config import Config
 
@@ -195,12 +198,14 @@ class TestConfigLoadFailureIsolation:
 class TestConfigDirPermissions:
     """Config directories holding socket/PID/history must be owner-only (#48)."""
 
+    @pytest.mark.skipif(os.name != "posix", reason="POSIX permission bits")
     def test_created_dirs_are_owner_only(self, tmp_path: Path) -> None:
         config_dir = tmp_path / "cfg"
         cfg = Config(config_dir=config_dir)
         for directory in (cfg.config_dir, cfg.ai_music_dir, cfg.youtube_cache_dir):
             assert stat.S_IMODE(directory.stat().st_mode) == 0o700
 
+    @pytest.mark.skipif(os.name != "posix", reason="POSIX permission bits")
     def test_existing_dirs_are_tightened(self, tmp_path: Path) -> None:
         """Directories created by older versions (0o755) get tightened."""
         config_dir = tmp_path / "cfg"
@@ -218,6 +223,7 @@ class TestAuthTokenStorage:
         cfg.write_auth_token("secret-token")
         assert cfg.read_auth_token() == "secret-token"
 
+    @pytest.mark.skipif(os.name != "posix", reason="POSIX permission bits")
     def test_token_file_is_owner_only(self, tmp_path: Path) -> None:
         cfg = Config(config_dir=tmp_path / "cfg")
         cfg.write_auth_token("secret-token")

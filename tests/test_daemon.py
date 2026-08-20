@@ -225,6 +225,7 @@ class TestAuthTokenEnforcement:
         response = await _roundtrip(port, {"command": "ping", "args": {}, "token": 123})
         assert response == {"error": "Unauthorized"}
 
+    @pytest.mark.skipif(os.name != "posix", reason="POSIX permission bits")
     def test_issue_auth_token_persists_owner_only(self, tmp_path: Path) -> None:
         import stat as stat_module
 
@@ -258,13 +259,19 @@ class TestUnixSocketPermissions:
     """The Unix socket must never be world-accessible (#48)."""
 
     @pytest.mark.skipif(os.name != "posix", reason="Unix sockets only")
-    async def test_socket_owner_only_immediately_after_start(self, tmp_path: Path) -> None:
+    async def test_socket_owner_only_immediately_after_start(self) -> None:
+        import shutil
+        import tempfile
+
         from music_cli.platform.ipc import UnixIPCServer
 
         async def noop_handler(reader, writer):
             writer.close()
 
-        socket_path = tmp_path / "music-cli.sock"
+        # macOS limits sun_path to 104 bytes and pytest's tmp_path can
+        # exceed that, so bind in a short-lived directory near the temp root.
+        short_dir = Path(tempfile.mkdtemp(prefix="music-cli-test-"))
+        socket_path = short_dir / "t.sock"
         server = UnixIPCServer()
         await server.start(noop_handler, socket_path)
         try:
@@ -273,6 +280,7 @@ class TestUnixSocketPermissions:
             assert mode & 0o700 == 0o600
         finally:
             await server.stop()
+            shutil.rmtree(short_dir, ignore_errors=True)
 
 
 class TestGenericErrorResponses:
