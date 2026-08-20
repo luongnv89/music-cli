@@ -1,6 +1,10 @@
 """Tests for configuration module."""
 
+import os
+import stat
 from pathlib import Path
+
+import pytest
 
 from music_cli.config import Config
 
@@ -171,3 +175,60 @@ guidance_scale = 8.0
 
         # Unknown time period should return None
         assert config.get_time_radio("unknown_time") is None
+
+
+class TestConfigLoadFailureIsolation:
+    """Regression tests for the shallow-copy defaults corruption bug (#45)."""
+
+    def test_failed_load_does_not_alias_class_defaults(self, tmp_path: Path) -> None:
+        """A corrupt config file must not alias Config.DEFAULT_CONFIG."""
+        (tmp_path / "config.toml").write_text("this is [ not valid toml")
+        cfg = Config(config_dir=tmp_path)
+        assert cfg._config["player"] is not Config.DEFAULT_CONFIG["player"]
+
+    def test_set_after_failed_load_leaves_defaults_intact(self, tmp_path: Path) -> None:
+        """Writing through a fallback config must not poison class defaults."""
+        (tmp_path / "config.toml").write_text("{{{broken")
+        cfg = Config(config_dir=tmp_path)
+        cfg.set("player.volume", 11)
+        assert Config.DEFAULT_CONFIG["player"]["volume"] == 80
+        assert cfg.get("player.volume") == 11
+
+
+class TestConfigDirPermissions:
+    """Config directories holding socket/PID/history must be owner-only (#48)."""
+
+    @pytest.mark.skipif(os.name != "posix", reason="POSIX permission bits")
+    def test_created_dirs_are_owner_only(self, tmp_path: Path) -> None:
+        config_dir = tmp_path / "cfg"
+        cfg = Config(config_dir=config_dir)
+        for directory in (cfg.config_dir, cfg.ai_music_dir, cfg.youtube_cache_dir):
+            assert stat.S_IMODE(directory.stat().st_mode) == 0o700
+
+    @pytest.mark.skipif(os.name != "posix", reason="POSIX permission bits")
+    def test_existing_dirs_are_tightened(self, tmp_path: Path) -> None:
+        """Directories created by older versions (0o755) get tightened."""
+        config_dir = tmp_path / "cfg"
+        config_dir.mkdir(mode=0o755)
+        cfg = Config(config_dir=config_dir)
+        for directory in (cfg.config_dir, cfg.ai_music_dir, cfg.youtube_cache_dir):
+            assert stat.S_IMODE(directory.stat().st_mode) == 0o700
+
+
+class TestAuthTokenStorage:
+    """Daemon auth token is stored owner-only in the config dir (#47)."""
+
+    def test_write_and_read_token_roundtrip(self, tmp_path: Path) -> None:
+        cfg = Config(config_dir=tmp_path / "cfg")
+        cfg.write_auth_token("secret-token")
+        assert cfg.read_auth_token() == "secret-token"
+
+    @pytest.mark.skipif(os.name != "posix", reason="POSIX permission bits")
+    def test_token_file_is_owner_only(self, tmp_path: Path) -> None:
+        cfg = Config(config_dir=tmp_path / "cfg")
+        cfg.write_auth_token("secret-token")
+        assert stat.S_IMODE(cfg.auth_token_file.stat().st_mode) == 0o600
+
+    def test_read_missing_token_returns_none(self, tmp_path: Path) -> None:
+        cfg = Config(config_dir=tmp_path / "cfg")
+        assert cfg.read_auth_token() is None

@@ -65,6 +65,7 @@ class DaemonClient:
         request = {
             "command": command,
             "args": args,
+            "token": self.config.read_auth_token(),
         }
 
         # Use platform-specific IPC client

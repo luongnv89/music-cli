@@ -120,7 +120,9 @@ track returned     : /var/folders/.../not-my-music.mp3     # accepted, outside t
 
 **Suggested Fix**:
 ```python
-file_path = (self.music_dir / path).resolve() if not Path(path).is_absolute() else Path(path).resolve()
+file_path = (
+    (self.music_dir / path).resolve() if not Path(path).is_absolute() else Path(path).resolve()
+)
 if not file_path.is_relative_to(self.music_dir.resolve()):
     return None
 ```
@@ -169,7 +171,7 @@ asyncio.create_task(self.stop())
 
 **Suggested Fix**:
 ```python
-self._background_tasks: set[asyncio.Task] = set()   # in __init__
+self._background_tasks: set[asyncio.Task] = set()  # in __init__
 ...
 task = asyncio.create_task(self.stop())
 self._background_tasks.add(task)
