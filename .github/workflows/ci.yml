@@ -105,7 +105,30 @@ jobs:
           pip install -c constraints-dev.txt -e ".[dev]"
 
       - name: Run unit + e2e tests
-        run: pytest tests/ -v --cov=music_cli --cov-report=xml --cov-report=term-missing
+        run: pytest tests/ -v --cov=music_cli --cov-report=xml --cov-report=json:coverage.json --cov-report=term-missing
+
+      # Coverage floor — derived from a recorded hermetic run (issue #43 made the
+      # suite hermetic), measured at 53.95% (3646 stmts, 1679 missing). The
+      # displayed "54%" is rounded; the true value is 53.9495%, so the floor is
+      # the measured percentage rounded DOWN to a whole number: 53.
+      # We gate on the RAW percent (not the rounded display) so the gate bites at
+      # floor+1: pytest-cov 7.x prints "FAIL" but does not propagate the exit code
+      # under pytest 9, so we enforce with an explicit check on coverage.json.
+      - name: Enforce coverage floor (53%)
+        if: matrix.python-version == '3.12' && matrix.os == 'ubuntu-latest'
+        run: |
+          python -c "
+          import json, sys
+          with open('coverage.json') as f:
+              totals = json.load(f)['totals']
+          pct = totals['percent_covered']
+          floor = 53
+          print(f'Coverage: {pct:.4f}% (floor={floor}%)')
+          if pct < floor:
+              print(f'::error::Coverage {pct:.4f}% is below the floor of {floor}%')
+              sys.exit(1)
+          print(f'::notice::Coverage {pct:.4f}% meets the floor of {floor}%')
+          "
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
