@@ -2,9 +2,11 @@
 
 import asyncio
 import codecs
+import hmac
 import json
 import logging
 import os
+import secrets
 import signal
 
 from .ai_tracks import get_ai_tracks
@@ -128,6 +130,17 @@ class MusicDaemon:
         self._running = False
         self._current_mood: Mood | None = None
         self._auto_play = False  # For infinite/context-aware mode
+        self._auth_token = ""  # Issued in start(); empty rejects every request
+
+    def _issue_auth_token(self) -> str:
+        """Generate a fresh auth token and persist it owner-only.
+
+        The token is stored in the config directory (0o700) with file mode
+        0o600 so only the owning user's clients can authenticate.
+        """
+        self._auth_token = secrets.token_hex(32)
+        self.config.write_auth_token(self._auth_token)
+        return self._auth_token
 
     async def start(self) -> None:
         """Start the daemon server.
@@ -139,6 +152,9 @@ class MusicDaemon:
         socket_path = self.config.socket_path
 
         self._running = True
+
+        # Generate a fresh per-run auth token before accepting connections
+        self._issue_auth_token()
 
         # Set up signal handlers (Unix only - not supported on Windows asyncio)
         if supports_unix_signals():
@@ -247,6 +263,19 @@ class MusicDaemon:
             if request is None:
                 return
 
+            # Authenticate before dispatching any command handler
+            token = request.get("token")
+            if (
+                not self._auth_token
+                or not isinstance(token, str)
+                or not hmac.compare_digest(token, self._auth_token)
+            ):
+                logger.warning("Rejected request with missing or invalid token")
+                response = {"error": "Unauthorized"}
+                writer.write(json.dumps(response).encode())
+                await writer.drain()
+                return
+
             command = request.get("command", "")
             args = request.get("args", {})
 
@@ -290,8 +319,10 @@ class MusicDaemon:
             try:
                 return await handler(args)
             except Exception as e:
-                logger.error(f"Error processing {command}: {e}")
-                return {"error": str(e)}
+                # Log the detail server-side; never leak exception text
+                # (which can contain filesystem paths) to the client.
+                logger.error(f"Error processing {command}: {e}", exc_info=True)
+                return {"error": "Internal error while processing command"}
         else:
             return {"error": f"Unknown command: {command}"}
 

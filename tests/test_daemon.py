@@ -1,7 +1,15 @@
 """Tests for the daemon module, especially cross-platform PID checking."""
 
+import asyncio
+import json
+import os
+import stat
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
+
+import pytest
+import pytest_asyncio
 
 from music_cli.daemon import _pid_alive, get_daemon_pid
 
@@ -151,3 +159,143 @@ class TestGetDaemonPid:
                     assert not pid_file.exists()
                     # Socket should still exist on Windows
                     assert socket_path.exists()
+
+
+class _DaemonTestHarness:
+    """Build a MusicDaemon without heavy player/source dependencies."""
+
+    @staticmethod
+    def make_daemon(tmp_path: Path, token: str = "test-token") -> Any:  # noqa: S107
+        from music_cli.daemon import MusicDaemon
+
+        daemon = MusicDaemon.__new__(MusicDaemon)
+        daemon._auth_token = token
+        return daemon
+
+
+async def _roundtrip(port: int, payload: dict) -> dict:
+    """Send one JSON request over TCP and return the JSON response."""
+    reader, writer = await asyncio.open_connection("127.0.0.1", port)
+    writer.write(json.dumps(payload).encode())
+    await writer.drain()
+    data = await asyncio.wait_for(reader.read(), timeout=5.0)
+    writer.close()
+    try:
+        await writer.wait_closed()
+    except (ConnectionError, OSError):
+        pass
+    return json.loads(data)
+
+
+class TestAuthTokenEnforcement:
+    """Every daemon request must carry a valid per-run token (#47)."""
+
+    async def _serve(self, daemon) -> tuple[asyncio.AbstractServer, int]:
+        server = await asyncio.start_server(daemon._handle_client, "127.0.0.1", 0)
+        port = server.sockets[0].getsockname()[1]
+        return server, port
+
+    @pytest_asyncio.fixture
+    async def running_server(self, tmp_path: Path):
+        daemon = _DaemonTestHarness.make_daemon(tmp_path)
+        server, port = await self._serve(daemon)
+        yield daemon, port
+        server.close()
+        await server.wait_closed()
+
+    async def test_missing_token_rejected(self, running_server) -> None:
+        daemon, port = running_server
+        response = await _roundtrip(port, {"command": "ping", "args": {}})
+        assert response == {"error": "Unauthorized"}
+
+    async def test_wrong_token_rejected(self, running_server) -> None:
+        daemon, port = running_server
+        response = await _roundtrip(port, {"command": "ping", "args": {}, "token": "wrong-token"})
+        assert response == {"error": "Unauthorized"}
+
+    async def test_valid_token_reaches_handler(self, running_server) -> None:
+        daemon, port = running_server
+        response = await _roundtrip(
+            port, {"command": "ping", "args": {}, "token": daemon._auth_token}
+        )
+        assert response.get("status") == "ok"
+
+    async def test_non_string_token_rejected(self, running_server) -> None:
+        daemon, port = running_server
+        response = await _roundtrip(port, {"command": "ping", "args": {}, "token": 123})
+        assert response == {"error": "Unauthorized"}
+
+    def test_issue_auth_token_persists_owner_only(self, tmp_path: Path) -> None:
+        import stat as stat_module
+
+        from music_cli.config import Config
+
+        config = Config(config_dir=tmp_path / "cfg")
+        daemon = _DaemonTestHarness.make_daemon(tmp_path)
+        daemon.config = config
+
+        token = daemon._issue_auth_token()
+
+        assert token == daemon._auth_token
+        assert len(token) >= 32
+        assert config.read_auth_token() == token
+        assert stat_module.S_IMODE(config.auth_token_file.stat().st_mode) == 0o600
+
+    def test_issue_auth_token_rotates(self, tmp_path: Path) -> None:
+        from music_cli.config import Config
+
+        config = Config(config_dir=tmp_path / "cfg")
+        daemon = _DaemonTestHarness.make_daemon(tmp_path)
+        daemon.config = config
+
+        first = daemon._issue_auth_token()
+        second = daemon._issue_auth_token()
+        assert first != second
+        assert config.read_auth_token() == second
+
+
+class TestUnixSocketPermissions:
+    """The Unix socket must never be world-accessible (#48)."""
+
+    @pytest.mark.skipif(os.name != "posix", reason="Unix sockets only")
+    async def test_socket_owner_only_immediately_after_start(self, tmp_path: Path) -> None:
+        from music_cli.platform.ipc import UnixIPCServer
+
+        async def noop_handler(reader, writer):
+            writer.close()
+
+        socket_path = tmp_path / "music-cli.sock"
+        server = UnixIPCServer()
+        await server.start(noop_handler, socket_path)
+        try:
+            mode = stat.S_IMODE(socket_path.stat().st_mode)
+            assert mode & 0o077 == 0, f"socket is group/world accessible: {oct(mode)}"
+            assert mode & 0o700 == 0o600
+        finally:
+            await server.stop()
+
+
+class TestGenericErrorResponses:
+    """Client-visible errors must not leak exception text or paths (#48)."""
+
+    async def test_no_filesystem_path_in_error(self, tmp_path: Path) -> None:
+        daemon = _DaemonTestHarness.make_daemon(tmp_path)
+
+        async def boom(args):
+            raise RuntimeError(f"cannot read {tmp_path / 'secret.wav'}")
+
+        daemon._cmd_status = boom
+
+        server = await asyncio.start_server(daemon._handle_client, "127.0.0.1", 0)
+        port = server.sockets[0].getsockname()[1]
+        try:
+            response = await _roundtrip(
+                port,
+                {"command": "status", "args": {}, "token": daemon._auth_token},
+            )
+        finally:
+            server.close()
+            await server.wait_closed()
+
+        assert response["error"] == "Internal error while processing command"
+        assert str(tmp_path) not in json.dumps(response)

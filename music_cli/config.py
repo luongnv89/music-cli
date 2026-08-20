@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from collections.abc import Mapping
 from copy import deepcopy
@@ -297,6 +298,7 @@ Radio Capital|https://icecast.unitedradio.it/Capital.mp3
         self.pid_file = self._path_provider.get_pid_file(self.config_dir)
         self.ai_music_dir = self._path_provider.get_ai_music_dir(self.config_dir)
         self.youtube_cache_dir = self._path_provider.get_youtube_cache_dir(self.config_dir)
+        self.auth_token_file = self.config_dir / "daemon_token"
         self.youtube_cache_file = self.config_dir / "youtube_cache.json"
         self.ai_tracks_file = self.config_dir / "ai_tracks.json"
         self._config: dict[str, Any] = {}
@@ -304,10 +306,19 @@ Radio Capital|https://icecast.unitedradio.it/Capital.mp3
         self._load_config()
 
     def _ensure_config_dir(self) -> None:
-        """Create config directory and default files if they don't exist."""
-        self.config_dir.mkdir(parents=True, exist_ok=True)
-        self.ai_music_dir.mkdir(parents=True, exist_ok=True)
-        self.youtube_cache_dir.mkdir(parents=True, exist_ok=True)
+        """Create config directory and default files if they don't exist.
+
+        All directories are owner-only (0o700): they hold the IPC socket,
+        PID file, playback history, and caches.
+        """
+        for directory in (self.config_dir, self.ai_music_dir, self.youtube_cache_dir):
+            directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+            try:
+                # chmod is not subject to umask and also tightens
+                # pre-existing directories created by older versions.
+                directory.chmod(0o700)
+            except OSError:
+                pass  # Best effort (e.g. filesystems without POSIX modes)
 
         if not self.config_file.exists():
             self._write_default_config()
@@ -317,6 +328,24 @@ Radio Capital|https://icecast.unitedradio.it/Capital.mp3
 
         if not self.history_file.exists():
             self.history_file.touch()
+
+    def read_auth_token(self) -> str | None:
+        """Read the daemon auth token, or None if it does not exist."""
+        try:
+            token = self.auth_token_file.read_text().strip()
+        except OSError:
+            return None
+        return token or None
+
+    def write_auth_token(self, token: str) -> None:
+        """Persist the daemon auth token with owner-only permissions."""
+        fd = os.open(
+            self.auth_token_file,
+            os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
+            0o600,
+        )
+        with os.fdopen(fd, "w") as f:
+            f.write(token)
 
     def _write_default_config(self) -> None:
         """Write default configuration file."""
@@ -334,7 +363,7 @@ Radio Capital|https://icecast.unitedradio.it/Capital.mp3
                 self._config = tomllib.load(f)
         except (OSError, tomllib.TOMLDecodeError) as e:
             logger.warning(f"Failed to load config from {self.config_file}: {e}")
-            self._config = self.DEFAULT_CONFIG.copy()
+            self._config = deepcopy(self.DEFAULT_CONFIG)
 
     def get(self, key: str, default: Any = None) -> Any:
         """Get a config value using dot notation (e.g., 'player.volume')."""

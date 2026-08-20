@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import socket
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
@@ -130,10 +131,17 @@ class UnixIPCServer(IPCServer):
         # Clean up stale socket
         self.cleanup_stale(socket_path)
 
-        self._server = await asyncio.start_unix_server(
-            handler,
-            path=str(socket_path),
-        )
+        # Bind under a restrictive umask so the socket is never
+        # world-accessible, even transiently (closes the TOCTOU window
+        # between creation and the chmod below).
+        old_umask = os.umask(0o077)
+        try:
+            self._server = await asyncio.start_unix_server(
+                handler,
+                path=str(socket_path),
+            )
+        finally:
+            os.umask(old_umask)
 
         # Set restrictive permissions (owner-only access)
         socket_path.chmod(0o600)
