@@ -35,7 +35,7 @@ music-cli/
 ├── music_cli/
 │   ├── __init__.py         # Package version
 │   ├── __main__.py          # Module entry point
-│   ├── cli.py               # Click CLI commands
+│   ├── cli/                 # Click CLI package (one module per command group)
 │   ├── client.py            # Socket client
 │   ├── config.py            # Configuration management
 │   ├── daemon.py            # Background daemon
@@ -147,7 +147,7 @@ handlers = {
 }
 ```
 
-3. Add CLI command in `cli.py`:
+3. Add the CLI command in the matching `music_cli/cli/` module:
 ```python
 @main.command()
 def mycommand():

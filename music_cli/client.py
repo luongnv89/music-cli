@@ -32,6 +32,65 @@ class DaemonClient:
         # Platform-specific IPC client (Unix sockets or TCP)
         self._ipc_client: IPCClient = get_ipc_client()
 
+    def _default_timeout(self, command: str, args: dict) -> float:
+        """Pick a timeout suited to *command* when the caller gave none."""
+        # Use longer timeout for AI commands
+        if command == "play" and args.get("mode") == "ai":
+            return AI_TIMEOUT
+        if command == "play" and args.get("mode") in ("youtube", "yt"):
+            return YOUTUBE_TIMEOUT
+        if command == "ai_play":
+            return AI_TIMEOUT
+        return DEFAULT_TIMEOUT
+
+    def _build_request(self, command: str, args: dict) -> dict:
+        """Build the framed request payload (protocol layer)."""
+        return {
+            "command": command,
+            "args": args,
+            "token": self.config.read_auth_token(),
+        }
+
+    def _round_trip(self, request: dict, timeout: float) -> bytes:
+        """Send *request* over IPC and collect the raw response bytes.
+
+        Transport layer only — connect, write, read-until-EOF, close.
+        Raises ConnectionError when the daemon cannot be reached.
+        """
+        sock = self._ipc_client.connect(self.socket_path, timeout)
+        try:
+            sock.sendall(json.dumps(request).encode())
+
+            # Receive response with size limit
+            response_data = b""
+            while len(response_data) < MAX_RESPONSE_SIZE:
+                chunk = sock.recv(SOCKET_BUFFER_SIZE)
+                if not chunk:
+                    break
+                response_data += chunk
+        finally:
+            sock.close()
+        return response_data
+
+    def _decode_response(self, response_data: bytes) -> dict[str, Any]:
+        """Map raw response bytes to a result dict (protocol layer).
+
+        Transport-level failures become error payloads instead of exceptions,
+        mirroring how the daemon reports command failures.
+        """
+        if len(response_data) >= MAX_RESPONSE_SIZE:
+            logger.warning("Response from daemon exceeded size limit")
+            return {"error": "Response too large from daemon"}
+
+        if not response_data:
+            return {"error": "Empty response from daemon"}
+
+        try:
+            return json.loads(response_data.decode())
+        except json.JSONDecodeError as e:
+            logger.warning(f"Invalid JSON response from daemon: {e}")
+            return {"error": "Invalid response from daemon"}
+
     def send_command(
         self, command: str, args: dict | None = None, timeout: float | None = None
     ) -> dict[str, Any]:
@@ -51,50 +110,12 @@ class DaemonClient:
         if args is None:
             args = {}
 
-        # Use longer timeout for AI commands
         if timeout is None:
-            if command == "play" and args.get("mode") == "ai":
-                timeout = AI_TIMEOUT
-            elif command == "play" and args.get("mode") in ("youtube", "yt"):
-                timeout = YOUTUBE_TIMEOUT
-            elif command == "ai_play":
-                timeout = AI_TIMEOUT
-            else:
-                timeout = DEFAULT_TIMEOUT
+            timeout = self._default_timeout(command, args)
 
-        request = {
-            "command": command,
-            "args": args,
-            "token": self.config.read_auth_token(),
-        }
-
-        # Use platform-specific IPC client
-        sock = self._ipc_client.connect(self.socket_path, timeout)
-        try:
-            sock.sendall(json.dumps(request).encode())
-
-            # Receive response with size limit
-            response_data = b""
-            while len(response_data) < MAX_RESPONSE_SIZE:
-                chunk = sock.recv(SOCKET_BUFFER_SIZE)
-                if not chunk:
-                    break
-                response_data += chunk
-
-            if len(response_data) >= MAX_RESPONSE_SIZE:
-                logger.warning("Response from daemon exceeded size limit")
-                return {"error": "Response too large from daemon"}
-
-            if response_data:
-                return json.loads(response_data.decode())
-            else:
-                return {"error": "Empty response from daemon"}
-
-        except json.JSONDecodeError as e:
-            logger.warning(f"Invalid JSON response from daemon: {e}")
-            return {"error": "Invalid response from daemon"}
-        finally:
-            sock.close()
+        request = self._build_request(command, args)
+        response_data = self._round_trip(request, timeout)
+        return self._decode_response(response_data)
 
     def ping(self) -> bool:
         """Check if daemon is running and responsive."""

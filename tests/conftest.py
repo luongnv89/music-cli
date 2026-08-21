@@ -80,7 +80,7 @@ def isolate_home(_isolated_home: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     # -> True makes ``ensure_daemon`` skip the spawn + wait loop, after which the
     # real (temp-dir) socket connect fails fast — exit 1, which those tests
     # already accept, with no real process forked.
-    import music_cli.cli as _cli_module
+    import music_cli.cli.runtime as _cli_module
 
     monkeypatch.setattr(_cli_module, "start_daemon_background", lambda *a, **k: None)
     monkeypatch.setattr(_cli_module, "is_daemon_running", lambda *a, **k: True)
