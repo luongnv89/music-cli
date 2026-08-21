@@ -205,7 +205,7 @@ class MusicDaemon:
                 raise RequestError("Request timed out")
             try:
                 chunk = await asyncio.wait_for(reader.read(REQUEST_CHUNK_SIZE), remaining)
-            except asyncio.TimeoutError as exc:
+            except TimeoutError as exc:
                 raise RequestError("Request timed out") from exc
 
             if not chunk:
