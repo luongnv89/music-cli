@@ -4,6 +4,9 @@ import asyncio
 import json
 import os
 import stat
+import subprocess
+import sys
+import time
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -11,7 +14,12 @@ from unittest.mock import MagicMock, patch
 import pytest
 import pytest_asyncio
 
-from music_cli.daemon import _pid_alive, get_daemon_pid
+from music_cli.daemon import (
+    _pid_alive,
+    _probe_daemon_identity,
+    get_daemon_pid,
+    is_daemon_running,
+)
 
 
 class TestPidAlive:
@@ -106,21 +114,23 @@ class TestGetDaemonPid:
                     assert not socket_path.exists()
 
     def test_live_pid_returns_pid(self, tmp_path: Path) -> None:
-        """When PID file points to a live process, return the PID."""
+        """A legacy plain-int PID file can never prove identity — stale."""
         config_dir = tmp_path / "config"
         config_dir.mkdir()
         pid_file = config_dir / "music-cli.pid"
+        socket_path = config_dir / "music-cli.sock"
         pid_file.write_text("12345")
+        socket_path.touch()
 
         with patch("music_cli.daemon.get_config") as mock_config:
             with patch("music_cli.daemon._pid_alive", return_value=True):
                 mock_cfg = MagicMock()
                 mock_cfg.pid_file = pid_file
-                mock_cfg.socket_path = config_dir / "music-cli.sock"
+                mock_cfg.socket_path = socket_path
                 mock_config.return_value = mock_cfg
                 result = get_daemon_pid()
-                assert result == 12345
-                assert pid_file.exists()
+                assert result is None
+                assert not pid_file.exists()
 
     def test_invalid_pid_file_content(self, tmp_path: Path) -> None:
         """When PID file has non-numeric content, clean up and return None."""
@@ -161,6 +171,134 @@ class TestGetDaemonPid:
                     assert socket_path.exists()
 
 
+class TestIdentityLiveness:
+    """Liveness requires identity, not just PID existence (#68)."""
+
+    @staticmethod
+    def _write_pid_file(pid_file: Path, pid: int, identity: str | None) -> None:
+        if identity is None:
+            pid_file.write_text(str(pid))
+        else:
+            pid_file.write_text(json.dumps({"pid": pid, "identity": identity}))
+
+    @staticmethod
+    def _patched_config(config_dir: Path, pid_file: Path):
+        mock_cfg = MagicMock()
+        mock_cfg.pid_file = pid_file
+        mock_cfg.socket_path = config_dir / "music-cli.sock"
+        mock_cfg.read_auth_token.return_value = None
+        return patch("music_cli.daemon.get_config", return_value=mock_cfg)
+
+    async def test_ping_echoes_run_identity(self, tmp_path: Path) -> None:
+        daemon = _DaemonTestHarness.make_daemon(tmp_path)
+        server = await asyncio.start_server(daemon._handle_client, "127.0.0.1", 0)
+        port = server.sockets[0].getsockname()[1]
+        try:
+            response = await _roundtrip(
+                port, {"command": "ping", "args": {}, "token": daemon._auth_token}
+            )
+        finally:
+            server.close()
+            await server.wait_closed()
+        assert response["status"] == "ok"
+        assert response["identity"] == daemon._identity
+
+    def test_live_unrelated_process_is_not_running(self, tmp_path: Path) -> None:
+        """A PID file naming a live non-daemon process is stale (#68)."""
+        config_dir = tmp_path / "config"
+        config_dir.mkdir()
+        pid_file = config_dir / "music-cli.pid"
+
+        proc = subprocess.Popen(
+            [sys.executable, "-c", "import time; time.sleep(30)"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        try:
+            assert _pid_alive(proc.pid), "test setup: sleeper must be alive"
+            self._write_pid_file(pid_file, proc.pid, "stale-nonce")
+            with self._patched_config(config_dir, pid_file):
+                assert get_daemon_pid() is None
+                assert not is_daemon_running()
+                assert not pid_file.exists()
+        finally:
+            proc.terminate()
+            proc.wait(timeout=10)
+
+    def test_identity_match_returns_pid(self, tmp_path: Path) -> None:
+        config_dir = tmp_path / "config"
+        config_dir.mkdir()
+        pid_file = config_dir / "music-cli.pid"
+        self._write_pid_file(pid_file, 12345, "run-nonce")
+
+        with self._patched_config(config_dir, pid_file):
+            with patch("music_cli.daemon._pid_alive", return_value=True):
+                with patch(
+                    "music_cli.daemon._probe_daemon_identity",
+                    return_value="run-nonce",
+                ):
+                    assert get_daemon_pid() == 12345
+                    assert pid_file.exists()
+
+    def test_identity_mismatch_cleans_up(self, tmp_path: Path) -> None:
+        """A live process that answers with a foreign identity is not ours."""
+        config_dir = tmp_path / "config"
+        config_dir.mkdir()
+        pid_file = config_dir / "music-cli.pid"
+        socket_path = config_dir / "music-cli.sock"
+        self._write_pid_file(pid_file, 12345, "recorded-nonce")
+        socket_path.touch()
+
+        with self._patched_config(config_dir, pid_file):
+            with patch("music_cli.daemon._pid_alive", return_value=True):
+                with patch(
+                    "music_cli.daemon._probe_daemon_identity",
+                    return_value="someone-else",
+                ):
+                    with patch("music_cli.platform.is_unix", return_value=True):
+                        assert get_daemon_pid() is None
+                        assert not pid_file.exists()
+                        assert not socket_path.exists()
+
+    def test_probe_fails_when_nothing_listens(self, tmp_path: Path) -> None:
+        """The real probe returns None against a socket path with no listener."""
+        assert _probe_daemon_identity(tmp_path / "no-such.sock", None) is None
+
+    def test_recycled_pid_scenario_end_to_end(self, tmp_path: Path) -> None:
+        """Unclean exit + PID recycling: stale file cleaned, daemon restartable.
+
+        Simulates the failure the issue describes: the PID file survives an
+        unclean exit and names a live unrelated process. Before #68 the
+        daemon was considered running forever; now the file is cleaned up so
+        ``ensure_daemon`` can start a fresh daemon.
+        """
+        config_dir = tmp_path / "config"
+        config_dir.mkdir()
+        pid_file = config_dir / "music-cli.pid"
+        socket_path = config_dir / "music-cli.sock"
+        socket_path.touch()  # leftover socket from the unclean exit
+
+        proc = subprocess.Popen(
+            [sys.executable, "-c", "import time; time.sleep(30)"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        try:
+            deadline = time.monotonic() + 5
+            while not _pid_alive(proc.pid):
+                assert time.monotonic() < deadline, "sleeper never came up"
+                time.sleep(0.05)
+            self._write_pid_file(pid_file, proc.pid, "dead-daemon-nonce")
+            with self._patched_config(config_dir, pid_file):
+                with patch("music_cli.platform.is_unix", return_value=True):
+                    assert get_daemon_pid() is None
+                    assert not pid_file.exists(), "stale PID file must be removed"
+                    assert not socket_path.exists(), "leftover socket must be removed"
+        finally:
+            proc.terminate()
+            proc.wait(timeout=10)
+
+
 class _DaemonTestHarness:
     """Build a MusicDaemon without heavy player/source dependencies."""
 
@@ -173,6 +311,7 @@ class _DaemonTestHarness:
         # Attributes __init__ normally provides and _process_command touches.
         daemon._command_lock = asyncio.Lock()
         daemon._background_tasks = set()
+        daemon._identity = "test-identity"
         return daemon
 
 
@@ -382,12 +521,12 @@ class TestCommandSerialization:
         )
         assert daemon.player._process is survivors[0]
 
-    async def test_ping_waits_for_in_flight_play(self, play_server) -> None:
+    async def test_ping_answers_outside_in_flight_play(self, play_server) -> None:
         daemon, player, port = play_server
 
         async def recording_ping(args):
             player.events.append("pong")
-            return {"status": "ok", "message": "pong"}
+            return {"status": "ok", "message": "pong", "identity": daemon._identity}
 
         daemon._cmd_ping = recording_ping
 
@@ -411,10 +550,11 @@ class TestCommandSerialization:
         pong = await _roundtrip(port, {"command": "ping", "args": {}, "token": daemon._auth_token})
         await asyncio.wait_for(play_task, timeout=5)
 
-        assert pong == {"status": "ok", "message": "pong"}
-        # The lock spans the whole command: pong can only be produced after
-        # the in-flight play finished mutating state.
-        assert player.events.index("play-done") < player.events.index("pong")
+        assert pong["status"] == "ok"
+        # Health checks answer outside the command lock (#68): a liveness
+        # probe must not queue behind a long state-mutating handler, or the
+        # identity check would hang for the duration of every play.
+        assert player.events.index("pong") < player.events.index("play-done")
 
 
 class TestBackgroundTaskReferences:
