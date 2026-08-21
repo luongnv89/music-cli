@@ -144,14 +144,14 @@ jobs:
       - name: Run unit + e2e tests
         run: pytest tests/ -v --cov=music_cli --cov-report=xml --cov-report=json:coverage.json --cov-report=term-missing
 
-      # Coverage floor — derived from a recorded hermetic run (issue #43 made the
-      # suite hermetic), measured at 53.95% (3646 stmts, 1679 missing). The
-      # displayed "54%" is rounded; the true value is 53.9495%, so the floor is
-      # the measured percentage rounded DOWN to a whole number: 53.
-      # We gate on the RAW percent (not the rounded display) so the gate bites at
-      # floor+1: pytest-cov 7.x prints "FAIL" but does not propagate the exit code
-      # under pytest 9, so we enforce with an explicit check on coverage.json.
-      - name: Enforce coverage floor (53%)
+      # Coverage floor — kept in lockstep with --cov-fail-under=75 in
+      # pyproject.toml (issue #72). The omit of ai_generator.py was removed so
+      # the metric is honest, and the suite was raised onto the new floor with a
+      # recorded run at 79%. We gate on the RAW percent (not the rounded display)
+      # so the gate bites at floor+1: pytest-cov 7.x prints "FAIL" but does not
+      # propagate the exit code under pytest 9, so we enforce with an explicit
+      # check on coverage.json.
+      - name: Enforce coverage floor (75%)
         if: matrix.python-version == '3.12' && matrix.os == 'ubuntu-latest'
         run: |
           python -c "
@@ -159,7 +159,7 @@ jobs:
           with open('coverage.json') as f:
               totals = json.load(f)['totals']
           pct = totals['percent_covered']
-          floor = 53
+          floor = 75
           print(f'Coverage: {pct:.4f}% (floor={floor}%)')
           if pct < floor:
               print(f'::error::Coverage {pct:.4f}% is below the floor of {floor}%')

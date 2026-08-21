@@ -135,7 +135,10 @@ warn_unused_ignores = false
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-addopts = "-v --cov=music_cli --cov-report=term-missing"
+# --cov-fail-under is the enforced coverage floor (issue #72): derived from a
+# recorded hermetic run at 79% with the ai_generator omit removed, rounded DOWN
+# to 75 to leave headroom for platform/interpreter variance in CI.
+addopts = "-v --cov=music_cli --cov-report=term-missing --cov-fail-under=75"
 
 [tool.bandit]
 exclude_dirs = ["tests", "venv"]
