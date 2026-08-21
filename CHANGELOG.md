@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Raise the supported Python floor from `>=3.10` to `>=3.12` (`F-DEP-001`). **Decision rationale:** Python 3.10 reaches end-of-life on **2026-10-31** — about ten weeks after the audit — so committing to test it until then buys nothing; `>=3.11` was rejected because the installed numpy stubs use PEP 695 `type` statements, which mypy rejects when targeting <3.12, leaving `[tool.mypy] python_version` permanently out of sync with the floor; `>=3.12` is therefore the only value that lets all declaration sites (`requires-python`, classifiers, ruff/black target-version, mypy python_version, CI matrix) agree, aligns with the existing CI matrix, and root-causes the numpy-stub conflict behind `F-CI-002` rather than working around it. The dead `tomli` shim (`python_version<'3.11'`) and its fallback import are removed; standalone CI jobs move 3.11 → 3.12 ([#58](https://github.com/luongnv89/music-cli/issues/58)).
+
 ### Added
 - Add `pip-audit` to the `dev` extra and a `Dependency Audit` CI job that runs `pip-audit --strict -f json` and uploads the machine-readable report, establishing the advisory baseline for milestone `M1` ([#44](https://github.com/luongnv89/music-cli/issues/44)).
 
