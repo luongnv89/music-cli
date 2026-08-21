@@ -99,7 +99,11 @@ class MusicGenStrategy(ModelStrategy):
 
         # Extract audio array and sample rate
         # MusicGen outputs shape: [batch, channels, samples]
-        sample_rate = model.config.audio_encoder.sampling_rate
+        # Generation parameters live on model.generation_config under
+        # transformers 5.x; fall back to the encoder config if absent.
+        sample_rate = getattr(model.generation_config, "sample_rate", None)
+        if sample_rate is None:
+            sample_rate = model.config.audio_encoder.sampling_rate
         audio = audio_values[0, 0].cpu().numpy()
 
         # Clip audio to [-1, 1] range to prevent distortion, then normalize to int16
@@ -171,7 +175,11 @@ class MusicGenStrategy(ModelStrategy):
                 do_sample=True,
             )
 
-        sample_rate = model.config.audio_encoder.sampling_rate
+        # Generation parameters live on model.generation_config under
+        # transformers 5.x; fall back to the encoder config if absent.
+        sample_rate = getattr(model.generation_config, "sample_rate", None)
+        if sample_rate is None:
+            sample_rate = model.config.audio_encoder.sampling_rate
         audio = audio_values[0, 0].cpu().numpy()
         audio_clipped = np.clip(audio, -1.0, 1.0)
         audio_int16 = (audio_clipped * 32767).astype(np.int16)
