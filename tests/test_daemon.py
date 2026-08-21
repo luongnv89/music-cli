@@ -524,10 +524,26 @@ class TestCommandSerialization:
     async def test_ping_answers_outside_in_flight_play(self, play_server) -> None:
         daemon, player, port = play_server
 
+        release_play = asyncio.Event()
+
+        async def holding_play(track: Any) -> bool:
+            await player.stop()
+            player.events.append(f"play:{track.source}")
+            # Hold the handler mid-play until the ping below has been
+            # answered, so the ordering assertion cannot lose a timing race
+            # on slow runners.
+            await asyncio.wait_for(release_play.wait(), timeout=5)
+            proc = {"id": track.source, "killed": False}
+            player.processes.append(proc)
+            player._process = proc
+            player.events.append("play-done")
+            return True
+
         async def recording_ping(args):
             player.events.append("pong")
             return {"status": "ok", "message": "pong", "identity": daemon._identity}
 
+        player.play = holding_play
         daemon._cmd_ping = recording_ping
 
         play_task = asyncio.create_task(
@@ -540,14 +556,20 @@ class TestCommandSerialization:
                 },
             )
         )
-        # Wait until the play handler is mid-flight inside player.play().
-        for _ in range(200):
-            if any(e.startswith("play:") for e in player.events):
-                break
-            await asyncio.sleep(0.005)
-        assert any(e.startswith("play:") for e in player.events)
+        try:
+            # Wait until the play handler is mid-flight and parked.
+            for _ in range(200):
+                if any(e.startswith("play:") for e in player.events):
+                    break
+                await asyncio.sleep(0.005)
+            assert any(e.startswith("play:") for e in player.events)
 
-        pong = await _roundtrip(port, {"command": "ping", "args": {}, "token": daemon._auth_token})
+            pong = await asyncio.wait_for(
+                _roundtrip(port, {"command": "ping", "args": {}, "token": daemon._auth_token}),
+                timeout=5,
+            )
+        finally:
+            release_play.set()
         await asyncio.wait_for(play_task, timeout=5)
 
         assert pong["status"] == "ok"
