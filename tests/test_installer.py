@@ -226,15 +226,22 @@ class TestVersionGate:
 
     @staticmethod
     def _path_stub(sandbox: dict, version_line: str, short_version: str) -> Path:
-        """A directory whose ``python3`` reports the given version."""
+        """A directory whose ``python``/``python3`` both report the given version.
+
+        ``install.sh`` probes candidates in ``python3 python`` order and falls
+        through on rejection, so every name it may resolve must be shadowed —
+        otherwise a real interpreter elsewhere on PATH (present on GitHub
+        runners) answers the gate and the sandbox never sees the stub.
+        """
         fake_bin = sandbox["shim"].parent / ("stub-" + short_version.replace(".", ""))
         fake_bin.mkdir(exist_ok=True)
         text = sandbox["shim"].read_text()
         text = text.replace("Python 3.11.0", version_line)
         text = text.replace('echo "3.11"', f'echo "{short_version}"')
-        python3 = fake_bin / "python3"
-        python3.write_text(text)
-        python3.chmod(0o755)
+        for candidate in ("python3", "python"):
+            stub = fake_bin / candidate
+            stub.write_text(text)
+            stub.chmod(0o755)
         return fake_bin
 
     def test_python_4_stub_is_accepted(self, sandbox) -> None:
