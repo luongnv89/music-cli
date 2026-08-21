@@ -26,7 +26,7 @@ IMPORTANT: always invoke tools through `.venv/bin/` — bare `pytest`/`mypy` res
 
 - YOU MUST NOT commit, push, or open a PR unless explicitly asked.
 - Never add `Co-Authored-By` trailers.
-- Prefer `ruff format` over `black` (black is slated for removal once `F-CLEAN-009` lands).
+- Format with `ruff format` (black was removed; `F-CLEAN-009`).
 - Never edit `[tool.mypy] python_version` to "fix" the exit-2 — Task 0.3 owns that.
 - Do not install the `ai`, `minimax`, or `youtube` extras unless the task needs them.
 - One logical change per commit; commit message format: `<type>(<scope>): <desc> (#N)`.
@@ -41,7 +41,7 @@ IMPORTANT: always invoke tools through `.venv/bin/` — bare `pytest`/`mypy` res
 ## What NOT to include
 
 - No file-by-file descriptions (use the architecture map above).
-- No style rules `ruff`/`black` already enforce.
+- No style rules `ruff` already enforces.
 - No version numbers or dates that change frequently.
 - No duplicating `docs/AGENT_SETUP.md` — link to it instead.
 

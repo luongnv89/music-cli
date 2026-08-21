@@ -6,6 +6,7 @@ import sys
 import click
 
 from .. import __version__
+from ..client import PlayRequest
 from ..config import get_config
 from . import runtime
 from .app import main
@@ -106,7 +107,7 @@ def radios_play(number):
     client = runtime.ensure_daemon()
 
     try:
-        response = client.play(mode="radio", source=url)
+        response = client.play(PlayRequest(mode="radio", source=url))
 
         if "error" in response:
             click.echo(f"Error: {response['error']}", err=True)

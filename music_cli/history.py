@@ -1,7 +1,7 @@
 """History logging and management for music-cli."""
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
@@ -12,9 +12,11 @@ from .config import get_config
 class HistoryEntry:
     """A single history entry."""
 
-    timestamp: str
-    source: str
-    source_type: str
+    # Stamped at construction when omitted so callers can build an entry
+    # directly and hand it to History.log (F-CLEAN-011 dataclass params).
+    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+    source: str = ""
+    source_type: str = "unknown"
     title: str | None = None
     artist: str | None = None
     mood: str | None = None
@@ -71,26 +73,8 @@ class History:
             history_file = get_config().history_file
         self.history_file = history_file
 
-    def log(
-        self,
-        source: str,
-        source_type: str,
-        title: str | None = None,
-        artist: str | None = None,
-        mood: str | None = None,
-        context: str | None = None,
-    ) -> HistoryEntry:
-        """Log a new history entry."""
-        entry = HistoryEntry(
-            timestamp=datetime.now().isoformat(),
-            source=source,
-            source_type=source_type,
-            title=title,
-            artist=artist,
-            mood=mood,
-            context=context,
-        )
-
+    def log(self, entry: HistoryEntry) -> HistoryEntry:
+        """Append a history entry to the history file."""
         with self.history_file.open("a") as f:
             f.write(json.dumps(entry.to_dict()) + "\n")
 

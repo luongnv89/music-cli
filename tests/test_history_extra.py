@@ -87,9 +87,13 @@ class TestSearchAndFiltering:
     @pytest.fixture()
     def populated(self, tmp_path: Path) -> History:
         history = History(tmp_path / "h.jsonl")
-        history.log("/m/a.mp3", "local", title="Chill Beats", artist="DJ Code")
-        history.log("https://stream.example/jazz", "radio")
-        history.log("/m/focus.mp3", "local", title="Deep Focus")
+        history.log(
+            HistoryEntry(
+                source="/m/a.mp3", source_type="local", title="Chill Beats", artist="DJ Code"
+            )
+        )
+        history.log(HistoryEntry(source="https://stream.example/jazz", source_type="radio"))
+        history.log(HistoryEntry(source="/m/focus.mp3", source_type="local", title="Deep Focus"))
         return history
 
     def test_search_matches_title_artist_and_source(self, populated: History) -> None:
@@ -104,7 +108,9 @@ class TestSearchAndFiltering:
     def test_search_limit_breaks_early(self, tmp_path: Path) -> None:
         history = History(tmp_path / "h.jsonl")
         for i in range(5):
-            history.log(f"/m/{i}.mp3", "local", title=f"same words {i}")
+            history.log(
+                HistoryEntry(source=f"/m/{i}.mp3", source_type="local", title=f"same words {i}")
+            )
         results = history.search("same", limit=2)
         assert len(results) == 2
 
@@ -129,7 +135,7 @@ class TestSingleton:
     def test_clear_wipes_file(self, tmp_path: Path) -> None:
         history_file = tmp_path / "h.jsonl"
         history = History(history_file)
-        history.log("/m/x.mp3", "local")
+        history.log(HistoryEntry(source="/m/x.mp3", source_type="local"))
         history.clear()
         assert history.history_file.read_text() == ""
         assert history.get_all() == []

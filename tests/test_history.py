@@ -68,14 +68,21 @@ class TestHistory:
         history = History(history_file=history_file)
 
         entry = history.log(
-            source="/path/to/song.mp3",
-            source_type="local",
-            title="Test Song",
+            HistoryEntry(source="/path/to/song.mp3", source_type="local", title="Test Song")
         )
 
         assert entry.source == "/path/to/song.mp3"
         assert entry.title == "Test Song"
         assert history_file.exists()
+
+    def test_log_stamps_timestamp_when_entry_has_none(self, tmp_path: Path) -> None:
+        """Entries built without a timestamp get one at construction."""
+        history_file = tmp_path / "history.jsonl"
+        history = History(history_file=history_file)
+
+        entry = HistoryEntry(source="a.mp3", source_type="local")
+        assert entry.timestamp  # default_factory stamped it
+        assert history.log(entry).timestamp == entry.timestamp
 
     def test_get_all(self, tmp_path: Path) -> None:
         """Test getting all history entries."""
@@ -83,9 +90,9 @@ class TestHistory:
         history = History(history_file=history_file)
 
         # Log some entries
-        history.log(source="song1.mp3", source_type="local", title="Song 1")
-        history.log(source="song2.mp3", source_type="local", title="Song 2")
-        history.log(source="song3.mp3", source_type="local", title="Song 3")
+        history.log(HistoryEntry(source="song1.mp3", source_type="local", title="Song 1"))
+        history.log(HistoryEntry(source="song2.mp3", source_type="local", title="Song 2"))
+        history.log(HistoryEntry(source="song3.mp3", source_type="local", title="Song 3"))
 
         entries = history.get_all()
 
@@ -100,7 +107,7 @@ class TestHistory:
         history = History(history_file=history_file)
 
         for i in range(10):
-            history.log(source=f"song{i}.mp3", source_type="local", title=f"Song {i}")
+            history.log(HistoryEntry(source=f"song{i}.mp3", source_type="local", title=f"Song {i}"))
 
         entries = history.get_all(limit=5)
 
@@ -111,8 +118,8 @@ class TestHistory:
         history_file = tmp_path / "history.jsonl"
         history = History(history_file=history_file)
 
-        history.log(source="song1.mp3", source_type="local", title="Song 1")
-        history.log(source="song2.mp3", source_type="local", title="Song 2")
+        history.log(HistoryEntry(source="song1.mp3", source_type="local", title="Song 1"))
+        history.log(HistoryEntry(source="song2.mp3", source_type="local", title="Song 2"))
 
         entry = history.get_by_index(1)  # Most recent
         assert entry is not None
@@ -127,7 +134,7 @@ class TestHistory:
         history_file = tmp_path / "history.jsonl"
         history = History(history_file=history_file)
 
-        history.log(source="song1.mp3", source_type="local", title="Song 1")
+        history.log(HistoryEntry(source="song1.mp3", source_type="local", title="Song 1"))
 
         assert history.get_by_index(0) is None
         assert history.get_by_index(99) is None
@@ -137,9 +144,9 @@ class TestHistory:
         history_file = tmp_path / "history.jsonl"
         history = History(history_file=history_file)
 
-        history.log(source="song1.mp3", source_type="local", title="Rock Song")
-        history.log(source="song2.mp3", source_type="local", title="Pop Song")
-        history.log(source="song3.mp3", source_type="local", title="Rock Ballad")
+        history.log(HistoryEntry(source="song1.mp3", source_type="local", title="Rock Song"))
+        history.log(HistoryEntry(source="song2.mp3", source_type="local", title="Pop Song"))
+        history.log(HistoryEntry(source="song3.mp3", source_type="local", title="Rock Ballad"))
 
         results = history.search("rock")
 
@@ -151,8 +158,8 @@ class TestHistory:
         history_file = tmp_path / "history.jsonl"
         history = History(history_file=history_file)
 
-        history.log(source="song1.mp3", source_type="local", title="Song 1")
-        history.log(source="song2.mp3", source_type="local", title="Song 2")
+        history.log(HistoryEntry(source="song1.mp3", source_type="local", title="Song 1"))
+        history.log(HistoryEntry(source="song2.mp3", source_type="local", title="Song 2"))
 
         history.clear()
 

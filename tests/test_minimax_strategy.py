@@ -12,7 +12,7 @@ from music_cli.client import DaemonClient
 from music_cli.config import Config
 from music_cli.daemon import MusicDaemon, RequestError
 from music_cli.player.base import TrackInfo
-from music_cli.sources.ai_generator import AIGenerator, _get_strategy
+from music_cli.sources.ai_generator import AIGenerator, GenerationRequest, _get_strategy
 from music_cli.sources.ai_models import ModelRegistry
 from music_cli.sources.ai_models.minimax_strategy import MiniMaxMusic3Strategy
 from music_cli.sources.ai_models.model_config import ModelConfig
@@ -224,7 +224,12 @@ def test_generator_rejects_whitespace_lyrics_before_loading(tmp_path) -> None:
         patch("music_cli.sources.ai_generator.is_ai_available", return_value=True),
         patch("music_cli.sources.ai_generator._get_strategy") as get_strategy,
     ):
-        assert generator.generate("description", model_id="minimax-music3", lyrics="  ") is None
+        assert (
+            generator.generate(
+                GenerationRequest(prompt="description", model_id="minimax-music3", lyrics="  ")
+            )
+            is None
+        )
 
     get_strategy.assert_not_called()
 

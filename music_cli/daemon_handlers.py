@@ -15,7 +15,9 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
 from .context.mood import MoodContext
+from .history import HistoryEntry
 from .player.base import TrackInfo
+from .youtube_history import YouTubeHistoryEntry
 
 if TYPE_CHECKING:
     import asyncio
@@ -152,20 +154,24 @@ class PlaybackHandlers:
             if track.source_type == "youtube" and track.metadata.get("youtube_url"):
                 log_source = track.metadata["youtube_url"]
                 self.youtube_history.add_entry(
-                    video_id=track.metadata.get("video_id", ""),
-                    url=log_source,
-                    title=track.title or "Unknown",
-                    artist=track.artist,
-                    duration=track.duration,
+                    YouTubeHistoryEntry(
+                        video_id=track.metadata.get("video_id", ""),
+                        url=log_source,
+                        title=track.title or "Unknown",
+                        artist=track.artist,
+                        duration=track.duration,
+                    )
                 )
 
             self.history.log(
-                source=log_source,
-                source_type=track.source_type,
-                title=track.title,
-                artist=track.artist,
-                mood=self._current_mood.value if self._current_mood else None,
-                context=self.temporal.get_time_period().value,
+                HistoryEntry(
+                    source=log_source,
+                    source_type=track.source_type,
+                    title=track.title,
+                    artist=track.artist,
+                    mood=self._current_mood.value if self._current_mood else None,
+                    context=self.temporal.get_time_period().value,
+                )
             )
 
             return {
@@ -545,10 +551,12 @@ class AIHandlers:
         model_id: str | None,
         lyrics: str | None,
     ) -> TrackInfo | None:
-        from .sources.ai_generator import AIGenerator
+        from .sources.ai_generator import AIGenerator, GenerationRequest
 
         generator = AIGenerator(output_dir=self.config.ai_music_dir, config=self.config)
-        return generator.generate(prompt, duration, model_id=model_id, lyrics=lyrics)
+        return generator.generate(
+            GenerationRequest(prompt=prompt, duration=duration, model_id=model_id, lyrics=lyrics)
+        )
 
     def _record_generated_track(
         self, track: TrackInfo, *, prompt: str, duration: int, lyrics: str | None
@@ -566,11 +574,13 @@ class AIHandlers:
         )
 
         self.history.log(
-            source=track.source,
-            source_type=track.source_type,
-            title=track.title,
-            mood=self._current_mood.value if self._current_mood else None,
-            context=self.temporal.get_time_period().value,
+            HistoryEntry(
+                source=track.source,
+                source_type=track.source_type,
+                title=track.title,
+                mood=self._current_mood.value if self._current_mood else None,
+                context=self.temporal.get_time_period().value,
+            )
         )
 
     async def _regenerate_ai_track(self, index: int, track_entry: Any) -> dict:
@@ -702,11 +712,13 @@ class YouTubeHistoryHandlers:
         success = await self.player.play(track)
         if success:
             self.youtube_history.add_entry(
-                video_id=entry.video_id,
-                url=entry.url,
-                title=entry.title,
-                artist=entry.artist,
-                duration=entry.duration,
+                YouTubeHistoryEntry(
+                    video_id=entry.video_id,
+                    url=entry.url,
+                    title=entry.title,
+                    artist=entry.artist,
+                    duration=entry.duration,
+                )
             )
             return {"status": "playing", "track": track.to_dict()}
         else:

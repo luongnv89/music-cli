@@ -1,8 +1,9 @@
 """Guard the supported-Python-floor decision (Task 3.1 / #58, F-DEP-001).
 
 Every declaration site must name the same floor: `requires-python`, the
-trove classifiers, `[tool.ruff] target-version`, `[tool.black]
-target-version`, `[tool.mypy] python_version`, and the CI matrix.
+trove classifiers, `[tool.ruff] target-version`, `[tool.mypy]
+python_version`, and the CI matrix. (`[tool.black]` was removed with
+F-CLEAN-009; ruff format is the single formatter.)
 """
 
 import re
@@ -49,10 +50,6 @@ def _tool_target(tool: str) -> str:
 
 def test_ruff_target_version_names_floor() -> None:
     assert f"py{FLOOR.replace('.', '')}" in _tool_target("ruff")
-
-
-def test_black_target_version_names_floor() -> None:
-    assert f"py{FLOOR.replace('.', '')}" in _tool_target("black")
 
 
 def test_mypy_python_version_names_floor() -> None:

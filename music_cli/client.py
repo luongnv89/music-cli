@@ -2,6 +2,7 @@
 
 import json
 import logging
+from dataclasses import dataclass
 from typing import Any
 
 from .config import get_config
@@ -16,6 +17,35 @@ MAX_RESPONSE_SIZE = 10 * 1024 * 1024  # 10MB limit
 DEFAULT_TIMEOUT = 10.0
 AI_TIMEOUT = 600.0  # 10 minutes for AI generation
 YOUTUBE_TIMEOUT = 60.0  # 1 minute for YouTube URL extraction
+
+
+@dataclass(frozen=True)
+class PlayRequest:
+    """Playback request payload for `DaemonClient.play`.
+
+    Groups the play parameters so the client method stays under the
+    argument-count gate (F-CLEAN-011) and callers pass one value.
+    """
+
+    mode: str = "radio"
+    source: str | None = None
+    mood: str | None = None
+    auto: bool = False
+    duration: int = 30
+    index: int | None = None
+
+    def to_args(self) -> dict:
+        """Render the daemon's flat `play` args, omitting unset optionals."""
+        args: dict = {"mode": self.mode, "auto": self.auto}
+        if self.source:
+            args["source"] = self.source
+        if self.mood:
+            args["mood"] = self.mood
+        if self.duration:
+            args["duration"] = self.duration
+        if self.index:
+            args["index"] = self.index
+        return args
 
 
 class DaemonClient:
@@ -125,35 +155,13 @@ class DaemonClient:
         except ConnectionError:
             return False
 
-    def play(
-        self,
-        mode: str = "radio",
-        source: str | None = None,
-        mood: str | None = None,
-        auto: bool = False,
-        duration: int = 30,
-        index: int | None = None,
-    ) -> dict:
+    def play(self, request: PlayRequest) -> dict:
         """Start playback.
 
         Args:
-            mode: Playback mode (local, radio, ai, context, history)
-            source: Source path/URL/name
-            mood: Mood tag (happy, sad, focus, etc.)
-            auto: Enable auto-play for local files
-            duration: Duration for AI generation (seconds)
-            index: History entry index (for mode=history)
+            request: Playback parameters (mode, source, mood, auto, duration, index).
         """
-        args = {"mode": mode, "auto": auto}
-        if source:
-            args["source"] = source
-        if mood:
-            args["mood"] = mood
-        if duration:
-            args["duration"] = duration
-        if index:
-            args["index"] = index
-        return self.send_command("play", args)
+        return self.send_command("play", request.to_args())
 
     def stop(self) -> dict:
         """Stop playback."""

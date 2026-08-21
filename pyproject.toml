@@ -64,7 +64,6 @@ dev = [
     "pytest>=7.0",
     "pytest-asyncio>=0.21",
     "pytest-cov>=4.0",
-    "black>=23.0",
     # Pinned to the exact ruff-pre-commit hook rev in .pre-commit-config.yaml
     # and the constraints-dev.txt CI pin so lint results are identical
     # everywhere (issue #55).
@@ -93,10 +92,6 @@ Changelog = "https://github.com/luongnv89/music-cli/releases"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["music_cli*"]
-
-[tool.black]
-line-length = 100
-target-version = ["py312"]
 
 [tool.ruff]
 line-length = 100

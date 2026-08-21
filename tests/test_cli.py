@@ -15,6 +15,7 @@ from music_cli.cli import (
     main,
     start_daemon_background,
 )
+from music_cli.client import PlayRequest
 from music_cli.config import get_config
 
 # The real spawner, captured at collection time: the autouse ``isolate_home``
@@ -492,8 +493,8 @@ class TestSmartPlayDetection:
         result = runner.invoke(main, ["play", "https://youtube.com/watch?v=test"])
         assert result.exit_code == 0
         mock_daemon_client.play.assert_called_once()
-        call_kwargs = mock_daemon_client.play.call_args
-        assert call_kwargs[1]["mode"] == "youtube" or call_kwargs.kwargs["mode"] == "youtube"
+        request = mock_daemon_client.play.call_args[0][0]
+        assert request.mode == "youtube"
 
     @patch("music_cli.cli.runtime.ensure_daemon")
     @patch("music_cli.cli.playback.check_ffplay_available", return_value=True)
@@ -501,8 +502,8 @@ class TestSmartPlayDetection:
         mock_daemon.return_value = mock_daemon_client
         result = runner.invoke(main, ["play"])
         assert result.exit_code == 0
-        call_kwargs = mock_daemon_client.play.call_args
-        assert call_kwargs[1]["mode"] == "context" or call_kwargs.kwargs["mode"] == "context"
+        request = mock_daemon_client.play.call_args[0][0]
+        assert request.mode == "context"
 
 
 class TestResolveLocalPath:
@@ -553,9 +554,9 @@ class TestPlayRelativeLocalPath:
         result = runner.invoke(main, ["play", "song.mp3"])
 
         assert result.exit_code == 0
-        call_kwargs = mock_daemon_client.play.call_args.kwargs
-        assert call_kwargs["mode"] == "local"
-        assert call_kwargs["source"] == str((tmp_path / "song.mp3").resolve())
+        request = mock_daemon_client.play.call_args[0][0]
+        assert request.mode == "local"
+        assert request.source == str((tmp_path / "song.mp3").resolve())
 
     @patch("music_cli.cli.runtime.ensure_daemon")
     @patch("music_cli.cli.playback.check_ffplay_available", return_value=True)
@@ -569,8 +570,8 @@ class TestPlayRelativeLocalPath:
         result = runner.invoke(main, ["play", "song.mp3", "--mode", "local"])
 
         assert result.exit_code == 0
-        call_kwargs = mock_daemon_client.play.call_args.kwargs
-        assert call_kwargs["source"] == str((tmp_path / "song.mp3").resolve())
+        request = mock_daemon_client.play.call_args[0][0]
+        assert request.source == str((tmp_path / "song.mp3").resolve())
 
     @patch("music_cli.cli.runtime.ensure_daemon")
     @patch("music_cli.cli.playback.check_ffplay_available", return_value=True)
@@ -585,8 +586,8 @@ class TestPlayRelativeLocalPath:
         result = runner.invoke(main, ["play", "not-in-cwd.mp3", "--mode", "local"])
 
         assert result.exit_code == 0
-        call_kwargs = mock_daemon_client.play.call_args.kwargs
-        assert call_kwargs["source"] == "not-in-cwd.mp3"
+        request = mock_daemon_client.play.call_args[0][0]
+        assert request.source == "not-in-cwd.mp3"
 
 
 # -------------------------------------------------------------------------
@@ -662,14 +663,14 @@ class TestHistoryGroup:
         mock_daemon.return_value = mock_daemon_client
         result = runner.invoke(main, ["history", "play", "3"])
         assert result.exit_code == 0
-        mock_daemon_client.play.assert_called_once_with(mode="history", index=3)
+        mock_daemon_client.play.assert_called_once_with(PlayRequest(mode="history", index=3))
 
     @patch("music_cli.cli.runtime.ensure_daemon")
     def test_h_alias_play(self, mock_daemon, runner, mock_daemon_client):
         mock_daemon.return_value = mock_daemon_client
         result = runner.invoke(main, ["h", "play", "1"])
         assert result.exit_code == 0
-        mock_daemon_client.play.assert_called_once_with(mode="history", index=1)
+        mock_daemon_client.play.assert_called_once_with(PlayRequest(mode="history", index=1))
 
     @patch("music_cli.cli.runtime.ensure_daemon")
     def test_h_bare_lists_history(self, mock_daemon, runner, mock_daemon_client):
@@ -762,8 +763,8 @@ class TestAIDurationDefault:
         mock_daemon.return_value = mock_daemon_client
         result = runner.invoke(main, ["play"])
         assert result.exit_code == 0
-        call_kwargs = mock_daemon_client.play.call_args[1]
-        assert call_kwargs["duration"] == 15
+        request = mock_daemon_client.play.call_args[0][0]
+        assert request.duration == 15
 
     @patch("music_cli.cli.runtime.ensure_daemon")
     def test_ai_play_duration_default_is_15(self, mock_daemon, runner, mock_daemon_client):
@@ -820,7 +821,7 @@ class TestMoodDirectPlay:
         mock_daemon.return_value = mock_daemon_client
         result = runner.invoke(main, ["mood", "focus"])
         assert result.exit_code == 0
-        mock_daemon_client.play.assert_called_once_with(mode="radio", mood="focus")
+        mock_daemon_client.play.assert_called_once_with(PlayRequest(mode="radio", mood="focus"))
         assert "Playing mood" in result.output
 
 
@@ -931,8 +932,8 @@ class TestPhase2Integration:
         mock_daemon.return_value = mock_daemon_client
         result = runner.invoke(main, ["play", "-m", "radio", "-s", "something"])
         assert result.exit_code == 0
-        call_kwargs = mock_daemon_client.play.call_args
-        assert call_kwargs[1]["mode"] == "radio" or call_kwargs.kwargs["mode"] == "radio"
+        request = mock_daemon_client.play.call_args[0][0]
+        assert request.mode == "radio"
 
 
 # =========================================================================

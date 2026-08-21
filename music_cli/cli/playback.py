@@ -7,6 +7,7 @@ from pathlib import Path
 import click
 
 from .. import __github_url__, __version__
+from ..client import PlayRequest
 from ..config import get_config
 from ..platform import is_windows
 from ..player.ffplay import check_ffplay_available
@@ -83,28 +84,26 @@ class PlayOptions:
     duration: int = 15
     index: int | None = None
 
+    # Click's flat callback kwarg names accepted by from_click.
+    _CLICK_KEYS = frozenset({"source", "source_flag", "mode", "mood", "auto", "duration", "index"})
+
     @classmethod
-    def from_click(
-        cls,
-        *,
-        source=None,
-        mode=None,
-        source_flag=None,
-        mood=None,
-        auto=False,
-        duration=15,
-        index=None,
-    ) -> "PlayOptions":
-        """Build options from Click's flat callback kwargs."""
+    def from_click(cls, click_args: dict) -> "PlayOptions":
+        """Build options from Click's flat callback kwargs, passed as one mapping."""
+        unknown = set(click_args) - cls._CLICK_KEYS
+        if unknown:
+            raise TypeError(f"Unexpected play options: {sorted(unknown)}")
         # Positional SOURCE takes priority over -s flag
-        effective_source = source if source is not None else source_flag
+        effective_source = click_args.get("source")
+        if effective_source is None:
+            effective_source = click_args.get("source_flag")
         return cls(
             source=effective_source,
-            mode=mode,
-            mood=mood,
-            auto=auto,
-            duration=duration,
-            index=index,
+            mode=click_args.get("mode"),
+            mood=click_args.get("mood"),
+            auto=click_args.get("auto", False),
+            duration=click_args.get("duration", 15),
+            index=click_args.get("index"),
         )
 
 
@@ -189,12 +188,14 @@ def _run_play(options: PlayOptions) -> None:
 
     try:
         response = client.play(
-            mode=mode,
-            source=source,
-            mood=options.mood,
-            auto=options.auto,
-            duration=options.duration,
-            index=options.index,
+            PlayRequest(
+                mode=mode,
+                source=source,
+                mood=options.mood,
+                auto=options.auto,
+                duration=options.duration,
+                index=options.index,
+            )
         )
 
         if animation:
@@ -251,7 +252,7 @@ def play(source, **options):
       mc play                                      # Context-aware radio
       mc play -M focus                             # Mood-based radio
     """
-    _run_play(PlayOptions.from_click(source=source, **options))
+    _run_play(PlayOptions.from_click({"source": source, **options}))
 
 
 @main.command()

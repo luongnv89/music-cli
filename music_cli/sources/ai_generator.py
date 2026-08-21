@@ -12,6 +12,7 @@ import hashlib
 import logging
 import tempfile
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -29,6 +30,18 @@ LOOP_INSTRUCTION = (
 
 # Flag to track if AI dependencies are available
 _AI_AVAILABLE: bool | None = None
+
+
+@dataclass(frozen=True)
+class GenerationRequest:
+    """Parameters for `AIGenerator.generate`, grouped to keep the API flat."""
+
+    prompt: str
+    duration: int = 30
+    filename: str | None = None
+    add_looping: bool = True
+    model_id: str | None = None
+    lyrics: str | None = None
 
 
 def is_ai_available() -> bool:
@@ -227,26 +240,13 @@ class AIGenerator:
             return None
         return configured_model
 
-    def generate(
-        self,
-        prompt: str,
-        duration: int = 30,
-        filename: str | None = None,
-        add_looping: bool = True,
-        model_id: str | None = None,
-        lyrics: str | None = None,
-    ) -> TrackInfo | None:
-        """Generate music from a text prompt.
+    def generate(self, request: GenerationRequest) -> TrackInfo | None:
+        """Generate music from a text request.
 
         Args:
-            prompt: Text description of the music to generate.
-            duration: Duration in seconds.
-            filename: Optional output filename.
-            add_looping: If True, append looping instructions to prompt.
-            model_id: Model to use (e.g., 'musicgen-small').
-                     If None, uses the configured default.
-            lyrics: Optional lyrics for lyrics-conditioned models. Models that
-                    require lyrics reject an omitted or empty value.
+            request: Generation parameters (prompt, duration, filename,
+                add_looping, model_id, lyrics). Models that require lyrics
+                reject an omitted or empty value.
 
         Returns:
             TrackInfo for the generated audio, or None if generation failed.
@@ -256,11 +256,12 @@ class AIGenerator:
             return None
 
         # Use default model if not specified
+        model_id = request.model_id
         if model_id is None:
             model_id = self.get_default_model()
 
         # Validate lyrics capabilities before loading a potentially large model.
-        configured_model = self._validated_model_for(model_id, lyrics)
+        configured_model = self._validated_model_for(model_id, request.lyrics)
         if configured_model is None:
             return None
 
@@ -275,12 +276,12 @@ class AIGenerator:
 
             # Clamp duration to model's allowed range
             model_config = strategy.config
-            duration = model_config.clamp_duration(duration)
+            duration = model_config.clamp_duration(request.duration)
 
             # Enhance prompt with looping instructions for seamless playback
-            enhanced_prompt = prompt
-            if add_looping:
-                enhanced_prompt = f"{prompt}, {LOOP_INSTRUCTION}"
+            enhanced_prompt = request.prompt
+            if request.add_looping:
+                enhanced_prompt = f"{request.prompt}, {LOOP_INSTRUCTION}"
 
             logger.info(f"Generating {duration}s with {model_id}: {enhanced_prompt[:50]}...")
 
@@ -288,16 +289,17 @@ class AIGenerator:
             # is unused so third-party strategies with the legacy two-argument
             # method remain compatible.
             generation_kwargs = {}
-            if lyrics is not None:
-                generation_kwargs["lyrics"] = lyrics
+            if request.lyrics is not None:
+                generation_kwargs["lyrics"] = request.lyrics
             audio, sample_rate = strategy.generate_audio(
                 enhanced_prompt, duration, **generation_kwargs
             )
 
             # Generate filename if not provided. Lyrics are part of the identity
             # so two songs with the same prompt cannot collide.
+            filename = request.filename
             if filename is None:
-                hash_input = f"{prompt}\0{lyrics or ''}{time.time()}"
+                hash_input = f"{request.prompt}\0{request.lyrics or ''}{time.time()}"
                 short_hash = hashlib.md5(  # noqa: S324
                     hash_input.encode(), usedforsecurity=False
                 ).hexdigest()[:8]
@@ -312,13 +314,13 @@ class AIGenerator:
             return TrackInfo(
                 source=str(output_path),
                 source_type="ai",
-                title=f"AI: {prompt[:40]}...",
+                title=f"AI: {request.prompt[:40]}...",
                 metadata={
-                    "prompt": prompt,
+                    "prompt": request.prompt,
                     "duration": duration,
                     "model": model_id,
                     "hf_model_id": model_config.hf_model_id,
-                    "lyrics": lyrics,
+                    "lyrics": request.lyrics,
                 },
             )
 
@@ -359,7 +361,11 @@ class AIGenerator:
             prompts.append("ambient background music")
 
         full_prompt = ", ".join(prompts)
-        return self.generate(full_prompt, duration, model_id=model_id, lyrics=lyrics)
+        return self.generate(
+            GenerationRequest(
+                prompt=full_prompt, duration=duration, model_id=model_id, lyrics=lyrics
+            )
+        )
 
     def cleanup_old_files(self, max_age_hours: int = 24) -> int:
         """Clean up old generated files.

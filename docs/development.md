@@ -83,7 +83,7 @@ python -m music_cli.daemon
 
 ```bash
 # Format code
-black music_cli/
+ruff format music_cli/
 
 # Lint
 ruff check music_cli/ --fix
@@ -341,7 +341,7 @@ pip install -e ".[dev]"
 pre-commit autoupdate
 
 # Run specific hook
-pre-commit run black --all-files
+pre-commit run ruff-format --all-files
 
 # Skip hooks (emergency only)
 git commit --no-verify
