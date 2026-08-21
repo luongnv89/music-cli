@@ -169,10 +169,14 @@ jobs:
           "
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v7
         if: matrix.python-version == '3.12' && matrix.os == 'ubuntu-latest'
         with:
           files: ./coverage.xml
+          # Deliberately false (decided in Task 4.4 / #63): an outage or
+          # rate-limit on Codecov's ingest must not fail CI — the coverage
+          # floor is enforced locally by the gate above this step, and a
+          # silent upload gap is caught by checking the Codecov dashboard.
           fail_ci_if_error: false
 
   build:
