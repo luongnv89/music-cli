@@ -1,13 +1,26 @@
 """Tests for CLI v2 Phase 1, Phase 2 & Phase 3."""
 
 import os
+import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 from click.testing import CliRunner
 
-from music_cli.cli import _detect_play_mode, _resolve_local_path, icon, main
+from music_cli.cli import (
+    _detect_play_mode,
+    _resolve_local_path,
+    icon,
+    main,
+    start_daemon_background,
+)
+from music_cli.config import get_config
+
+# The real spawner, captured at collection time: the autouse ``isolate_home``
+# fixture swaps ``music_cli.cli.start_daemon_background`` for a no-op during
+# every test, so these daemon-startup tests must re-bind this original.
+_real_start_daemon_background = start_daemon_background
 
 
 @pytest.fixture
@@ -231,6 +244,113 @@ class TestBareInvocation:
             or "daemon" in output_lower
             or "starting" in output_lower
         ), f"Bare invocation did not attempt status: {result.output}"
+
+
+# -------------------------------------------------------------------------
+# Daemon startup failure surfacing (issue #71 / F-BUG-011)
+# -------------------------------------------------------------------------
+
+# A fake child-process traceback, written into whatever stderr handle the
+# spawn wired up — mirrors what a real `python -m music_cli.daemon` writes
+# before dying at startup.
+_TRACEBACK_LINES = (
+    "Traceback (most recent call last):\n",
+    '  File "<string>", line 1, in <module>\n',
+    "RuntimeError: daemon failed to start\n",
+)
+
+
+class TestDaemonStartupFailureLog:
+    """A failed daemon start must leave its stderr in a readable log file."""
+
+    def _force_failed_start(self, runner, monkeypatch):
+        """Drive ensure_daemon through a spawn whose child dies with a traceback.
+
+        Replaces subprocess.Popen so no real process is forked: the fake
+        writes the traceback into the stderr handle the CLI passed for the
+        child — exactly what the OS-level redirection must deliver to disk.
+        """
+        import music_cli.cli as cli_module
+
+        log_path = get_config().config_dir / "daemon.log"
+        monkeypatch.setattr(cli_module, "is_daemon_running", lambda *a, **k: False)
+        # Restore the real spawner (conftest no-ops it) so the fake Popen
+        # below is actually reached through ensure_daemon.
+        monkeypatch.setattr(cli_module, "start_daemon_background", _real_start_daemon_background)
+
+        def fake_popen(cmd, **kwargs):
+            err = kwargs["stderr"]
+            assert hasattr(err, "write"), f"child stderr was not redirected to a file: {err!r}"
+            for line in _TRACEBACK_LINES:
+                err.write(line)
+            err.flush()
+            return MagicMock()
+
+        monkeypatch.setattr(cli_module.subprocess, "Popen", fake_popen)
+        result = runner.invoke(main, ["status"])
+        return result, log_path
+
+    def test_failure_message_prints_log_path(self, runner, monkeypatch):
+        result, log_path = self._force_failed_start(runner, monkeypatch)
+        assert result.exit_code == 1
+        assert "Failed to start daemon" in result.output
+        assert str(log_path) in result.output
+
+    def test_log_file_contains_child_traceback(self, runner, monkeypatch):
+        result, log_path = self._force_failed_start(runner, monkeypatch)
+        assert result.exit_code == 1
+        assert log_path.exists()
+        content = log_path.read_text(encoding="utf-8")
+        assert "Traceback" in content
+        assert "RuntimeError: daemon failed to start" in content
+
+
+class TestDaemonSpawnWiring:
+    """start_daemon_background redirects the child's stderr to the log file."""
+
+    @pytest.fixture
+    def captured_popen(self, monkeypatch):
+        """Capture Popen kwargs without forking; returns (calls list)."""
+        import music_cli.cli as cli_module
+
+        calls: list[dict] = []
+
+        def fake_popen(cmd, **kwargs):
+            calls.append(kwargs)
+            # Close any file handle passed as stderr so tests stay tidy.
+            err = kwargs.get("stderr")
+            if hasattr(err, "close"):
+                err.close()
+            return MagicMock(pid=4321)
+
+        monkeypatch.setattr(cli_module.subprocess, "Popen", fake_popen)
+        return calls
+
+    def test_unix_branch_redirects_stderr_to_log_file(self, monkeypatch, captured_popen):
+        import music_cli.cli as cli_module
+
+        monkeypatch.setattr(cli_module, "is_windows", lambda: False)
+        expected = get_config().config_dir / "daemon.log"
+
+        _real_start_daemon_background()
+
+        kwargs = captured_popen[0]
+        assert kwargs["stdout"] == subprocess.DEVNULL
+        assert Path(kwargs["stderr"].name) == expected
+        assert kwargs["start_new_session"] is True
+
+    def test_windows_branch_redirects_stderr_to_log_file(self, monkeypatch, captured_popen):
+        import music_cli.cli as cli_module
+
+        monkeypatch.setattr(cli_module, "is_windows", lambda: True)
+        expected = get_config().config_dir / "daemon.log"
+
+        _real_start_daemon_background()
+
+        kwargs = captured_popen[0]
+        assert kwargs["stdout"] == subprocess.DEVNULL
+        assert Path(kwargs["stderr"].name) == expected
+        assert kwargs["creationflags"] == 0x00000200 | 0x00000008
 
 
 # -------------------------------------------------------------------------
