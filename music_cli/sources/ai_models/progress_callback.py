@@ -56,8 +56,8 @@ class DownloadProgressCallback:
         self,
         current: int,
         total: int,
-        *args: Any,
-        **kwargs: Any,
+        *_args: Any,
+        **_kwargs: Any,
     ) -> None:
         """Handle progress update.
 
@@ -66,8 +66,8 @@ class DownloadProgressCallback:
         Args:
             current: Current bytes downloaded.
             total: Total bytes to download.
-            *args: Additional positional arguments (ignored).
-            **kwargs: Additional keyword arguments (ignored).
+            *_args: Additional positional arguments (ignored).
+            **_kwargs: Additional keyword arguments (ignored).
         """
         if self.disable:
             return

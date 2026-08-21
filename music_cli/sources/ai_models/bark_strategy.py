@@ -74,8 +74,8 @@ class BarkStrategy(ModelStrategy):
     def generate_audio(
         self,
         prompt: str,
-        duration: int,
-        lyrics: str | None = None,
+        duration: int,  # noqa: ARG002 -- Interface conformance: ModelStrategy.generate_audio signature
+        lyrics: str | None = None,  # noqa: ARG002 -- Interface conformance: ModelStrategy.generate_audio signature
     ) -> tuple[np.ndarray, int]:
         """Generate audio from a text prompt using Bark.
 

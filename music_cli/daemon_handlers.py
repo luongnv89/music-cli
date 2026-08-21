@@ -77,12 +77,12 @@ class SystemHandlers:
     stop: Callable[[], Coroutine[Any, Any, None]]
 
     @handles("ping")
-    async def _cmd_ping(self, args: dict) -> dict:
+    async def _cmd_ping(self, _args: dict) -> dict:
         """Health check. Echoes the run identity for liveness checks (#68)."""
         return {"status": "ok", "message": "pong", "identity": self._identity}
 
     @handles("shutdown")
-    async def _cmd_shutdown(self, args: dict) -> dict:
+    async def _cmd_shutdown(self, _args: dict) -> dict:
         """Shutdown the daemon gracefully.
 
         Used on Windows where signal handlers aren't supported.
@@ -182,26 +182,26 @@ class PlaybackHandlers:
             return {"error": "Failed to start playback"}
 
     @handles("stop")
-    async def _cmd_stop(self, args: dict) -> dict:
+    async def _cmd_stop(self, _args: dict) -> dict:
         """Stop playback."""
         self._auto_play = False
         await self.player.stop()
         return {"status": "stopped"}
 
     @handles("pause")
-    async def _cmd_pause(self, args: dict) -> dict:
+    async def _cmd_pause(self, _args: dict) -> dict:
         """Pause playback."""
         await self.player.pause()
         return {"status": "paused"}
 
     @handles("resume")
-    async def _cmd_resume(self, args: dict) -> dict:
+    async def _cmd_resume(self, _args: dict) -> dict:
         """Resume playback."""
         await self.player.resume()
         return {"status": "playing"}
 
     @handles("status")
-    async def _cmd_status(self, args: dict) -> dict:
+    async def _cmd_status(self, _args: dict) -> dict:
         """Get current status."""
         status = self.player.get_status()
         status["auto_play"] = self._auto_play
@@ -210,7 +210,7 @@ class PlaybackHandlers:
         return status
 
     @handles("next")
-    async def _cmd_next(self, args: dict) -> dict:
+    async def _cmd_next(self, _args: dict) -> dict:
         """Skip to next track (for auto-play mode)."""
         if self._auto_play:
             await self._play_next()
@@ -228,7 +228,7 @@ class PlaybackHandlers:
         return {"volume": self.player.volume}
 
     @handles("list_radios")
-    async def _cmd_list_radios(self, args: dict) -> dict:
+    async def _cmd_list_radios(self, _args: dict) -> dict:
         """List available radio stations."""
         return {"stations": self.radio_source.list_stations()}
 
@@ -310,7 +310,7 @@ class PlaybackHandlers:
                 "error": "AI generation not available. Install with: pip install 'music-cli[ai]'"
             }
 
-    async def _resolve_context_track(self, args: dict) -> TrackInfo | None:
+    async def _resolve_context_track(self, _args: dict) -> TrackInfo | None:
         """Resolve a station for play mode ``context``.
 
         Context-aware mode: use radio with mood/time awareness.
@@ -389,7 +389,7 @@ class AIHandlers:
         }
 
     @handles("ai_list")
-    async def _cmd_ai_list(self, args: dict) -> dict:
+    async def _cmd_ai_list(self, _args: dict) -> dict:
         """List all AI-generated tracks."""
         tracks = self.ai_tracks.get_all()
         return {
@@ -537,7 +537,7 @@ class AIHandlers:
             return {"error": f"Model '{selected_model.id}' requires non-empty lyrics"}
         return None
 
-    def _invalid_ai_index_error(self, index: int) -> dict:
+    def _invalid_ai_index_error(self, _index: int) -> dict:
         """Map a missing library entry to the client-visible index errors."""
         count = self.ai_tracks.count()
         if count == 0:
@@ -639,7 +639,7 @@ class YouTubeHistoryHandlers:
     youtube_history: YouTubeHistory
 
     @handles("youtube_history_list")
-    async def _cmd_youtube_history_list(self, args: dict) -> dict:
+    async def _cmd_youtube_history_list(self, _args: dict) -> dict:
         entries = self.youtube_history.get_all()
 
         total_size_bytes = 0
@@ -739,7 +739,7 @@ class YouTubeHistoryHandlers:
         return {"error": f"Invalid index: {index}"}
 
     @handles("youtube_history_clear")
-    async def _cmd_youtube_history_clear(self, args: dict) -> dict:
+    async def _cmd_youtube_history_clear(self, _args: dict) -> dict:
         count = self.youtube_history.count()
         cache_dir = self.config.youtube_cache_dir
         if cache_dir.exists():

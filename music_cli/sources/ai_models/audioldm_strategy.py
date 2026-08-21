@@ -67,7 +67,7 @@ class AudioLDMStrategy(ModelStrategy):
         self,
         prompt: str,
         duration: int,
-        lyrics: str | None = None,
+        lyrics: str | None = None,  # noqa: ARG002 -- Interface conformance: ModelStrategy.generate_audio signature
     ) -> tuple[np.ndarray, int]:
         """Generate audio from a text prompt using AudioLDM.
 
