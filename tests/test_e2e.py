@@ -73,8 +73,8 @@ def mock_client() -> MagicMock:
 def _patch_daemon(mock_client: MagicMock):
     """Patch both ensure_daemon and check_ffplay_available for play tests."""
     return [
-        patch("music_cli.cli.ensure_daemon", return_value=mock_client),
-        patch("music_cli.cli.check_ffplay_available", return_value=True),
+        patch("music_cli.cli.runtime.ensure_daemon", return_value=mock_client),
+        patch("music_cli.cli.playback.check_ffplay_available", return_value=True),
     ]
 
 
@@ -296,7 +296,7 @@ class TestSimplePlaybackCommands:
     def test_command_invokes_without_usage_error(
         self, runner: CliRunner, mock_client: MagicMock, cmd: str
     ) -> None:
-        with patch("music_cli.cli.ensure_daemon", return_value=mock_client):
+        with patch("music_cli.cli.runtime.ensure_daemon", return_value=mock_client):
             result = runner.invoke(main, [cmd])
             assert result.exit_code != 2, f"Command '{cmd}' gave usage error:\n{result.output}"
 
@@ -315,13 +315,13 @@ class TestVolCommand:
         assert "LEVEL" in result.output or "volume" in result.output.lower()
 
     def test_vol_get(self, runner: CliRunner, mock_client: MagicMock) -> None:
-        with patch("music_cli.cli.ensure_daemon", return_value=mock_client):
+        with patch("music_cli.cli.runtime.ensure_daemon", return_value=mock_client):
             result = runner.invoke(main, ["vol"])
             assert result.exit_code != 2
 
     @pytest.mark.parametrize("level", ["0", "50", "100"])
     def test_vol_set_valid(self, runner: CliRunner, mock_client: MagicMock, level: str) -> None:
-        with patch("music_cli.cli.ensure_daemon", return_value=mock_client):
+        with patch("music_cli.cli.runtime.ensure_daemon", return_value=mock_client):
             result = runner.invoke(main, ["vol", level])
             assert result.exit_code != 2, f"vol {level} gave usage error:\n{result.output}"
 
@@ -329,7 +329,7 @@ class TestVolCommand:
     def test_vol_set_invalid_rejected(
         self, runner: CliRunner, mock_client: MagicMock, level: str
     ) -> None:
-        with patch("music_cli.cli.ensure_daemon", return_value=mock_client):
+        with patch("music_cli.cli.runtime.ensure_daemon", return_value=mock_client):
             result = runner.invoke(main, ["vol", level])
             # Should not succeed silently — exit code != 0
             assert result.exit_code != 0, (
@@ -337,7 +337,7 @@ class TestVolCommand:
             )
 
     def test_volume_alias(self, runner: CliRunner, mock_client: MagicMock) -> None:
-        with patch("music_cli.cli.ensure_daemon", return_value=mock_client):
+        with patch("music_cli.cli.runtime.ensure_daemon", return_value=mock_client):
             result = runner.invoke(main, ["volume"])
             assert result.exit_code != 2
 
@@ -351,7 +351,7 @@ class TestMoodCommand:
     """mood with no arg lists moods; with a valid mood plays; aliases work."""
 
     def test_mood_list(self, runner: CliRunner, mock_client: MagicMock) -> None:
-        with patch("music_cli.cli.ensure_daemon", return_value=mock_client):
+        with patch("music_cli.cli.runtime.ensure_daemon", return_value=mock_client):
             result = runner.invoke(main, ["mood"])
             assert result.exit_code != 2
 
@@ -360,12 +360,12 @@ class TestMoodCommand:
         ["happy", "sad", "excited", "focus", "relaxed", "energetic", "melancholic", "peaceful"],
     )
     def test_mood_play(self, runner: CliRunner, mock_client: MagicMock, mood: str) -> None:
-        with patch("music_cli.cli.ensure_daemon", return_value=mock_client):
+        with patch("music_cli.cli.runtime.ensure_daemon", return_value=mock_client):
             result = runner.invoke(main, ["mood", mood])
             assert result.exit_code != 2, f"mood {mood} gave usage error:\n{result.output}"
 
     def test_moods_alias(self, runner: CliRunner, mock_client: MagicMock) -> None:
-        with patch("music_cli.cli.ensure_daemon", return_value=mock_client):
+        with patch("music_cli.cli.runtime.ensure_daemon", return_value=mock_client):
             result = runner.invoke(main, ["moods"])
             assert result.exit_code != 2
 
@@ -379,27 +379,27 @@ class TestHistoryCommand:
     """history list, history play, -h alias, --limit flag."""
 
     def test_history_list(self, runner: CliRunner, mock_client: MagicMock) -> None:
-        with patch("music_cli.cli.ensure_daemon", return_value=mock_client):
+        with patch("music_cli.cli.runtime.ensure_daemon", return_value=mock_client):
             result = runner.invoke(main, ["history", "list"])
             assert result.exit_code != 2
 
     def test_history_list_with_limit(self, runner: CliRunner, mock_client: MagicMock) -> None:
-        with patch("music_cli.cli.ensure_daemon", return_value=mock_client):
+        with patch("music_cli.cli.runtime.ensure_daemon", return_value=mock_client):
             result = runner.invoke(main, ["history", "list", "--limit", "5"])
             assert result.exit_code != 2
 
     def test_history_list_short_limit(self, runner: CliRunner, mock_client: MagicMock) -> None:
-        with patch("music_cli.cli.ensure_daemon", return_value=mock_client):
+        with patch("music_cli.cli.runtime.ensure_daemon", return_value=mock_client):
             result = runner.invoke(main, ["history", "list", "-n", "5"])
             assert result.exit_code != 2
 
     def test_history_play(self, runner: CliRunner, mock_client: MagicMock) -> None:
-        with patch("music_cli.cli.ensure_daemon", return_value=mock_client):
+        with patch("music_cli.cli.runtime.ensure_daemon", return_value=mock_client):
             result = runner.invoke(main, ["history", "play", "1"])
             assert result.exit_code != 2
 
     def test_h_alias(self, runner: CliRunner, mock_client: MagicMock) -> None:
-        with patch("music_cli.cli.ensure_daemon", return_value=mock_client):
+        with patch("music_cli.cli.runtime.ensure_daemon", return_value=mock_client):
             result = runner.invoke(main, ["h", "list"])
             assert result.exit_code != 2
 
@@ -413,7 +413,7 @@ class TestRadioCommand:
     """radio list/play/add/remove/update and radios alias."""
 
     def test_radio_list(self, runner: CliRunner) -> None:
-        with patch("music_cli.cli.get_config") as mock_cfg_fn:
+        with patch("music_cli.cli.radio.get_config") as mock_cfg_fn:
             cfg = MagicMock()
             cfg.get_radios_categorized.return_value = [
                 {"index": 1, "name": "Lofi", "url": "https://stream.lofi.com", "category": "Chill"},
@@ -425,8 +425,8 @@ class TestRadioCommand:
 
     def test_radio_play_by_number(self, runner: CliRunner, mock_client: MagicMock) -> None:
         with (
-            patch("music_cli.cli.ensure_daemon", return_value=mock_client),
-            patch("music_cli.cli.get_config") as mock_cfg_fn,
+            patch("music_cli.cli.runtime.ensure_daemon", return_value=mock_client),
+            patch("music_cli.cli.radio.get_config") as mock_cfg_fn,
         ):
             cfg = MagicMock()
             cfg.get_radio_by_index.return_value = ("Lofi", "https://stream.lofi.com")
@@ -435,7 +435,7 @@ class TestRadioCommand:
             assert result.exit_code != 2
 
     def test_radio_remove(self, runner: CliRunner) -> None:
-        with patch("music_cli.cli.get_config") as mock_cfg_fn:
+        with patch("music_cli.cli.radio.get_config") as mock_cfg_fn:
             cfg = MagicMock()
             cfg.get_radios.return_value = [("Lofi", "https://stream.lofi.com")]
             cfg.remove_radio.return_value = ("Lofi", "https://stream.lofi.com")
@@ -444,7 +444,7 @@ class TestRadioCommand:
             assert result.exit_code != 2
 
     def test_radio_update(self, runner: CliRunner) -> None:
-        with patch("music_cli.cli.get_config") as mock_cfg_fn:
+        with patch("music_cli.cli.radio.get_config") as mock_cfg_fn:
             cfg = MagicMock()
             cfg.get_new_default_stations.return_value = []
             mock_cfg_fn.return_value = cfg
@@ -452,7 +452,7 @@ class TestRadioCommand:
             assert result.exit_code == 0
 
     def test_radios_alias(self, runner: CliRunner) -> None:
-        with patch("music_cli.cli.get_config") as mock_cfg_fn:
+        with patch("music_cli.cli.radio.get_config") as mock_cfg_fn:
             cfg = MagicMock()
             cfg.get_radios_categorized.return_value = []
             mock_cfg_fn.return_value = cfg
@@ -503,38 +503,38 @@ class TestYtCommand:
 
     def test_yt_list(self, runner: CliRunner) -> None:
         client = self._make_client()
-        with patch("music_cli.cli.ensure_daemon", return_value=client):
+        with patch("music_cli.cli.runtime.ensure_daemon", return_value=client):
             result = runner.invoke(main, ["yt", "list"])
             assert result.exit_code != 2
 
     def test_yt_play(self, runner: CliRunner) -> None:
         client = self._make_client()
-        with patch("music_cli.cli.ensure_daemon", return_value=client):
+        with patch("music_cli.cli.runtime.ensure_daemon", return_value=client):
             result = runner.invoke(main, ["yt", "play", "1"])
             assert result.exit_code != 2
 
     def test_yt_remove(self, runner: CliRunner) -> None:
         client = self._make_client()
-        with patch("music_cli.cli.ensure_daemon", return_value=client):
+        with patch("music_cli.cli.runtime.ensure_daemon", return_value=client):
             # Provide "n" to the confirmation prompt
             result = runner.invoke(main, ["yt", "remove", "1"], input="n\n")
             assert result.exit_code != 2
 
     def test_yt_clear(self, runner: CliRunner) -> None:
         client = self._make_client()
-        with patch("music_cli.cli.ensure_daemon", return_value=client):
+        with patch("music_cli.cli.runtime.ensure_daemon", return_value=client):
             result = runner.invoke(main, ["yt", "clear"], input="n\n")
             assert result.exit_code != 2
 
     def test_youtube_alias(self, runner: CliRunner) -> None:
         client = self._make_client()
-        with patch("music_cli.cli.ensure_daemon", return_value=client):
+        with patch("music_cli.cli.runtime.ensure_daemon", return_value=client):
             result = runner.invoke(main, ["youtube", "list"])
             assert result.exit_code != 2
 
     def test_yt_cached_alias(self, runner: CliRunner) -> None:
         client = self._make_client()
-        with patch("music_cli.cli.ensure_daemon", return_value=client):
+        with patch("music_cli.cli.runtime.ensure_daemon", return_value=client):
             result = runner.invoke(main, ["yt", "cached"])
             assert result.exit_code != 2
 
@@ -572,7 +572,7 @@ class TestAiCommand:
         return client
 
     def test_ai_list(self, runner: CliRunner) -> None:
-        with patch("music_cli.cli.ensure_daemon", return_value=self._make_client()):
+        with patch("music_cli.cli.runtime.ensure_daemon", return_value=self._make_client()):
             result = runner.invoke(main, ["ai", "list"])
             assert result.exit_code != 2
 
@@ -583,12 +583,12 @@ class TestAiCommand:
             assert flag in result.output, f"Missing {flag!r} in ai play --help"
 
     def test_ai_replay(self, runner: CliRunner) -> None:
-        with patch("music_cli.cli.ensure_daemon", return_value=self._make_client()):
+        with patch("music_cli.cli.runtime.ensure_daemon", return_value=self._make_client()):
             result = runner.invoke(main, ["ai", "replay", "1"])
             assert result.exit_code != 2
 
     def test_ai_remove(self, runner: CliRunner) -> None:
-        with patch("music_cli.cli.ensure_daemon", return_value=self._make_client()):
+        with patch("music_cli.cli.runtime.ensure_daemon", return_value=self._make_client()):
             result = runner.invoke(main, ["ai", "remove", "1"], input="n\n")
             assert result.exit_code != 2
 
@@ -624,9 +624,9 @@ class TestDaemonCommand:
     def test_daemon_action_invoked(self, runner: CliRunner, action: str) -> None:
         """daemon <action> should not raise a usage error even if daemon is absent."""
         with (
-            patch("music_cli.cli.get_daemon_pid", return_value=None),
-            patch("music_cli.cli.is_daemon_running", return_value=False),
-            patch("music_cli.cli.start_daemon_background", return_value=None),
+            patch("music_cli.cli.daemon_cmds.get_daemon_pid", return_value=None),
+            patch("music_cli.cli.daemon_cmds.is_daemon_running", return_value=False),
+            patch("music_cli.cli.runtime.start_daemon_background", return_value=None),
         ):
             result = runner.invoke(main, ["daemon", action])
             assert result.exit_code != 2, f"daemon {action} gave usage error:\n{result.output}"
@@ -665,7 +665,7 @@ class TestUpdateRadios:
         assert result.exit_code == 0
 
     def test_update_radios_invoked(self, runner: CliRunner) -> None:
-        with patch("music_cli.cli.get_config") as mock_cfg_fn:
+        with patch("music_cli.cli.radio.get_config") as mock_cfg_fn:
             cfg = MagicMock()
             mock_cfg_fn.return_value = cfg
             result = runner.invoke(main, ["update-radios"])

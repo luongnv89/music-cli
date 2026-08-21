@@ -18,7 +18,7 @@ from music_cli.cli import (
 from music_cli.config import get_config
 
 # The real spawner, captured at collection time: the autouse ``isolate_home``
-# fixture swaps ``music_cli.cli.start_daemon_background`` for a no-op during
+# fixture swaps ``music_cli.cli.runtime.start_daemon_background`` for a no-op during
 # every test, so these daemon-startup tests must re-bind this original.
 _real_start_daemon_background = start_daemon_background
 
@@ -270,7 +270,7 @@ class TestDaemonStartupFailureLog:
         writes the traceback into the stderr handle the CLI passed for the
         child — exactly what the OS-level redirection must deliver to disk.
         """
-        import music_cli.cli as cli_module
+        import music_cli.cli.runtime as cli_module
 
         log_path = get_config().config_dir / "daemon.log"
         monkeypatch.setattr(cli_module, "is_daemon_running", lambda *a, **k: False)
@@ -313,7 +313,7 @@ class TestDaemonSpawnWiring:
     @pytest.fixture
     def captured_popen(self, monkeypatch):
         """Capture Popen kwargs without forking; returns (calls list)."""
-        import music_cli.cli as cli_module
+        import music_cli.cli.runtime as cli_module
 
         calls: list[dict] = []
 
@@ -329,7 +329,7 @@ class TestDaemonSpawnWiring:
         return calls
 
     def test_unix_branch_redirects_stderr_to_log_file(self, monkeypatch, captured_popen):
-        import music_cli.cli as cli_module
+        import music_cli.cli.runtime as cli_module
 
         monkeypatch.setattr(cli_module, "is_windows", lambda: False)
         expected = get_config().config_dir / "daemon.log"
@@ -342,7 +342,7 @@ class TestDaemonSpawnWiring:
         assert kwargs["start_new_session"] is True
 
     def test_windows_branch_redirects_stderr_to_log_file(self, monkeypatch, captured_popen):
-        import music_cli.cli as cli_module
+        import music_cli.cli.runtime as cli_module
 
         monkeypatch.setattr(cli_module, "is_windows", lambda: True)
         expected = get_config().config_dir / "daemon.log"
@@ -462,7 +462,7 @@ class TestSmartPlayDetection:
         assert mode == "radio"
         assert src == url
 
-    @patch("music_cli.cli.get_config")
+    @patch("music_cli.cli.playback.get_config")
     def test_station_name_returns_radio(self, mock_config):
         mock_cfg = MagicMock()
         mock_cfg.get_station_by_name.return_value = ("Chill", "https://stream.chill.com/radio")
@@ -471,7 +471,7 @@ class TestSmartPlayDetection:
         assert mode == "radio"
         assert src == "https://stream.chill.com/radio"
 
-    @patch("music_cli.cli.get_config")
+    @patch("music_cli.cli.playback.get_config")
     def test_unknown_string_falls_back_to_radio(self, mock_config):
         mock_cfg = MagicMock()
         mock_cfg.get_station_by_name.return_value = None
@@ -485,8 +485,8 @@ class TestSmartPlayDetection:
         assert result.exit_code == 0
         assert "SOURCE" in result.output
 
-    @patch("music_cli.cli.ensure_daemon")
-    @patch("music_cli.cli.check_ffplay_available", return_value=True)
+    @patch("music_cli.cli.runtime.ensure_daemon")
+    @patch("music_cli.cli.playback.check_ffplay_available", return_value=True)
     def test_play_with_youtube_url(self, mock_ffplay, mock_daemon, runner, mock_daemon_client):
         mock_daemon.return_value = mock_daemon_client
         result = runner.invoke(main, ["play", "https://youtube.com/watch?v=test"])
@@ -495,8 +495,8 @@ class TestSmartPlayDetection:
         call_kwargs = mock_daemon_client.play.call_args
         assert call_kwargs[1]["mode"] == "youtube" or call_kwargs.kwargs["mode"] == "youtube"
 
-    @patch("music_cli.cli.ensure_daemon")
-    @patch("music_cli.cli.check_ffplay_available", return_value=True)
+    @patch("music_cli.cli.runtime.ensure_daemon")
+    @patch("music_cli.cli.playback.check_ffplay_available", return_value=True)
     def test_play_bare_uses_context(self, mock_ffplay, mock_daemon, runner, mock_daemon_client):
         mock_daemon.return_value = mock_daemon_client
         result = runner.invoke(main, ["play"])
@@ -541,8 +541,8 @@ class TestPlayRelativeLocalPath:
     and would silently fail to be found (issue #18).
     """
 
-    @patch("music_cli.cli.ensure_daemon")
-    @patch("music_cli.cli.check_ffplay_available", return_value=True)
+    @patch("music_cli.cli.runtime.ensure_daemon")
+    @patch("music_cli.cli.playback.check_ffplay_available", return_value=True)
     def test_play_relative_file_sends_absolute_source(
         self, mock_ffplay, mock_daemon, runner, mock_daemon_client, tmp_path, monkeypatch
     ):
@@ -557,8 +557,8 @@ class TestPlayRelativeLocalPath:
         assert call_kwargs["mode"] == "local"
         assert call_kwargs["source"] == str((tmp_path / "song.mp3").resolve())
 
-    @patch("music_cli.cli.ensure_daemon")
-    @patch("music_cli.cli.check_ffplay_available", return_value=True)
+    @patch("music_cli.cli.runtime.ensure_daemon")
+    @patch("music_cli.cli.playback.check_ffplay_available", return_value=True)
     def test_play_explicit_mode_local_relative_file_sends_absolute_source(
         self, mock_ffplay, mock_daemon, runner, mock_daemon_client, tmp_path, monkeypatch
     ):
@@ -572,8 +572,8 @@ class TestPlayRelativeLocalPath:
         call_kwargs = mock_daemon_client.play.call_args.kwargs
         assert call_kwargs["source"] == str((tmp_path / "song.mp3").resolve())
 
-    @patch("music_cli.cli.ensure_daemon")
-    @patch("music_cli.cli.check_ffplay_available", return_value=True)
+    @patch("music_cli.cli.runtime.ensure_daemon")
+    @patch("music_cli.cli.playback.check_ffplay_available", return_value=True)
     def test_play_explicit_mode_local_missing_file_kept_relative(
         self, mock_ffplay, mock_daemon, runner, mock_daemon_client, tmp_path, monkeypatch
     ):
@@ -597,8 +597,8 @@ class TestPlayRelativeLocalPath:
 class TestDeprecatePlayAI:
     """play -m ai shows deprecation warning but still works."""
 
-    @patch("music_cli.cli.ensure_daemon")
-    @patch("music_cli.cli.check_ffplay_available", return_value=True)
+    @patch("music_cli.cli.runtime.ensure_daemon")
+    @patch("music_cli.cli.playback.check_ffplay_available", return_value=True)
     def test_play_m_ai_shows_warning(self, mock_ffplay, mock_daemon, runner, mock_daemon_client):
         mock_daemon_client.play.return_value = {"track": {"title": "AI Track", "source_type": "ai"}}
         mock_daemon.return_value = mock_daemon_client
@@ -617,8 +617,8 @@ class TestDeprecatePlayAI:
 class TestDeprecatePlayHistory:
     """play -m history shows deprecation warning but still works."""
 
-    @patch("music_cli.cli.ensure_daemon")
-    @patch("music_cli.cli.check_ffplay_available", return_value=True)
+    @patch("music_cli.cli.runtime.ensure_daemon")
+    @patch("music_cli.cli.playback.check_ffplay_available", return_value=True)
     def test_play_m_history_shows_warning(
         self, mock_ffplay, mock_daemon, runner, mock_daemon_client
     ):
@@ -643,35 +643,35 @@ class TestHistoryGroup:
         assert "list" in result.output
         assert "play" in result.output
 
-    @patch("music_cli.cli.ensure_daemon")
+    @patch("music_cli.cli.runtime.ensure_daemon")
     def test_bare_history_lists(self, mock_daemon, runner, mock_daemon_client):
         mock_daemon.return_value = mock_daemon_client
         result = runner.invoke(main, ["history"])
         assert result.exit_code == 0
         mock_daemon_client.list_history.assert_called_once()
 
-    @patch("music_cli.cli.ensure_daemon")
+    @patch("music_cli.cli.runtime.ensure_daemon")
     def test_history_list_with_limit(self, mock_daemon, runner, mock_daemon_client):
         mock_daemon.return_value = mock_daemon_client
         result = runner.invoke(main, ["history", "list", "-n", "5"])
         assert result.exit_code == 0
         mock_daemon_client.list_history.assert_called_once_with(limit=5)
 
-    @patch("music_cli.cli.ensure_daemon")
+    @patch("music_cli.cli.runtime.ensure_daemon")
     def test_history_play_number(self, mock_daemon, runner, mock_daemon_client):
         mock_daemon.return_value = mock_daemon_client
         result = runner.invoke(main, ["history", "play", "3"])
         assert result.exit_code == 0
         mock_daemon_client.play.assert_called_once_with(mode="history", index=3)
 
-    @patch("music_cli.cli.ensure_daemon")
+    @patch("music_cli.cli.runtime.ensure_daemon")
     def test_h_alias_play(self, mock_daemon, runner, mock_daemon_client):
         mock_daemon.return_value = mock_daemon_client
         result = runner.invoke(main, ["h", "play", "1"])
         assert result.exit_code == 0
         mock_daemon_client.play.assert_called_once_with(mode="history", index=1)
 
-    @patch("music_cli.cli.ensure_daemon")
+    @patch("music_cli.cli.runtime.ensure_daemon")
     def test_h_bare_lists_history(self, mock_daemon, runner, mock_daemon_client):
         mock_daemon.return_value = mock_daemon_client
         result = runner.invoke(main, ["h"])
@@ -753,8 +753,8 @@ class TestAIModelGroup:
 class TestAIDurationDefault:
     """Both ai play and play should default --duration to 15."""
 
-    @patch("music_cli.cli.ensure_daemon")
-    @patch("music_cli.cli.check_ffplay_available", return_value=True)
+    @patch("music_cli.cli.runtime.ensure_daemon")
+    @patch("music_cli.cli.playback.check_ffplay_available", return_value=True)
     def test_play_duration_default_is_15(
         self, mock_ffplay, mock_daemon, runner, mock_daemon_client
     ):
@@ -765,7 +765,7 @@ class TestAIDurationDefault:
         call_kwargs = mock_daemon_client.play.call_args[1]
         assert call_kwargs["duration"] == 15
 
-    @patch("music_cli.cli.ensure_daemon")
+    @patch("music_cli.cli.runtime.ensure_daemon")
     def test_ai_play_duration_default_is_15(self, mock_daemon, runner, mock_daemon_client):
         """ai play command sends duration=15 when not explicitly set."""
         mock_daemon_client.ai_play.return_value = {
@@ -778,7 +778,7 @@ class TestAIDurationDefault:
         call_kwargs = mock_daemon_client.ai_play.call_args[1]
         assert call_kwargs["duration"] == 15
 
-    @patch("music_cli.cli.ensure_daemon")
+    @patch("music_cli.cli.runtime.ensure_daemon")
     def test_ai_play_forwards_lyrics(self, mock_daemon, runner, mock_daemon_client):
         mock_daemon_client.ai_play.return_value = {
             "track": {"title": "AI Track", "metadata": {"model": "minimax-music3"}},
@@ -815,7 +815,7 @@ class TestMoodDirectPlay:
         assert result.exit_code == 0
         assert "MOOD_NAME" in result.output
 
-    @patch("music_cli.cli.ensure_daemon")
+    @patch("music_cli.cli.runtime.ensure_daemon")
     def test_mood_focus_plays(self, mock_daemon, runner, mock_daemon_client):
         mock_daemon.return_value = mock_daemon_client
         result = runner.invoke(main, ["mood", "focus"])
@@ -846,7 +846,7 @@ class TestVolumeValidation:
         result = runner.invoke(main, ["vol", "150"])
         assert result.exit_code != 0
 
-    @patch("music_cli.cli.ensure_daemon")
+    @patch("music_cli.cli.runtime.ensure_daemon")
     def test_vol_50_accepted(self, mock_daemon, runner, mock_daemon_client):
         mock_daemon.return_value = mock_daemon_client
         mock_daemon_client.set_volume.return_value = {"volume": 50}
@@ -854,14 +854,14 @@ class TestVolumeValidation:
         assert result.exit_code == 0
         assert "50" in result.output
 
-    @patch("music_cli.cli.ensure_daemon")
+    @patch("music_cli.cli.runtime.ensure_daemon")
     def test_vol_0_accepted(self, mock_daemon, runner, mock_daemon_client):
         mock_daemon.return_value = mock_daemon_client
         mock_daemon_client.set_volume.return_value = {"volume": 0}
         result = runner.invoke(main, ["vol", "0"])
         assert result.exit_code == 0
 
-    @patch("music_cli.cli.ensure_daemon")
+    @patch("music_cli.cli.runtime.ensure_daemon")
     def test_vol_100_accepted(self, mock_daemon, runner, mock_daemon_client):
         mock_daemon.return_value = mock_daemon_client
         mock_daemon_client.set_volume.return_value = {"volume": 100}
@@ -922,8 +922,8 @@ class TestPhase2Integration:
         assert "list" in result.output
         assert "play" in result.output
 
-    @patch("music_cli.cli.ensure_daemon")
-    @patch("music_cli.cli.check_ffplay_available", return_value=True)
+    @patch("music_cli.cli.runtime.ensure_daemon")
+    @patch("music_cli.cli.playback.check_ffplay_available", return_value=True)
     def test_play_explicit_mode_overrides_detection(
         self, mock_ffplay, mock_daemon, runner, mock_daemon_client
     ):
@@ -1020,7 +1020,7 @@ class TestHelpShortcut:
 class TestNoColorFlag:
     """--no-color flag and NO_COLOR env var suppress emoji."""
 
-    @patch("music_cli.cli.ensure_daemon")
+    @patch("music_cli.cli.runtime.ensure_daemon")
     def test_no_color_flag_status_no_emoji(self, mock_daemon, runner, mock_daemon_client):
         mock_daemon.return_value = mock_daemon_client
         result = runner.invoke(main, ["--no-color", "status"])
@@ -1034,7 +1034,7 @@ class TestNoColorFlag:
         # Should contain text fallback
         assert "[playing]" in result.output
 
-    @patch("music_cli.cli.ensure_daemon")
+    @patch("music_cli.cli.runtime.ensure_daemon")
     def test_no_color_env_status_no_emoji(self, mock_daemon, runner, mock_daemon_client):
         mock_daemon.return_value = mock_daemon_client
         result = runner.invoke(main, ["status"], env={"NO_COLOR": "1"})
@@ -1042,7 +1042,7 @@ class TestNoColorFlag:
         assert "\u25b6" not in result.output
         assert "[playing]" in result.output
 
-    @patch("music_cli.cli.ensure_daemon")
+    @patch("music_cli.cli.runtime.ensure_daemon")
     def test_no_color_env_empty_string_means_color(self, mock_daemon, runner, mock_daemon_client):
         """NO_COLOR='' (empty) should NOT disable color."""
         mock_daemon.return_value = mock_daemon_client
@@ -1051,7 +1051,7 @@ class TestNoColorFlag:
         # With color enabled, should have unicode symbol
         assert "\u25b6" in result.output
 
-    @patch("music_cli.cli.ensure_daemon")
+    @patch("music_cli.cli.runtime.ensure_daemon")
     def test_color_by_default_status_has_emoji(self, mock_daemon, runner, mock_daemon_client):
         mock_daemon.return_value = mock_daemon_client
         # Ensure NO_COLOR is not set
@@ -1061,7 +1061,7 @@ class TestNoColorFlag:
         assert result.exit_code == 0
         assert "\u25b6" in result.output
 
-    @patch("music_cli.cli.ensure_daemon")
+    @patch("music_cli.cli.runtime.ensure_daemon")
     def test_no_color_stop_text_fallback(self, mock_daemon, runner, mock_daemon_client):
         mock_daemon_client.stop.return_value = {"status": "stopped"}
         mock_daemon.return_value = mock_daemon_client
@@ -1070,7 +1070,7 @@ class TestNoColorFlag:
         assert "\u23f9" not in result.output
         assert "[stopped]" in result.output
 
-    @patch("music_cli.cli.ensure_daemon")
+    @patch("music_cli.cli.runtime.ensure_daemon")
     def test_no_color_pause_text_fallback(self, mock_daemon, runner, mock_daemon_client):
         mock_daemon_client.pause.return_value = {"status": "paused"}
         mock_daemon.return_value = mock_daemon_client
@@ -1079,7 +1079,7 @@ class TestNoColorFlag:
         assert "\u23f8" not in result.output
         assert "[paused]" in result.output
 
-    @patch("music_cli.cli.ensure_daemon")
+    @patch("music_cli.cli.runtime.ensure_daemon")
     def test_no_color_resume_text_fallback(self, mock_daemon, runner, mock_daemon_client):
         mock_daemon_client.resume.return_value = {"status": "resumed"}
         mock_daemon.return_value = mock_daemon_client
@@ -1088,7 +1088,7 @@ class TestNoColorFlag:
         assert "\u25b6" not in result.output
         assert "[resumed]" in result.output
 
-    @patch("music_cli.cli.ensure_daemon")
+    @patch("music_cli.cli.runtime.ensure_daemon")
     def test_no_color_next_text_fallback(self, mock_daemon, runner, mock_daemon_client):
         mock_daemon_client.next_track.return_value = {"status": "next"}
         mock_daemon.return_value = mock_daemon_client
@@ -1097,8 +1097,8 @@ class TestNoColorFlag:
         assert "\u23ed" not in result.output
         assert "[skip]" in result.output
 
-    @patch("music_cli.cli.ensure_daemon")
-    @patch("music_cli.cli.check_ffplay_available", return_value=True)
+    @patch("music_cli.cli.runtime.ensure_daemon")
+    @patch("music_cli.cli.playback.check_ffplay_available", return_value=True)
     def test_no_color_play_text_fallback(
         self, mock_ffplay, mock_daemon, runner, mock_daemon_client
     ):
