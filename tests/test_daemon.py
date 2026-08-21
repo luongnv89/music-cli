@@ -170,6 +170,9 @@ class _DaemonTestHarness:
 
         daemon = MusicDaemon.__new__(MusicDaemon)
         daemon._auth_token = token
+        # Attributes __init__ normally provides and _process_command touches.
+        daemon._command_lock = asyncio.Lock()
+        daemon._background_tasks = set()
         return daemon
 
 
@@ -281,6 +284,218 @@ class TestUnixSocketPermissions:
         finally:
             await server.stop()
             shutil.rmtree(short_dir, ignore_errors=True)
+
+
+class _StubPlayer:
+    """Minimal player double mimicking FFplayPlayer's play/stop lifecycle.
+
+    ``play`` yields before assigning ``_process`` so that, without the
+    command lock, two concurrent plays reliably interleave and both
+    subprocesses survive.
+    """
+
+    def __init__(self) -> None:
+        self._process = None
+        self.processes: list[Any] = []
+        self.events: list[str] = []
+        self.stopped_count = 0
+
+    async def stop(self) -> None:
+        self.events.append("stop")
+        self.stopped_count += 1
+        if self._process is not None:
+            self._process["killed"] = True
+            self._process = None
+
+    async def play(self, track: Any) -> bool:
+        # Mirror FFplayPlayer.play: every play stops current playback first.
+        await self.stop()
+        self.events.append(f"play:{track.source}")
+        await asyncio.sleep(0.01)
+        proc = {"id": track.source, "killed": False}
+        self.processes.append(proc)
+        self._process = proc
+        self.events.append("play-done")
+        return True
+
+    def set_on_track_end(self, callback: Any) -> None:
+        pass
+
+    def get_status(self) -> dict:
+        return {"state": "stopped"}
+
+
+def _make_play_daemon(tmp_path: Path, player: _StubPlayer) -> Any:
+    """Harness daemon wired for play commands through a stub player."""
+    from music_cli.player.base import TrackInfo
+
+    daemon = _DaemonTestHarness.make_daemon(tmp_path)
+    daemon.player = player
+    daemon._auto_play = False
+    daemon._current_mood = None
+    daemon.local_source = MagicMock()
+    daemon.local_source.get_track.side_effect = lambda source: TrackInfo(
+        source=source, source_type="local", title=source
+    )
+    daemon.radio_source = MagicMock()
+    daemon.youtube_source = MagicMock()
+    daemon.history = MagicMock()
+    daemon.youtube_history = MagicMock()
+    daemon.temporal = MagicMock()
+    return daemon
+
+
+class TestCommandSerialization:
+    """State-mutating command handlers run under one lock (#67)."""
+
+    @pytest_asyncio.fixture
+    async def play_server(self, tmp_path: Path):
+        player = _StubPlayer()
+        daemon = _make_play_daemon(tmp_path, player)
+        server = await asyncio.start_server(daemon._handle_client, "127.0.0.1", 0)
+        port = server.sockets[0].getsockname()[1]
+        yield daemon, player, port
+        server.close()
+        await server.wait_closed()
+
+    async def test_concurrent_plays_leave_single_process(self, play_server) -> None:
+        daemon, player, port = play_server
+
+        def payload(n: int) -> dict:
+            return {
+                "command": "play",
+                "args": {"mode": "local", "source": f"track-{n}.wav"},
+                "token": daemon._auth_token,
+            }
+
+        first, second = await asyncio.gather(
+            _roundtrip(port, payload(1)),
+            _roundtrip(port, payload(2)),
+        )
+
+        assert first.get("status") == "playing"
+        assert second.get("status") == "playing"
+
+        survivors = [p for p in player.processes if not p["killed"]]
+        assert len(survivors) == 1, (
+            f"expected exactly one live ffplay process, got {len(survivors)}"
+        )
+        assert daemon.player._process is survivors[0]
+
+    async def test_ping_waits_for_in_flight_play(self, play_server) -> None:
+        daemon, player, port = play_server
+
+        async def recording_ping(args):
+            player.events.append("pong")
+            return {"status": "ok", "message": "pong"}
+
+        daemon._cmd_ping = recording_ping
+
+        play_task = asyncio.create_task(
+            _roundtrip(
+                port,
+                {
+                    "command": "play",
+                    "args": {"mode": "local", "source": "slow.wav"},
+                    "token": daemon._auth_token,
+                },
+            )
+        )
+        # Wait until the play handler is mid-flight inside player.play().
+        for _ in range(200):
+            if any(e.startswith("play:") for e in player.events):
+                break
+            await asyncio.sleep(0.005)
+        assert any(e.startswith("play:") for e in player.events)
+
+        pong = await _roundtrip(port, {"command": "ping", "args": {}, "token": daemon._auth_token})
+        await asyncio.wait_for(play_task, timeout=5)
+
+        assert pong == {"status": "ok", "message": "pong"}
+        # The lock spans the whole command: pong can only be produced after
+        # the in-flight play finished mutating state.
+        assert player.events.index("play-done") < player.events.index("pong")
+
+
+class TestBackgroundTaskReferences:
+    """Fire-and-forget tasks keep strong references until done (#69)."""
+
+    async def test_spawn_task_tracked_until_completion(self, tmp_path) -> None:
+        daemon = _DaemonTestHarness.make_daemon(tmp_path)
+        finished = asyncio.Event()
+
+        async def work():
+            await asyncio.sleep(0)
+            finished.set()
+
+        task = daemon._spawn_task(work())
+        assert task in daemon._background_tasks
+        await asyncio.wait_for(task, timeout=5)
+        assert finished.is_set()
+        assert task not in daemon._background_tasks
+
+    async def test_auto_play_chain_spawns_tracked_locked_task(self, tmp_path) -> None:
+        from music_cli.player.base import TrackInfo
+
+        player = _StubPlayer()
+        daemon = _make_play_daemon(tmp_path, player)
+        daemon._auto_play = True
+        daemon.local_source.get_random_track.return_value = TrackInfo(
+            source="next.wav", source_type="local", title="next"
+        )
+
+        daemon._on_track_end()
+
+        tasks = list(daemon._background_tasks)
+        assert len(tasks) == 1, "auto-play chain must keep a strong reference"
+        await asyncio.wait_for(asyncio.gather(*tasks), timeout=5)
+
+        # The detached advance ran under the command lock and took over
+        # playback: previous process killed, exactly one survivor.
+        survivors = [p for p in player.processes if not p["killed"]]
+        assert len(survivors) == 1
+        assert daemon.player._process is survivors[0]
+        daemon.history.log.assert_called_once()
+
+    async def test_authenticated_shutdown_stops_serve_loop(self, tmp_path, monkeypatch):
+        from music_cli.platform.ipc import TCPIPCServer
+
+        monkeypatch.setattr("music_cli.daemon.supports_unix_signals", lambda: False)
+
+        daemon = _DaemonTestHarness.make_daemon(tmp_path)
+        daemon.player = _StubPlayer()
+        ipc = TCPIPCServer(port=0)
+        daemon._ipc_server = ipc
+
+        pid_file = tmp_path / "daemon.pid"
+        config = MagicMock()
+        config.socket_path = tmp_path / "daemon.sock"
+        config.pid_file = pid_file
+        daemon.config = config
+
+        start_task = asyncio.create_task(daemon.start())
+        for _ in range(100):
+            if ipc.server is not None:
+                break
+            await asyncio.sleep(0.01)
+        port = ipc.server.sockets[0].getsockname()[1]
+
+        response = await _roundtrip(
+            port,
+            # start() rotates the per-run token; use the fresh one.
+            {"command": "shutdown", "args": {}, "token": daemon._auth_token},
+        )
+        assert response == {"status": "shutting_down"}
+
+        # The daemon must actually terminate, not merely acknowledge.
+        # Server.close() cancels the serve_forever future, so start()
+        # surfaces that cancellation — either way the loop has exited.
+        try:
+            await asyncio.wait_for(start_task, timeout=5)
+        except asyncio.CancelledError:
+            pass
+        assert start_task.done() and not daemon._running
+        assert not pid_file.exists()
 
 
 class TestGenericErrorResponses:
