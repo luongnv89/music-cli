@@ -1,7 +1,10 @@
 """Tests for history module."""
 
+import json
+import time
 from pathlib import Path
 
+from music_cli.config import Config
 from music_cli.history import History, HistoryEntry
 
 
@@ -138,6 +141,119 @@ class TestHistory:
 
         assert history.get_by_index(0) is None
         assert history.get_by_index(99) is None
+
+    def test_log_enforces_cap(self, tmp_path: Path) -> None:
+        """Logging past max_entries rotates the oldest entries out."""
+        history_file = tmp_path / "history.jsonl"
+        history = History(history_file=history_file, max_entries=3)
+
+        for i in range(5):
+            history.log(HistoryEntry(source=f"song{i}.mp3", source_type="local", title=f"Song {i}"))
+
+        entries = history.get_all()
+
+        assert len(entries) == 3
+        # Newest kept, oldest rotated out.
+        assert entries[0].title == "Song 4"
+        assert entries[-1].title == "Song 2"
+
+    def test_log_under_cap_keeps_everything(self, tmp_path: Path) -> None:
+        """Logging below the cap never rewrites the file."""
+        history_file = tmp_path / "history.jsonl"
+        history = History(history_file=history_file, max_entries=10)
+
+        for i in range(4):
+            history.log(HistoryEntry(source=f"song{i}.mp3", source_type="local", title=f"Song {i}"))
+
+        assert len(history.get_all()) == 4
+
+    def test_trim_drops_malformed_lines(self, tmp_path: Path) -> None:
+        """Rotation keeps only valid JSON lines, like get_all."""
+        history_file = tmp_path / "history.jsonl"
+        history = History(history_file=history_file, max_entries=2)
+
+        history.log(HistoryEntry(source="a.mp3", source_type="local", title="A"))
+        with history_file.open("a") as f:
+            f.write("{corrupt\n")
+        history.log(HistoryEntry(source="b.mp3", source_type="local", title="B"))
+        history.log(HistoryEntry(source="c.mp3", source_type="local", title="C"))
+
+        entries = history.get_all()
+
+        assert len(entries) == 2
+        assert [e.title for e in entries] == ["C", "B"]
+        assert not history_file.with_name("history.jsonl.tmp").exists()
+
+    def test_get_by_index_across_chunk_boundary(self, tmp_path: Path) -> None:
+        """Backward reads stay correct when lines span chunk boundaries."""
+        history_file = tmp_path / "history.jsonl"
+        history = History(history_file=history_file)
+
+        # Long titles push the newest entries across the 8 KiB read chunk.
+        big_title = "X" * 400
+        total = 60
+        for i in range(total):
+            history.log(
+                HistoryEntry(
+                    source=f"song{i}.mp3",
+                    source_type="local",
+                    title=f"{i} {big_title}",
+                )
+            )
+
+        entry = history.get_by_index(1)
+        assert entry is not None
+        assert entry.title.startswith("59 ")
+        entry = history.get_by_index(37)
+        assert entry is not None
+        assert entry.title.startswith(f"{total - 37} ")
+
+    def test_get_by_index_skips_malformed_tail(self, tmp_path: Path) -> None:
+        """Malformed trailing lines are skipped, matching get_all."""
+        history_file = tmp_path / "history.jsonl"
+        history = History(history_file=history_file)
+
+        history.log(HistoryEntry(source="song1.mp3", source_type="local", title="Song 1"))
+        history.log(HistoryEntry(source="song2.mp3", source_type="local", title="Song 2"))
+        with history_file.open("a") as f:
+            f.write("{truncated\n")
+
+        entry = history.get_by_index(1)
+        assert entry is not None
+        assert entry.title == "Song 2"
+
+    def test_default_config_caps_history(self) -> None:
+        """The default config ships a cap matching youtube_history's bound."""
+        assert Config.DEFAULT_CONFIG["history"]["max_entries"] == 1000
+
+    def test_get_by_index_benchmark_50k_entries(self, tmp_path: Path) -> None:
+        """Benchmark: get_by_index(1) stays under 5 ms on 50k entries (F-PERF-002)."""
+        history_file = tmp_path / "history.jsonl"
+        total = 50_000
+        lines = [
+            json.dumps(
+                {
+                    "timestamp": f"2024-01-01T00:00:{i % 60:02d}",
+                    "source": f"/music/song{i}.mp3",
+                    "source_type": "local",
+                    "title": f"Song {i}",
+                    "artist": None,
+                    "mood": None,
+                    "context": None,
+                }
+            )
+            for i in range(total)
+        ]
+        history_file.write_text("\n".join(lines) + "\n")
+        history = History(history_file=history_file)
+
+        start = time.perf_counter()
+        entry = history.get_by_index(1)
+        elapsed = time.perf_counter() - start
+
+        assert entry is not None
+        assert entry.title == f"Song {total - 1}"
+        assert elapsed <= 0.005, f"get_by_index(1) took {elapsed * 1000:.2f} ms (> 5 ms)"
 
     def test_search(self, tmp_path: Path) -> None:
         """Test searching history."""
