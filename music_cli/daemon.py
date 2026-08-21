@@ -30,6 +30,9 @@ logger = logging.getLogger(__name__)
 REQUEST_CHUNK_SIZE = 4096
 MAX_REQUEST_SIZE = 1024 * 1024
 REQUEST_READ_TIMEOUT = 5.0
+# Liveness-probe budget (#68): long enough for a busy loop to answer a ping,
+# short enough that a hung impostor does not stall every CLI command.
+IDENTITY_PROBE_TIMEOUT = 2.0
 
 
 class RequestError(ValueError):
@@ -141,6 +144,10 @@ class MusicDaemon:
         # keeps only a weak reference, so unreferenced tasks can be collected
         # mid-execution.
         self._background_tasks: set[asyncio.Task] = set()
+        # Per-run identity (#68): recorded in the PID file and echoed by
+        # ``ping`` so liveness checks can tell this daemon apart from an
+        # unrelated process that merely recycled its PID.
+        self._identity = secrets.token_hex(16)
 
     def _spawn_task(self, coro: Coroutine[Any, Any, Any]) -> asyncio.Task:
         """Schedule a background task and hold a reference until it finishes."""
@@ -182,8 +189,11 @@ class MusicDaemon:
         # Start IPC server (platform-specific)
         await self._ipc_server.start(self._handle_client, socket_path)
 
-        # Write PID file
-        self.config.pid_file.write_text(str(os.getpid()))
+        # Write PID file with the run's identity so liveness checks can
+        # verify the process behind the PID is this daemon (#68).
+        self.config.pid_file.write_text(
+            json.dumps({"pid": os.getpid(), "identity": self._identity})
+        )
 
         address_display = self._ipc_server.get_address_display(socket_path)
         logger.info(f"Daemon started, listening on {address_display}")
@@ -334,6 +344,11 @@ class MusicDaemon:
 
         handler = handlers.get(command)
         if handler:
+            # Health checks answer outside the command lock (#68): a ping
+            # must not queue behind a long state-mutating handler, or every
+            # liveness probe would block for the duration of a play.
+            if command == "ping":
+                return await handler(args)
             try:
                 # Hold the command lock for the whole handler so concurrent
                 # connections cannot interleave state mutations (#67).
@@ -348,8 +363,8 @@ class MusicDaemon:
             return {"error": f"Unknown command: {command}"}
 
     async def _cmd_ping(self, args: dict) -> dict:
-        """Health check."""
-        return {"status": "ok", "message": "pong"}
+        """Health check. Echoes the run identity for liveness checks (#68)."""
+        return {"status": "ok", "message": "pong", "identity": self._identity}
 
     async def _cmd_play(self, args: dict) -> dict:
         """Play music based on arguments."""
@@ -983,11 +998,52 @@ def _pid_alive(pid: int) -> bool:
         return False
 
 
+def _probe_daemon_identity(socket_path: Any, token: str | None) -> str | None:
+    """Ask the process listening on ``socket_path`` to identify itself (#68).
+
+    Sends an authenticated ``ping`` and returns the daemon's run identity,
+    or ``None`` when nothing answers, the answer is unauthenticated, or the
+    response carries no identity. Never raises.
+    """
+    from .platform import get_ipc_client
+
+    try:
+        client = get_ipc_client()
+        sock = client.connect(socket_path, IDENTITY_PROBE_TIMEOUT)
+    except Exception:
+        return None
+    try:
+        request = json.dumps({"command": "ping", "args": {}, "token": token})
+        sock.sendall(request.encode())
+        response_data = b""
+        while len(response_data) < MAX_REQUEST_SIZE:
+            chunk = sock.recv(REQUEST_CHUNK_SIZE)
+            if not chunk:
+                break
+            response_data += chunk
+        response = json.loads(response_data.decode())
+    except Exception:
+        return None
+    finally:
+        try:
+            sock.close()
+        except OSError:
+            pass
+    if not isinstance(response, dict):
+        return None
+    identity = response.get("identity")
+    return identity if isinstance(identity, str) else None
+
+
 def get_daemon_pid() -> int | None:
     """Get the PID of the running daemon.
 
-    Returns the PID if daemon is running, None otherwise.
-    Also cleans up stale PID/socket files if the daemon is not running.
+    Returns the PID only when the PID file is current *and* the process it
+    names proves its identity (#68): the daemon records a per-run nonce in
+    the PID file and echoes it over ``ping``, so a recycled PID belonging to
+    an unrelated process no longer reads as a live daemon.
+
+    Also cleans up stale PID/socket files when the daemon is not running.
     """
     from .platform import is_unix
 
@@ -997,8 +1053,37 @@ def get_daemon_pid() -> int | None:
         return None
 
     try:
-        pid = int(config.pid_file.read_text().strip())
-    except (ValueError, OSError):
+        raw = config.pid_file.read_text().strip()
+    except OSError:
+        raw = ""
+
+    # Current format: JSON {"pid": ..., "identity": ...}. A legacy plain-int
+    # file parses as a PID but carries no identity, so it can never be
+    # verified and is treated as stale.
+    identity: str | None = None
+    pid: int | None = None
+    try:
+        parsed = json.loads(raw)
+    except ValueError:
+        parsed = None
+    if isinstance(parsed, dict):
+        file_pid = parsed.get("pid")
+        file_identity = parsed.get("identity")
+        # bool is an int subclass; a PID of ``true`` must not read as 1.
+        if (
+            isinstance(file_pid, int)
+            and not isinstance(file_pid, bool)
+            and isinstance(file_identity, str)
+        ):
+            pid = file_pid
+            identity = file_identity
+    if pid is None:
+        try:
+            pid = int(raw)
+        except ValueError:
+            pid = None
+
+    if pid is None:
         try:
             if config.pid_file.exists():
                 config.pid_file.unlink()
@@ -1006,19 +1091,39 @@ def get_daemon_pid() -> int | None:
             pass
         return None
 
-    if _pid_alive(pid):
-        return pid
+    if not _pid_alive(pid):
+        # PID file is stale, clean up
+        try:
+            if config.pid_file.exists():
+                config.pid_file.unlink()
+            # Only clean up socket file on Unix (Windows uses TCP)
+            if is_unix() and config.socket_path.exists():
+                config.socket_path.unlink()
+        except OSError:
+            pass  # Best effort cleanup
+        return None
 
-    # PID file is stale, clean up
-    try:
-        if config.pid_file.exists():
-            config.pid_file.unlink()
-        # Only clean up socket file on Unix (Windows uses TCP)
-        if is_unix() and config.socket_path.exists():
-            config.socket_path.unlink()
-    except OSError:
-        pass  # Best effort cleanup
-    return None
+    # The PID is alive — now make sure it is *our* daemon and not whatever
+    # process recycled the PID after an unclean exit (#68).
+    answered = _probe_daemon_identity(config.socket_path, config.read_auth_token())
+    if identity is None or answered != identity:
+        logger.info(
+            "PID file identity check failed (recorded=%s, answered=%s) — "
+            "treating PID file as stale",
+            "present" if identity else "missing",
+            "matching" if answered == identity else "mismatched",
+        )
+        try:
+            if config.pid_file.exists():
+                config.pid_file.unlink()
+            # Only clean up socket file on Unix (Windows uses TCP)
+            if is_unix() and config.socket_path.exists():
+                config.socket_path.unlink()
+        except OSError:
+            pass  # Best effort cleanup
+        return None
+
+    return pid
 
 
 def is_daemon_running() -> bool:
