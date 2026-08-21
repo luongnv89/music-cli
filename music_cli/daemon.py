@@ -8,6 +8,8 @@ import logging
 import os
 import secrets
 import signal
+from collections.abc import Coroutine
+from typing import Any
 
 from .ai_tracks import get_ai_tracks
 from .config import get_config
@@ -131,6 +133,21 @@ class MusicDaemon:
         self._current_mood: Mood | None = None
         self._auto_play = False  # For infinite/context-aware mode
         self._auth_token: str | None = None  # Issued in start(); None rejects every request
+        # Serializes state-mutating command handlers (#67): per-connection
+        # tasks interleave at every await, so concurrent plays would race on
+        # player state and orphan ffplay processes.
+        self._command_lock = asyncio.Lock()
+        # Strong references to fire-and-forget tasks (#69): the event loop
+        # keeps only a weak reference, so unreferenced tasks can be collected
+        # mid-execution.
+        self._background_tasks: set[asyncio.Task] = set()
+
+    def _spawn_task(self, coro: Coroutine[Any, Any, Any]) -> asyncio.Task:
+        """Schedule a background task and hold a reference until it finishes."""
+        task = asyncio.create_task(coro)
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+        return task
 
     def _issue_auth_token(self) -> str:
         """Generate a fresh auth token and persist it owner-only.
@@ -160,7 +177,7 @@ class MusicDaemon:
         if supports_unix_signals():
             loop = asyncio.get_event_loop()
             for sig in (signal.SIGTERM, signal.SIGINT):
-                loop.add_signal_handler(sig, lambda: asyncio.create_task(self.stop()))
+                loop.add_signal_handler(sig, lambda: self._spawn_task(self.stop()))
 
         # Start IPC server (platform-specific)
         await self._ipc_server.start(self._handle_client, socket_path)
@@ -318,7 +335,10 @@ class MusicDaemon:
         handler = handlers.get(command)
         if handler:
             try:
-                return await handler(args)
+                # Hold the command lock for the whole handler so concurrent
+                # connections cannot interleave state mutations (#67).
+                async with self._command_lock:
+                    return await handler(args)
             except Exception as e:
                 # Log the detail server-side; never leak exception text
                 # (which can contain filesystem paths) to the client.
@@ -486,7 +506,17 @@ class MusicDaemon:
     def _on_track_end(self) -> None:
         """Called when a track ends in auto-play mode."""
         if self._auto_play:
-            asyncio.create_task(self._play_next())
+            self._spawn_task(self._auto_advance())
+
+    async def _auto_advance(self) -> None:
+        """Advance to the next track under the command lock.
+
+        The lock is not reentrant, so ``_cmd_next`` (which already holds it)
+        calls ``_play_next`` directly; only the detached auto-play chain
+        re-acquires the lock here.
+        """
+        async with self._command_lock:
+            await self._play_next()
 
     async def _play_next(self) -> None:
         """Play the next track in auto-play mode."""
@@ -900,7 +930,7 @@ class MusicDaemon:
         """
         logger.info("Shutdown command received")
         # Schedule stop in a separate task so we can respond first
-        asyncio.create_task(self.stop())
+        self._spawn_task(self.stop())
         return {"status": "shutting_down"}
 
 
