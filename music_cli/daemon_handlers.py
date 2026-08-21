@@ -7,13 +7,29 @@ monkeypatching working. Each handler registers its command name once via
 the :func:`handles` decorator; the registry is built at import time.
 """
 
+from __future__ import annotations
+
 import logging
 from collections.abc import Mapping
 from types import MappingProxyType
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .context.mood import MoodContext
 from .player.base import TrackInfo
+
+if TYPE_CHECKING:
+    import asyncio
+    from collections.abc import Callable, Coroutine
+
+    from .ai_tracks import AITracksManager
+    from .config import Config
+    from .context.temporal import TemporalContext
+    from .history import History
+    from .player.ffplay import FFplayPlayer
+    from .sources.local import LocalSource
+    from .sources.radio import RadioSource
+    from .sources.youtube import YouTubeSource
+    from .youtube_history import YouTubeHistory
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +67,13 @@ def handles(command: str) -> Any:
 class SystemHandlers:
     """Health and lifecycle commands."""
 
+    # Host-class surface (provided by MusicDaemon). Declaration-only: these
+    # annotations create no attributes, so dispatch and the registry
+    # identity guarantees are untouched.
+    _identity: str
+    _spawn_task: Callable[[Coroutine[Any, Any, Any]], asyncio.Task]
+    stop: Callable[[], Coroutine[Any, Any, None]]
+
     @handles("ping")
     async def _cmd_ping(self, args: dict) -> dict:
         """Health check. Echoes the run identity for liveness checks (#68)."""
@@ -70,6 +93,18 @@ class SystemHandlers:
 
 class PlaybackHandlers:
     """Playback control and play-mode track resolution."""
+
+    # Host-class surface (provided by MusicDaemon); see SystemHandlers.
+    config: Config
+    player: FFplayPlayer
+    local_source: LocalSource
+    radio_source: RadioSource
+    youtube_source: YouTubeSource
+    youtube_history: YouTubeHistory
+    history: History
+    temporal: TemporalContext
+    _on_track_end: Callable[[], None]
+    _play_next: Callable[[], Coroutine[Any, Any, None]]
 
     @handles("play")
     async def _cmd_play(self, args: dict) -> dict:
@@ -334,6 +369,13 @@ class PlaybackHandlers:
 class AIHandlers:
     """AI generation commands sharing one setup/error-mapping path (#75)."""
 
+    # Host-class surface (provided by MusicDaemon); see SystemHandlers.
+    ai_tracks: AITracksManager
+    config: Config
+    player: FFplayPlayer
+    history: History
+    temporal: TemporalContext
+
     @staticmethod
     def _ai_unavailable_error() -> dict:
         return {
@@ -580,6 +622,12 @@ class AIHandlers:
 class YouTubeHistoryHandlers:
     """Cached YouTube history commands."""
 
+    # Host-class surface (provided by MusicDaemon); see SystemHandlers.
+    config: Config
+    player: FFplayPlayer
+    youtube_source: YouTubeSource
+    youtube_history: YouTubeHistory
+
     @handles("youtube_history_list")
     async def _cmd_youtube_history_list(self, args: dict) -> dict:
         entries = self.youtube_history.get_all()
@@ -635,6 +683,7 @@ class YouTubeHistoryHandlers:
             return {"error": "YouTube playback not available."}
 
         file_path = self.config.youtube_cache_dir / f"{entry.video_id}.m4a"
+        track: TrackInfo | None
         if file_path.exists():
             track = TrackInfo(
                 source=str(file_path),
