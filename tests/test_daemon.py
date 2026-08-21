@@ -9,7 +9,7 @@ import sys
 import time
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import pytest_asyncio
@@ -689,3 +689,56 @@ class TestGenericErrorResponses:
 
         assert response["error"] == "Internal error while processing command"
         assert str(tmp_path) not in json.dumps(response)
+
+
+class TestPidWriteBeforeBind:
+    """PID-file failures must abort startup before the socket binds (#84).
+
+    F-BUG-022: the PID write used to happen after ``_ipc_server.start``, so an
+    unwritable config dir killed the daemon while its socket was already
+    accepting connections.
+    """
+
+    async def test_pid_write_failure_raises_before_socket_binds(self, tmp_path: Path) -> None:
+        pid_file = tmp_path / "music-cli.pid"
+
+        def unwritable_write(_content: str) -> None:
+            raise OSError(f"cannot write {pid_file}")
+
+        daemon = _DaemonTestHarness.make_daemon(tmp_path)
+        daemon._running = False
+        daemon.config = MagicMock()
+        daemon.config.socket_path = tmp_path / "music-cli.sock"
+        daemon.config.pid_file = MagicMock()
+        daemon.config.pid_file.write_text.side_effect = unwritable_write
+        daemon.config.write_auth_token = MagicMock()
+        daemon._ipc_server = AsyncMock()
+
+        with patch("music_cli.daemon.supports_unix_signals", return_value=False):
+            with pytest.raises(OSError):
+                await daemon.start()
+
+        daemon.config.pid_file.write_text.assert_called_once()
+        daemon._ipc_server.start.assert_not_awaited()
+
+    async def test_pid_written_before_ipc_server_start(self, tmp_path: Path) -> None:
+        """Ordering guarantee: PID file exists by the time bind is attempted."""
+        write_order: list[str] = []
+
+        def recording_write(_content: str) -> None:
+            write_order.append("pid")
+
+        daemon = _DaemonTestHarness.make_daemon(tmp_path)
+        daemon._running = False
+        daemon.config = MagicMock()
+        daemon.config.socket_path = tmp_path / "music-cli.sock"
+        daemon.config.pid_file = MagicMock()
+        daemon.config.pid_file.write_text.side_effect = recording_write
+        daemon.config.write_auth_token = MagicMock()
+        daemon._ipc_server = AsyncMock()
+        daemon._ipc_server.start.side_effect = lambda *args, **kwargs: write_order.append("bind")
+
+        serve_forever = asyncio.create_task(daemon.start())
+        await asyncio.wait_for(serve_forever, timeout=5.0)
+
+        assert write_order == ["pid", "bind"]

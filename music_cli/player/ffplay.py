@@ -13,6 +13,9 @@ from .base import Player, PlayerState, TrackInfo
 
 logger = logging.getLogger(__name__)
 
+# How long play() waits for the subprocess to prove it survived startup.
+STARTUP_PROBE_TIMEOUT = 0.1
+
 
 class FFplayPlayer(Player):
     """Audio player using ffplay (part of FFmpeg).
@@ -101,18 +104,10 @@ class FFplayPlayer(Player):
                 stderr=asyncio.subprocess.DEVNULL,
             )
 
-            # Verify ffplay actually started (macOS audio init can fail silently)
-            # Give the process a brief moment to initialize, then check if it's
-            # still alive. If it exited immediately, clean up the failed
-            # startup and return False so the CLI reports the failure.
-            await asyncio.sleep(0.1)
-            if self._process.returncode is not None:
-                logger.warning(
-                    "ffplay exited immediately (returncode=%s). "
-                    "Audio device may be unavailable or ffplay failed to start.",
-                    self._process.returncode,
-                )
-                await self._cleanup_failed_start()
+            # Verify ffplay actually started (macOS audio init can fail silently).
+            # Wait for the process to either exit within the probe window or
+            # survive it; sleep-then-poll raced a death at >0.1 s (#84, F-BUG-017).
+            if await self._process_during_startup("ffplay"):
                 self._state = PlayerState.STOPPED
                 self._current_track = None
                 self._paused = False
@@ -171,14 +166,8 @@ class FFplayPlayer(Player):
             self._is_process_group = True
 
             # Verify the pipe process actually started
-            await asyncio.sleep(0.1)
-            if self._process.returncode is not None:
-                logger.warning(
-                    "yt-dlp | ffplay pipe exited immediately (returncode=%s).",
-                    self._process.returncode,
-                )
+            if await self._process_during_startup("yt-dlp | ffplay pipe"):
                 # Keep the track and loading state for the direct-URL fallback.
-                await self._cleanup_failed_start()
                 return False
 
             self._state = PlayerState.PLAYING
@@ -193,6 +182,33 @@ class FFplayPlayer(Player):
             logger.error(f"Failed to start YouTube playback: {e}")
             self._state = PlayerState.ERROR
             return False
+
+    async def _process_during_startup(self, label: str) -> bool:
+        """Detect a subprocess that dies during the startup probe window.
+
+        Waits up to :data:`STARTUP_PROBE_TIMEOUT` for the process to exit.
+        Returns True (and cleans up) when it exited within the window; False
+        means it was still running when the window closed. Waiting on
+        ``wait()`` with a timeout has no race: unlike sleep-then-poll, a death
+        at any point during the window is observed (#84, F-BUG-017).
+        """
+        process = self._process
+        if process is None:
+            return True
+
+        try:
+            returncode = await asyncio.wait_for(process.wait(), timeout=STARTUP_PROBE_TIMEOUT)
+        except TimeoutError:
+            return False  # still alive after the window -> treat as started
+
+        logger.warning(
+            "%s exited immediately (returncode=%s). "
+            "Audio device may be unavailable or the process failed to start.",
+            label,
+            returncode,
+        )
+        await self._cleanup_failed_start()
+        return True
 
     async def _cleanup_failed_start(self) -> None:
         """Clear and reap a subprocess that failed during startup."""

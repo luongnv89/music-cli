@@ -4,12 +4,14 @@ import random
 
 from ..config import get_config
 from ..player.base import TrackInfo
-from .youtube import is_youtube_available
+from .youtube import is_youtube_available, is_youtube_url
 
 
 def _is_youtube_url(url: str) -> bool:
     """Check if URL is a YouTube URL."""
-    return "youtube.com" in url or "youtu.be" in url
+    # Host-based comparison shared with the YouTube source (#84, F-BUG-016);
+    # a substring test used to match hosts like evil-youtube.com.attacker.net.
+    return is_youtube_url(url)
 
 
 class RadioSource:

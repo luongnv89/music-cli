@@ -32,6 +32,11 @@ class TestUrlCleaning:
     def test_clean_url_is_applied_before_matching(self) -> None:
         assert is_youtube_url("https://www.youtube.com/watch\\?v=abc") is True
 
+    def test_non_corruption_backslashes_are_preserved(self) -> None:
+        """F-BUG-021: only paste-corruption escapes are stripped, not all."""
+        url = "https://youtube.com/watch?v=t\\title"
+        assert _clean_url(url) == url
+
 
 class TestIsYoutubeUrl:
     @pytest.mark.parametrize(
@@ -56,6 +61,19 @@ class TestIsYoutubeUrl:
         ],
     )
     def test_rejects_non_youtube(self, url: str) -> None:
+        assert is_youtube_url(url) is False
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://evil-youtube.com.attacker.net/x",
+            "https://youtube.com.attacker.net/watch?v=x",
+            "https://notyoutube.com/watch?v=x",
+            "https://youtube.com.evil.example/x",
+        ],
+    )
+    def test_rejects_lookalike_hosts(self, url: str) -> None:
+        """Detection compares the parsed hostname, not substrings (#84)."""
         assert is_youtube_url(url) is False
 
 

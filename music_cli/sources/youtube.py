@@ -6,18 +6,19 @@ Requires yt-dlp to be installed (optional dependency).
 
 import logging
 import re
+from urllib.parse import urlparse
 
 from ..player.base import TrackInfo
 
 logger = logging.getLogger(__name__)
 
-# YouTube URL patterns
-YOUTUBE_URL_PATTERNS = [
-    r"(?:https?://)?(?:www\.)?youtube\.com/watch\?v=[\w-]+(?:&[\w=-]+)*",
-    r"(?:https?://)?(?:www\.)?youtu\.be/[\w-]+(?:\?[\w&=-]+)?",
-    r"(?:https?://)?(?:www\.)?youtube\.com/shorts/[\w-]+(?:\?[\w&=-]+)?",
-    r"(?:https?://)?music\.youtube\.com/watch\?v=[\w-]+(?:&[\w=-]+)*",
-]
+# YouTube hosts compared against the parsed URL hostname (#84, F-BUG-016).
+# A leading "www." is stripped before comparison, so it is not listed here.
+YOUTUBE_HOSTS = frozenset({"youtube.com", "youtu.be", "music.youtube.com", "m.youtube.com"})
+
+# Copy/paste corruption escapes punctuation with backslashes ("youtu\.be",
+# "watch\?v="). Strip only those; backslashes elsewhere belong to the URL.
+_PASTE_ESCAPE_RE = re.compile(r"\\(?=[.?&=%-])")
 
 
 def is_youtube_available() -> bool:
@@ -31,25 +32,37 @@ def is_youtube_available() -> bool:
 
 
 def _clean_url(url: str) -> str:
-    """Remove backslashes from URL that may be introduced during copy/paste.
+    """Undo copy/paste corruption without altering legitimate URLs.
+
+    Only backslashes that precede characters commonly mangled by escaping
+    (``. ? & = % -``) are removed (#84, F-BUG-021). A backslash anywhere else
+    is part of the URL and is left untouched.
 
     Args:
         url: The potentially corrupted URL string
 
     Returns:
-        Cleaned URL with backslashes removed
+        URL with paste-corruption backslashes removed
     """
-    return url.replace("\\", "")
+    return _PASTE_ESCAPE_RE.sub("", url)
 
 
 def is_youtube_url(url: str) -> bool:
     """Check if the given string is a valid YouTube URL."""
-    # Clean the URL first to remove any backslashes
-    cleaned_url = _clean_url(url)
-    for pattern in YOUTUBE_URL_PATTERNS:
-        if re.match(pattern, cleaned_url):
-            return True
-    return False
+    # Clean the URL first to repair any copy/paste corruption
+    candidate = _clean_url(url).strip()
+    if not candidate:
+        return False
+    parsed = urlparse(candidate)
+    if not parsed.scheme:
+        parsed = urlparse(f"https://{candidate}")
+    host = parsed.hostname
+    if not host:
+        return False
+    host = host.lower()
+    if host.startswith("www."):
+        host = host[4:]
+    return host in YOUTUBE_HOSTS
 
 
 class YouTubeSource:
