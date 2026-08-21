@@ -1069,7 +1069,12 @@ def get_daemon_pid() -> int | None:
     if isinstance(parsed, dict):
         file_pid = parsed.get("pid")
         file_identity = parsed.get("identity")
-        if isinstance(file_pid, int) and isinstance(file_identity, str):
+        # bool is an int subclass; a PID of ``true`` must not read as 1.
+        if (
+            isinstance(file_pid, int)
+            and not isinstance(file_pid, bool)
+            and isinstance(file_identity, str)
+        ):
             pid = file_pid
             identity = file_identity
     if pid is None:
