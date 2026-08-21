@@ -32,6 +32,8 @@ SKIP_FFMPEG="${SKIP_FFMPEG:-0}"
 FORCE_LINK="${FORCE_LINK:-0}"
 
 # --- Color Output ---
+# Colors are passed as printf *arguments*, never interpolated into the
+# format string (SC2059): INSTALL_DIR/EXTRAS reach these helpers as "$*".
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -40,11 +42,11 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-info()  { printf "${BLUE}[INFO]${NC}  %s\n" "$*"; }
-ok()    { printf "${GREEN}[ OK ]${NC}  %s\n" "$*"; }
-warn()  { printf "${YELLOW}[WARN]${NC}  %s\n" "$*"; }
-step()  { printf "\n${BOLD}${CYAN}==> %s${NC}\n" "$*"; }
-err()   { printf "${RED}[ERR ]${NC}  %s\n" "$*" >&2; }
+info()  { printf '%s[INFO]%s  %s\n' "$BLUE" "$NC" "$*"; }
+ok()    { printf '%s[ OK ]%s  %s\n' "$GREEN" "$NC" "$*"; }
+warn()  { printf '%s[WARN]%s  %s\n' "$YELLOW" "$NC" "$*"; }
+step()  { printf '\n%s%s==> %s%s\n' "$BOLD" "$CYAN" "$*" "$NC"; }
+err()   { printf '%s[ERR ]%s  %s\n' "$RED" "$NC" "$*" >&2; }
 die()   { err "$@"; exit 1; }
 
 # --- OS / Arch Detection ---
@@ -102,7 +104,10 @@ require_python() {
             local major minor
             major="${ver%%.*}"
             minor="${ver##*.}"
-            if [ "$major" -ge 3 ] && [ "$minor" -ge 10 ]; then
+            # Require >=3.10 by comparing the version tuple, not each field:
+            # "[ $minor -ge 10 ]" alone would reject a hypothetical Python 4.0
+            # (#84, F-BUG-019).
+            if [ "$major" -gt 3 ] || { [ "$major" -eq 3 ] && [ "$minor" -ge 10 ]; }; then
                 echo "$candidate"
                 return
             fi

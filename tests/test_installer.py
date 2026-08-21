@@ -190,6 +190,69 @@ class TestWindowsScriptsLayout:
         assert "bin/" in combined or "Scripts/" in combined
 
 
+def _run_installer_detecting_python(
+    sandbox: dict, fake_bin: Path
+) -> subprocess.CompletedProcess[str]:
+    """Run the installer with ``python3`` resolved to a PATH stub.
+
+    Unlike :func:`_run_installer`, no ``PYTHON`` override is exported, so the
+    installer's own interpreter-detection and version gate run.
+    """
+    env = os.environ.copy()
+    env.update(
+        {
+            "HOME": str(sandbox["home"]),
+            "INSTALL_DIR": str(sandbox["install_dir"]),
+            "SKIP_FFMPEG": "1",
+            "FAKE_PYTHON_SHIM": str(fake_bin / "python3"),
+            "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+        }
+    )
+    env.pop("PYTHON", None)
+    bash = shutil.which("bash")
+    assert bash is not None, "bash is required to run install.sh"
+    return subprocess.run(
+        [bash, str(INSTALLER)],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+    )
+
+
+class TestVersionGate:
+    """F-BUG-019: the >=3.10 gate compares tuples, not each field."""
+
+    @staticmethod
+    def _path_stub(sandbox: dict, version_line: str, short_version: str) -> Path:
+        """A directory whose ``python3`` reports the given version."""
+        fake_bin = sandbox["shim"].parent / ("stub-" + short_version.replace(".", ""))
+        fake_bin.mkdir(exist_ok=True)
+        text = sandbox["shim"].read_text()
+        text = text.replace("Python 3.11.0", version_line)
+        text = text.replace('echo "3.11"', f'echo "{short_version}"')
+        python3 = fake_bin / "python3"
+        python3.write_text(text)
+        python3.chmod(0o755)
+        return fake_bin
+
+    def test_python_4_stub_is_accepted(self, sandbox) -> None:
+        """A hypothetical Python 4.0 satisfies >=3.10 (#84)."""
+        fake_bin = self._path_stub(sandbox, "Python 4.0.0", "4.0")
+        proc = _run_installer_detecting_python(sandbox, fake_bin)
+
+        assert proc.returncode == 0, proc.stderr
+        assert (sandbox["local_bin"] / "mc").is_symlink()
+
+    def test_python_2_stub_is_rejected(self, sandbox) -> None:
+        fake_bin = self._path_stub(sandbox, "Python 2.7.18", "2.7")
+        proc = _run_installer_detecting_python(sandbox, fake_bin)
+
+        assert proc.returncode != 0
+        assert "3.10" in proc.stdout + proc.stderr
+
+
 def test_shellcheck_passes() -> None:
     """shellcheck install.sh must exit 0 (issue #50 acceptance)."""
     shellcheck = shutil.which("shellcheck")
