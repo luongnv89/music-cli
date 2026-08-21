@@ -7,7 +7,7 @@ name = "coder-music-cli"
 version = "0.10.1"
 description = "A command-line music application for coders with daemon support, radio streaming, and AI-generated music"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 license = "MIT"
 authors = [
     {name = "Luong Nguyen", email = "luongnv89@gmail.com"}
@@ -24,8 +24,6 @@ classifiers = [
     "Operating System :: MacOS",
     "Operating System :: Microsoft :: Windows",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
@@ -34,7 +32,6 @@ classifiers = [
 
 dependencies = [
     "click>=8.0",
-    "tomli>=2.0;python_version<'3.11'",
     "tomli-w>=1.0",
     # Media controller dependencies (platform-specific)
     "pyobjc-framework-MediaPlayer>=10.0; sys_platform == 'darwin'",
@@ -99,11 +96,11 @@ include = ["music_cli*"]
 
 [tool.black]
 line-length = 100
-target-version = ["py310"]
+target-version = ["py312"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "S", "PTH"]
@@ -119,10 +116,11 @@ ignore = [
 "tests/*" = ["S101"]  # Allow assert in tests
 
 [tool.mypy]
-# mypy targets 3.12 (not requires-python's 3.10) because the installed numpy
-# stubs use PEP 695 `type` statements, which mypy rejects when targeting <3.12
-# (exit 2 without checking a single file). 3.12 is the lowest version that lets
-# `.venv/bin/mypy music_cli` run to completion — see issue #37.
+# Aligned with requires-python (>=3.12) as of Task 3.1 / #58: the installed
+# numpy stubs use PEP 695 `type` statements, which mypy rejects when targeting
+# <3.12 (exit 2 without checking a single file — see issue #37 / F-CI-002).
+# Raising the project floor to 3.12 made 3.12 both the floor and the lowest
+# target mypy can run to completion on.
 python_version = "3.12"
 warn_return_any = false
 warn_unused_ignores = true

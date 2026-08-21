@@ -254,7 +254,7 @@ class FFplayPlayer(Player):
                 else:
                     self._process.terminate()
                 await asyncio.wait_for(self._process.wait(), timeout=2.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 if self._is_process_group:
                     os.killpg(self._process.pid, signal.SIGKILL)
                 else:
