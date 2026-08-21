@@ -55,10 +55,21 @@ class TestLoading:
 
 
 class TestAddAndDedupe:
+    def test_add_entry_stamps_timestamp_when_missing(self, history_file: Path) -> None:
+        history = YouTubeHistory(history_file)
+        entry = YouTubeHistoryEntry(video_id="v1", url="u1", title="One")
+        assert entry.timestamp is None
+        stored = history.add_entry(entry)
+        assert stored.timestamp is not None
+
     def test_add_entry_inserts_newest_first_and_persists(self, history_file: Path) -> None:
         history = YouTubeHistory(history_file)
-        history.add_entry("v1", "https://youtu.be/v1", "One")
-        history.add_entry("v2", "https://youtu.be/v2", "Two")
+        history.add_entry(
+            YouTubeHistoryEntry(video_id="v1", url="https://youtu.be/v1", title="One")
+        )
+        history.add_entry(
+            YouTubeHistoryEntry(video_id="v2", url="https://youtu.be/v2", title="Two")
+        )
 
         assert [e.video_id for e in history.get_all()] == ["v2", "v1"]
         # Reload from disk to prove persistence.
@@ -67,23 +78,30 @@ class TestAddAndDedupe:
 
     def test_duplicate_video_ids_are_replaced(self, history_file: Path) -> None:
         history = YouTubeHistory(history_file)
-        history.add_entry("v1", "https://youtu.be/v1", "Old title")
-        history.add_entry("v1", "https://youtu.be/v1", "New title")
+        history.add_entry(
+            YouTubeHistoryEntry(video_id="v1", url="https://youtu.be/v1", title="Old title")
+        )
+        history.add_entry(
+            YouTubeHistoryEntry(video_id="v1", url="https://youtu.be/v1", title="New title")
+        )
         assert history.count() == 1
         assert history.get_all()[0].title == "New title"
 
     def test_max_entries_trims_oldest(self, history_file: Path) -> None:
         history = YouTubeHistory(history_file)
         for i in range(5):
-            history.add_entry(f"v{i}", f"https://youtu.be/v{i}", f"T{i}", max_entries=3)
+            history.add_entry(
+                YouTubeHistoryEntry(video_id=f"v{i}", url=f"https://youtu.be/v{i}", title=f"T{i}"),
+                max_entries=3,
+            )
         assert [e.video_id for e in history.get_all()] == ["v4", "v3", "v2"]
 
 
 class TestIndexAccessAndRemoval:
     def _populated(self, history_file: Path) -> YouTubeHistory:
         history = YouTubeHistory(history_file)
-        history.add_entry("v1", "u1", "One")
-        history.add_entry("v2", "u2", "Two")
+        history.add_entry(YouTubeHistoryEntry(video_id="v1", url="u1", title="One"))
+        history.add_entry(YouTubeHistoryEntry(video_id="v2", url="u2", title="Two"))
         return history
 
     def test_get_by_index_bounds(self, history_file: Path) -> None:
@@ -137,7 +155,7 @@ class TestSaveFailure:
         history = YouTubeHistory(tmp_path / "absent.json")
         history.history_file = tmp_path
         with caplog.at_level(logging.WARNING):
-            history.add_entry("v1", "u1", "One")
+            history.add_entry(YouTubeHistoryEntry(video_id="v1", url="u1", title="One"))
         assert any("Failed to save" in r.message for r in caplog.records)
 
 

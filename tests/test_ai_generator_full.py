@@ -18,6 +18,7 @@ import music_cli.sources.ai_generator as ai_generator_module
 from music_cli.sources.ai_generator import (
     LOOP_INSTRUCTION,
     AIGenerator,
+    GenerationRequest,
     _get_strategy,
     _get_strategy_cache,
     get_ai_install_instructions,
@@ -294,25 +295,29 @@ class TestGenerate:
     def test_unavailable_returns_none(self, tmp_path) -> None:
         generator, _ = self._generator()
         with patch.object(ai_generator_module, "is_ai_available", return_value=False):
-            assert generator.generate("beats") is None
+            assert generator.generate(GenerationRequest(prompt="beats")) is None
 
     @pytest.mark.parametrize("lyrics", [None, "", "   "])
     def test_requires_lyrics_models_reject_missing_lyrics(self, tmp_path, lyrics) -> None:
         generator, _ = self._generator()
         with patch.object(ai_generator_module, "is_ai_available", return_value=True):
-            result = generator.generate("song", model_id="minimax-music3", lyrics=lyrics)
+            result = generator.generate(
+                GenerationRequest(prompt="song", model_id="minimax-music3", lyrics=lyrics)
+            )
         assert result is None
 
     def test_lyrics_rejected_on_non_supporting_model(self, tmp_path) -> None:
         generator, _ = self._generator()
         with patch.object(ai_generator_module, "is_ai_available", return_value=True):
-            result = generator.generate("song", model_id="musicgen-small", lyrics="la")
+            result = generator.generate(
+                GenerationRequest(prompt="song", model_id="musicgen-small", lyrics="la")
+            )
         assert result is None
 
     def test_unconfigured_model_rejected(self, tmp_path) -> None:
         generator, _ = self._generator()
         with patch.object(ai_generator_module, "is_ai_available", return_value=True):
-            result = generator.generate("song", model_id="ghost-model")
+            result = generator.generate(GenerationRequest(prompt="song", model_id="ghost-model"))
         assert result is None
 
     def test_failed_strategy_returns_none(self, tmp_path, monkeypatch) -> None:
@@ -321,7 +326,7 @@ class TestGenerate:
             patch.object(ai_generator_module, "is_ai_available", return_value=True),
             patch.object(ai_generator_module, "_get_strategy", return_value=None),
         ):
-            assert generator.generate("beats") is None
+            assert generator.generate(GenerationRequest(prompt="beats")) is None
 
     def test_generation_happy_path(self, tmp_path, monkeypatch) -> None:
         generator, _ = self._generator()
@@ -332,7 +337,9 @@ class TestGenerate:
             patch.object(ai_generator_module, "is_ai_available", return_value=True),
             patch.object(ai_generator_module, "_get_strategy", return_value=strategy),
         ):
-            track = generator.generate("lofi beats", duration=999, add_looping=True)
+            track = generator.generate(
+                GenerationRequest(prompt="lofi beats", duration=999, add_looping=True)
+            )
 
         assert track is not None
         assert track.source_type == "ai"
@@ -355,7 +362,7 @@ class TestGenerate:
             patch.object(ai_generator_module, "is_ai_available", return_value=True),
             patch.object(ai_generator_module, "_get_strategy", return_value=strategy),
         ):
-            generator.generate("pure prompt", add_looping=False)
+            generator.generate(GenerationRequest(prompt="pure prompt", add_looping=False))
         prompt_arg = strategy.generate_audio.call_args[0][0]
         assert prompt_arg == "pure prompt"
 
@@ -368,7 +375,9 @@ class TestGenerate:
             patch.object(ai_generator_module, "is_ai_available", return_value=True),
             patch.object(ai_generator_module, "_get_strategy", return_value=strategy),
         ):
-            generator.generate("song", model_id="minimax-music3", lyrics="verse one")
+            generator.generate(
+                GenerationRequest(prompt="song", model_id="minimax-music3", lyrics="verse one")
+            )
         kwargs = strategy.generate_audio.call_args[1]
         assert kwargs == {"lyrics": "verse one"}
 
@@ -381,7 +390,7 @@ class TestGenerate:
             patch.object(ai_generator_module, "is_ai_available", return_value=True),
             patch.object(ai_generator_module, "_get_strategy", return_value=strategy),
         ):
-            assert generator.generate("beats") is None
+            assert generator.generate(GenerationRequest(prompt="beats")) is None
 
 
 class TestGenerateForContext:
@@ -392,8 +401,8 @@ class TestGenerateForContext:
 
         captured = {}
 
-        def fake_generate(prompt, duration, **kwargs):
-            captured["prompt"] = prompt
+        def fake_generate(request):
+            captured["prompt"] = request.prompt
             return "track"
 
         with patch.object(generator, "generate", side_effect=fake_generate):

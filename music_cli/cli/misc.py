@@ -4,6 +4,7 @@ import sys
 
 import click
 
+from ..client import PlayRequest
 from ..config import get_config
 from . import runtime
 from .app import main
@@ -40,7 +41,7 @@ def list_moods(mood_name):
         # Play mood-based radio directly
         client = runtime.ensure_daemon()
         try:
-            response = client.play(mode="radio", mood=mood_name)
+            response = client.play(PlayRequest(mode="radio", mood=mood_name))
             if "error" in response:
                 click.echo(f"Error: {response['error']}", err=True)
                 sys.exit(1)

@@ -80,9 +80,8 @@ editing `[tool.mypy]` here — Task 0.3 owns that.
 
 ## 6. Formatting
 
-`ruff format` is the intended formatter; `black` is still configured but is
-slated for removal once `F-CLEAN-009` lands. Until then, either is acceptable on
-`music_cli/`, but prefer `ruff format` for new work:
+`ruff format` is the formatter (black was removed in `F-CLEAN-009`; use it for
+all formatting on `music_cli/` and `tests/`):
 
 ```bash
 .venv/bin/ruff format .

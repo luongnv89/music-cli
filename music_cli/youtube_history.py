@@ -91,23 +91,13 @@ class YouTubeHistory:
 
     def add_entry(
         self,
-        video_id: str,
-        url: str,
-        title: str,
-        artist: str | None = None,
-        duration: float | None = None,
+        entry: YouTubeHistoryEntry,
+        *,
         max_entries: int = 1000,
     ) -> YouTubeHistoryEntry:
-        self._entries = [e for e in self._entries if e.video_id != video_id]
-
-        entry = YouTubeHistoryEntry(
-            video_id=video_id,
-            url=url,
-            title=title,
-            artist=artist,
-            duration=duration,
-            timestamp=datetime.now().isoformat(),
-        )
+        if entry.timestamp is None:
+            entry.timestamp = datetime.now().isoformat()
+        self._entries = [e for e in self._entries if e.video_id != entry.video_id]
         self._entries.insert(0, entry)
 
         if len(self._entries) > max_entries:

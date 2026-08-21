@@ -163,10 +163,10 @@ still open against `main`, but they do not merge until `main` is green again.
 
 ### Formatting & Linting
 
-The project uses [Black](https://black.readthedocs.io/) + [Ruff](https://docs.astral.sh/ruff/) with a 100-character line length. Pre-commit hooks run these automatically.
+The project uses [Ruff](https://docs.astral.sh/ruff/) for both formatting and linting with a 100-character line length. Pre-commit hooks run these automatically.
 
 ```bash
-black music_cli/          # Format
+ruff format music_cli/     # Format
 ruff check music_cli/ --fix  # Lint + auto-fix
 mypy music_cli/           # Type check
 bandit -c pyproject.toml -r music_cli/  # Security scan

@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from music_cli.sources.ai_generator import AIGenerator
+from music_cli.sources.ai_generator import AIGenerator, GenerationRequest
 
 
 @pytest.fixture
@@ -65,7 +65,7 @@ class TestGenerateDelegatesValidation:
             patch("music_cli.sources.ai_generator.is_ai_available", return_value=True),
             patch("music_cli.sources.ai_generator._get_strategy") as get_strategy,
         ):
-            assert gen.generate("desc", model_id="m", lyrics="  ") is None
+            assert gen.generate(GenerationRequest(prompt="desc", model_id="m", lyrics="  ")) is None
 
         get_strategy.assert_not_called()
 
@@ -92,7 +92,7 @@ class TestGenerateDelegatesValidation:
                 },
             ),
         ):
-            track = gen.generate("desc", 5, model_id="m")
+            track = gen.generate(GenerationRequest(prompt="desc", duration=5, model_id="m"))
 
         assert track is not None
         assert track.metadata["model"] == "m"

@@ -21,7 +21,7 @@ from .daemon_handlers import (
     SystemHandlers,
     YouTubeHistoryHandlers,
 )
-from .history import get_history
+from .history import HistoryEntry, get_history
 from .ipc_framing import MAX_REQUEST_SIZE, REQUEST_CHUNK_SIZE, RequestError, read_request
 from .platform import get_ipc_server, supports_unix_signals
 from .platform.ipc import IPCServer
@@ -256,12 +256,14 @@ class MusicDaemon(
         if track:
             await self.player.play(track)
             self.history.log(
-                source=track.source,
-                source_type=track.source_type,
-                title=track.title,
-                artist=track.artist,
-                mood=self._current_mood.value if self._current_mood else None,
-                context=self.temporal.get_time_period().value,
+                HistoryEntry(
+                    source=track.source,
+                    source_type=track.source_type,
+                    title=track.title,
+                    artist=track.artist,
+                    mood=self._current_mood.value if self._current_mood else None,
+                    context=self.temporal.get_time_period().value,
+                )
             )
 
 

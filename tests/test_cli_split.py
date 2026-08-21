@@ -111,18 +111,24 @@ class TestPackageLayout:
 
 class TestPlayOptionsGrouping:
     def test_positional_source_wins_over_legacy_flag(self) -> None:
-        opts = PlayOptions.from_click(source="song.mp3", source_flag="ignored.mp3")
+        opts = PlayOptions.from_click({"source": "song.mp3", "source_flag": "ignored.mp3"})
         assert opts.source == "song.mp3"
 
     def test_flag_used_when_no_positional_source(self) -> None:
-        opts = PlayOptions.from_click(source=None, source_flag="flag.mp3")
+        opts = PlayOptions.from_click({"source": None, "source_flag": "flag.mp3"})
         assert opts.source == "flag.mp3"
 
     def test_defaults(self) -> None:
-        opts = PlayOptions.from_click()
+        opts = PlayOptions.from_click({})
         assert opts == PlayOptions(
             source=None, mode=None, mood=None, auto=False, duration=15, index=None
         )
+
+    def test_unknown_click_kwarg_rejected(self) -> None:
+        import pytest
+
+        with pytest.raises(TypeError):
+            PlayOptions.from_click({"mood": "focus", "bogus": 1})
 
     def test_callback_parameter_count(self) -> None:
         """play's Click callback takes ≤4 params (issue #76 acceptance criterion)."""

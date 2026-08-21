@@ -4,6 +4,7 @@ import sys
 
 import click
 
+from ..client import PlayRequest
 from . import runtime
 from .app import main
 from .common import AliasedGroup, icon
@@ -65,7 +66,7 @@ def history_play(number):
     client = runtime.ensure_daemon()
 
     try:
-        response = client.play(mode="history", index=number)
+        response = client.play(PlayRequest(mode="history", index=number))
 
         if "error" in response:
             click.echo(f"Error: {response['error']}", err=True)

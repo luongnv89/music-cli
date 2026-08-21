@@ -17,6 +17,7 @@ from music_cli.client import (
     DEFAULT_TIMEOUT,
     YOUTUBE_TIMEOUT,
     DaemonClient,
+    PlayRequest,
     get_client,
 )
 
@@ -143,12 +144,9 @@ class TestConvenienceWrappers:
         ipc.connect.return_value = make_socket(b"{}")
         with patch.object(client, "send_command", wraps=client.send_command):
             client.play(
-                mode="history",
-                source="src",
-                mood="focus",
-                auto=True,
-                duration=60,
-                index=3,
+                PlayRequest(
+                    mode="history", source="src", mood="focus", auto=True, duration=60, index=3
+                )
             )
             sent = ipc.connect.return_value.sendall.call_args[0][0]
         import json
@@ -162,6 +160,15 @@ class TestConvenienceWrappers:
             "duration": 60,
             "index": 3,
         }
+
+    def test_play_omits_unset_optionals(self, ipc: MagicMock, client: DaemonClient) -> None:
+        ipc.connect.return_value = make_socket(b"{}")
+        client.play(PlayRequest())
+        import json
+
+        args = json.loads(ipc.connect.return_value.sendall.call_args[0][0].decode())["args"]
+        # Only mode/auto/duration are always sent; unset optionals stay absent.
+        assert args == {"mode": "radio", "auto": False, "duration": 30}
 
     def test_simple_wrappers_send_expected_commands(
         self, ipc: MagicMock, client: DaemonClient
