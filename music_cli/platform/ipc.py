@@ -242,7 +242,7 @@ class TCPIPCServer(IPCServer):
     async def start(
         self,
         handler: ClientHandler,
-        address: str | Path,
+        address: str | Path,  # noqa: ARG002 -- Interface conformance: abstract IPC signature; address ignored for TCP
     ) -> None:
         """Start TCP server on localhost.
 
@@ -262,7 +262,7 @@ class TCPIPCServer(IPCServer):
         """TCP sockets clean up automatically - no action needed."""
         pass
 
-    def get_address_display(self, address: str | Path) -> str:
+    def get_address_display(self, address: str | Path) -> str:  # noqa: ARG002 -- Interface conformance: abstract IPC signature; address ignored for TCP
         """Get human-readable address for logging."""
         return f"tcp://{self.host}:{self.port}"
 
@@ -277,7 +277,7 @@ class TCPIPCClient(IPCClient):
         self.port = port
         self.host = host
 
-    def connect(self, address: str | Path, timeout: float) -> socket.socket:
+    def connect(self, address: str | Path, timeout: float) -> socket.socket:  # noqa: ARG002 -- Interface conformance: abstract IPC signature; address ignored for TCP
         """Connect via TCP to localhost.
 
         Args:
@@ -305,7 +305,7 @@ class TCPIPCClient(IPCClient):
             sock.close()
             raise ConnectionError(f"Connection failed: {e}") from e
 
-    def get_address_display(self, address: str | Path) -> str:
+    def get_address_display(self, address: str | Path) -> str:  # noqa: ARG002 -- Interface conformance: abstract IPC signature; address ignored for TCP
         """Get human-readable address for error messages."""
         return f"tcp://{self.host}:{self.port}"
 
