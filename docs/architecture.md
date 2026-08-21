@@ -52,7 +52,7 @@ graph TB
 
 | Component | Module | Responsibility |
 |-----------|--------|----------------|
-| CLI | `cli.py` | User commands, daemon lifecycle |
+| CLI | `cli/` | User commands (one module per command group), daemon lifecycle in `cli/runtime.py` |
 | Client | `client.py` | IPC communication with daemon |
 | Daemon | `daemon.py` | Background process, command routing |
 | Player | `player/` | Audio playback via ffplay |
