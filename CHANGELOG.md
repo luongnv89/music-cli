@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Fix YouTube URL detection to compare the parsed hostname instead of substring matching, so look-alike hosts such as `evil-youtube.com.attacker.net` are no longer routed to yt-dlp or filtered incorrectly; the check is shared by `RadioSource`, the daemon's radio-mode handler, and `YouTubeSource.get_track` ([#84](https://github.com/luongnv89/music-cli/issues/84)).
+- Narrow installer-adjacent URL cleaning so only copy/paste corruption backslashes (before `. ? & = % -`) are stripped; legitimate URLs containing other backslashes are no longer altered before extraction ([#84](https://github.com/luongnv89/music-cli/issues/84)).
+- Fix a startup liveness race in `ffplay` playback: the 0.1 s sleep-then-poll is replaced by waiting on the subprocess with a timeout, so a process that dies anywhere inside the probe window is reliably detected as a failed start, for both direct and YouTube-pipe playback ([#84](https://github.com/luongnv89/music-cli/issues/84)).
+- Fail daemon startup *before* binding the IPC socket when the PID file cannot be written, instead of killing an already-listening daemon afterwards ([#84](https://github.com/luongnv89/music-cli/issues/84)).
+- Fix `install.sh`: color codes are passed as `printf` arguments rather than interpolated into format strings (`SC2059`, hardening against user-controlled `INSTALL_DIR`/`EXTRAS`), and the Python version gate compares tuples so any interpreter ≥3.10 — including a hypothetical Python 4.0 — is accepted ([#84](https://github.com/luongnv89/music-cli/issues/84)).
+
 ### Changed
 - Raise the supported Python floor from `>=3.10` to `>=3.12` (`F-DEP-001`). **Decision rationale:** Python 3.10 reaches end-of-life on **2026-10-31** — about ten weeks after the audit — so committing to test it until then buys nothing; `>=3.11` was rejected because the installed numpy stubs use PEP 695 `type` statements, which mypy rejects when targeting <3.12, leaving `[tool.mypy] python_version` permanently out of sync with the floor; `>=3.12` is therefore the only value that lets all declaration sites (`requires-python`, classifiers, ruff/black target-version, mypy python_version, CI matrix) agree, aligns with the existing CI matrix, and root-causes the numpy-stub conflict behind `F-CI-002` rather than working around it. The dead `tomli` shim (`python_version<'3.11'`) and its fallback import are removed; standalone CI jobs move 3.11 → 3.12 ([#58](https://github.com/luongnv89/music-cli/issues/58)).
 
