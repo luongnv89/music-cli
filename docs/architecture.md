@@ -174,6 +174,7 @@ Communication uses JSON over IPC (Unix sockets on Linux/macOS, TCP localhost on 
 ```
 <config-dir>/
 ├── config.toml      # User settings
+├── daemon.log       # Daemon startup errors (stderr)
 ├── radios.txt       # Radio station URLs
 ├── history.jsonl    # Playback history
 ├── ai_tracks.json   # AI track metadata

@@ -310,6 +310,7 @@ https://some-stream.example.com/stream.mp3
 | File | Purpose |
 |------|---------|
 | `config.toml` | Settings (volume, mood mappings, version) |
+| `daemon.log` | Daemon startup errors (stderr) |
 | `radios.txt` | Station URLs (`name\|url` format) |
 | `history.jsonl` | Playback history |
 | `ai_tracks.json` | AI track metadata (prompts, durations) |

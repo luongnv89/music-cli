@@ -277,6 +277,8 @@ class TestDaemonStartupFailureLog:
         # Restore the real spawner (conftest no-ops it) so the fake Popen
         # below is actually reached through ensure_daemon.
         monkeypatch.setattr(cli_module, "start_daemon_background", _real_start_daemon_background)
+        # Skip the ~2s "is it up yet?" retry loop — the fake child never starts.
+        monkeypatch.setattr(cli_module.time, "sleep", lambda *_: None)
 
         def fake_popen(cmd, **kwargs):
             err = kwargs["stderr"]
