@@ -369,114 +369,30 @@ class MusicDaemon:
     async def _cmd_play(self, args: dict) -> dict:
         """Play music based on arguments."""
         mode = args.get("mode", "radio")
-        source = args.get("source")
-        mood = args.get("mood")
         self._auto_play = args.get("auto", False)
 
-        track: TrackInfo | None = None
-
+        mood = args.get("mood")
         if mood:
             self._current_mood = MoodContext.parse_mood(mood)
 
-        if mode == "local":
-            if source:
-                track = self.local_source.get_track(source)
-            else:
-                track = self.local_source.get_random_track()
+        resolvers = {
+            "local": self._resolve_local_track,
+            "radio": self._resolve_radio_track,
+            "ai": self._resolve_ai_track,
+            "context": self._resolve_context_track,
+            "history": self._resolve_history_track,
+            "youtube": self._resolve_youtube_track,
+            "yt": self._resolve_youtube_track,
+        }
 
-        elif mode == "radio":
-            if source:
-                # Try as station name first
-                track = self.radio_source.get_station_by_name(source)
-                if not track:
-                    # Try as URL
-                    track = self.radio_source.get_track(source)
-            elif mood and self._current_mood:
-                track = self.radio_source.get_mood_station(self._current_mood.value)
-            else:
-                # Use temporal context
-                time_period = self.temporal.get_time_period()
-                track = self.radio_source.get_time_station(time_period.value)
-                if not track:
-                    track = self.radio_source.get_random_station()
-
-            # Handle YouTube URLs in radio stations
-            if track and ("youtube.com" in track.source or "youtu.be" in track.source):
-                station_name = track.title
-                yt_track = self.youtube_source.get_track(track.source)
-                if yt_track:
-                    yt_track.title = station_name
-                    track = yt_track
-
-        elif mode == "ai":
-            # Try to use AI generation
-            try:
-                from .sources.ai_generator import AIGenerator, is_ai_available
-
-                if not is_ai_available():
-                    return {
-                        "error": "AI generation not available. Install with: pip install 'music-cli[ai]'"
-                    }
-
-                # Use persistent AI music directory from config
-                generator = AIGenerator(output_dir=self.config.ai_music_dir)
-
-                # Build prompt
-                temporal_prompt = self.temporal.get_music_prompt()
-                mood_prompt = None
-                if self._current_mood:
-                    mood_prompt = MoodContext.get_prompt(self._current_mood)
-
-                duration = args.get("duration", 30)
-                track = generator.generate_for_context(mood_prompt, temporal_prompt, duration)
-
-            except ImportError:
-                return {
-                    "error": "AI generation not available. Install with: pip install 'music-cli[ai]'"
-                }
-
-        elif mode == "context":
-            # Context-aware mode: use radio with mood/time awareness
-            if self._current_mood:
-                track = self.radio_source.get_mood_station(self._current_mood.value)
-            else:
-                time_period = self.temporal.get_time_period()
-                track = self.radio_source.get_time_station(time_period.value)
-
-            if not track:
-                track = self.radio_source.get_random_station()
-
-        elif mode == "history":
-            index = args.get("index", 1)
-            entry = self.history.get_by_index(index)
-            if entry:
-                if entry.source_type == "local":
-                    track = self.local_source.get_track(entry.source)
-                elif entry.source_type == "youtube":
-                    if not is_youtube_available():
-                        return {
-                            "error": "YouTube playback not available. Install with: pip install 'coder-music-cli[youtube]'"
-                        }
-                    track = self.youtube_source.get_track(entry.source)
-                    if not track:
-                        return {
-                            "error": f"Could not load YouTube video (may be deleted or private): {entry.source}"
-                        }
-                else:
-                    track = self.radio_source.get_track(entry.source, entry.title)
-
-        elif mode == "youtube" or mode == "yt":
-            if not source:
-                return {
-                    "error": "YouTube URL is required. Use: -s 'https://youtube.com/watch?v=...'"
-                }
-
-            if not is_youtube_available():
-                return {
-                    "error": "YouTube playback not available. Install with: pip install 'coder-music-cli[youtube]'"
-                }
-
-            track = self.youtube_source.get_track(source)
+        track: TrackInfo | None = None
+        resolver = resolvers.get(mode)
+        if resolver:
+            resolved = await resolver(args)
+            if isinstance(resolved, dict):
+                # The resolver answered with a client-visible error response.
+                return resolved
+            track = resolved
 
         if not track:
             return {"error": "Could not find track to play"}
@@ -517,6 +433,139 @@ class MusicDaemon:
             }
         else:
             return {"error": "Failed to start playback"}
+
+    async def _resolve_local_track(self, args: dict) -> TrackInfo | None:
+        """Resolve a track from the local library for play mode ``local``."""
+        source = args.get("source")
+        if source:
+            return self.local_source.get_track(source)
+        return self.local_source.get_random_track()
+
+    async def _resolve_radio_track(self, args: dict) -> TrackInfo | None:
+        """Resolve a station for play mode ``radio``.
+
+        Tries the source as a station name, then as a URL; without a source it
+        falls back to the mood station (when one was requested with this
+        command) and then to the time-of-day station.
+        """
+        source = args.get("source")
+        mood = args.get("mood")
+
+        if source:
+            # Try as station name first
+            track = self.radio_source.get_station_by_name(source)
+            if not track:
+                # Try as URL
+                track = self.radio_source.get_track(source)
+        elif mood and self._current_mood:
+            track = self.radio_source.get_mood_station(self._current_mood.value)
+        else:
+            # Use temporal context
+            time_period = self.temporal.get_time_period()
+            track = self.radio_source.get_time_station(time_period.value)
+            if not track:
+                track = self.radio_source.get_random_station()
+
+        # Handle YouTube URLs in radio stations
+        if track and ("youtube.com" in track.source or "youtu.be" in track.source):
+            station_name = track.title
+            yt_track = self.youtube_source.get_track(track.source)
+            if yt_track:
+                yt_track.title = station_name
+                track = yt_track
+
+        return track
+
+    async def _resolve_ai_track(self, args: dict) -> TrackInfo | dict | None:
+        """Generate a track for play mode ``ai``.
+
+        Returns an error response dict when AI generation is unavailable.
+        """
+        try:
+            from .sources.ai_generator import AIGenerator, is_ai_available
+
+            if not is_ai_available():
+                return {
+                    "error": "AI generation not available. Install with: pip install 'music-cli[ai]'"
+                }
+
+            # Use persistent AI music directory from config
+            generator = AIGenerator(output_dir=self.config.ai_music_dir)
+
+            # Build prompt
+            temporal_prompt = self.temporal.get_music_prompt()
+            mood_prompt = None
+            if self._current_mood:
+                mood_prompt = MoodContext.get_prompt(self._current_mood)
+
+            duration = args.get("duration", 30)
+            return generator.generate_for_context(mood_prompt, temporal_prompt, duration)
+
+        except ImportError:
+            return {
+                "error": "AI generation not available. Install with: pip install 'music-cli[ai]'"
+            }
+
+    async def _resolve_context_track(self, args: dict) -> TrackInfo | None:
+        """Resolve a station for play mode ``context``.
+
+        Context-aware mode: use radio with mood/time awareness.
+        """
+        if self._current_mood:
+            track = self.radio_source.get_mood_station(self._current_mood.value)
+        else:
+            time_period = self.temporal.get_time_period()
+            track = self.radio_source.get_time_station(time_period.value)
+
+        if not track:
+            track = self.radio_source.get_random_station()
+
+        return track
+
+    async def _resolve_history_track(self, args: dict) -> TrackInfo | dict | None:
+        """Replay a history entry for play mode ``history``.
+
+        Returns an error response dict when YouTube playback is unavailable or
+        the video can no longer be loaded.
+        """
+        index = args.get("index", 1)
+        entry = self.history.get_by_index(index)
+        if not entry:
+            return None
+
+        if entry.source_type == "local":
+            return self.local_source.get_track(entry.source)
+
+        if entry.source_type == "youtube":
+            if not is_youtube_available():
+                return {
+                    "error": "YouTube playback not available. Install with: pip install 'coder-music-cli[youtube]'"
+                }
+            track = self.youtube_source.get_track(entry.source)
+            if not track:
+                return {
+                    "error": f"Could not load YouTube video (may be deleted or private): {entry.source}"
+                }
+            return track
+
+        return self.radio_source.get_track(entry.source, entry.title)
+
+    async def _resolve_youtube_track(self, args: dict) -> TrackInfo | dict | None:
+        """Resolve a stream for play modes ``youtube``/``yt``.
+
+        Returns an error response dict when the URL is missing or YouTube
+        playback is unavailable.
+        """
+        source = args.get("source")
+        if not source:
+            return {"error": "YouTube URL is required. Use: -s 'https://youtube.com/watch?v=...'"}
+
+        if not is_youtube_available():
+            return {
+                "error": "YouTube playback not available. Install with: pip install 'coder-music-cli[youtube]'"
+            }
+
+        return self.youtube_source.get_track(source)
 
     def _on_track_end(self) -> None:
         """Called when a track ends in auto-play mode."""
