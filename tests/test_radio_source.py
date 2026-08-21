@@ -46,9 +46,7 @@ class TestGetStations:
         with patch.object(radio_module, "is_youtube_available", return_value=True):
             assert len(source.get_stations()) == 2
 
-    def test_youtube_stations_filtered_when_unavailable(
-        self, source: RadioSource
-    ) -> None:
+    def test_youtube_stations_filtered_when_unavailable(self, source: RadioSource) -> None:
         with patch.object(radio_module, "is_youtube_available", return_value=False):
             stations = source.get_stations()
         assert [name for name, _ in stations] == ["Jazz Groove"]
@@ -75,9 +73,7 @@ class TestTrackResolution:
         track = source.get_track("https://unknown.example/stream")
         assert track.title == "https://unknown.example/stream"
 
-    def test_station_by_name_case_insensitive_partial(
-        self, source: RadioSource
-    ) -> None:
+    def test_station_by_name_case_insensitive_partial(self, source: RadioSource) -> None:
         track = source.get_station_by_name("jazz")
         assert track is not None
         assert track.title == "Jazz Groove"

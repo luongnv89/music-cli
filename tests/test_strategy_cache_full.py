@@ -126,18 +126,14 @@ class TestMaxSizeSetter:
 
 
 class TestGlobalSingleton:
-    def test_get_strategy_cache_is_singleton(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_get_strategy_cache_is_singleton(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(strategy_cache_module, "_global_cache", None)
         first = get_strategy_cache(max_size=7)
         second = get_strategy_cache(max_size=99)  # max_size ignored after creation
         assert first is second
         assert first.max_size == 7
 
-    def test_clear_global_cache_clears_instance(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_clear_global_cache_clears_instance(self, monkeypatch: pytest.MonkeyPatch) -> None:
         cache = LRUStrategyCache(max_size=2)
         spy = make_strategy()
         cache.put("m", spy)

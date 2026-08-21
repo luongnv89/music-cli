@@ -25,9 +25,7 @@ class TestDisplayStr:
         assert entry.display_str() == "2026-08-21T10:00:00 | Song Title | [local]"
 
     def test_local_source_uses_basename(self) -> None:
-        entry = HistoryEntry(
-            timestamp="t", source="/music/sub/track.mp3", source_type="local"
-        )
+        entry = HistoryEntry(timestamp="t", source="/music/sub/track.mp3", source_type="local")
         assert "track.mp3" in entry.display_str()
 
     def test_long_remote_source_is_truncated(self) -> None:
@@ -38,9 +36,7 @@ class TestDisplayStr:
         assert long_url not in display
 
     def test_artist_is_appended(self) -> None:
-        entry = HistoryEntry(
-            timestamp="t", source="s", source_type="ai", artist="The Coder"
-        )
+        entry = HistoryEntry(timestamp="t", source="s", source_type="ai", artist="The Coder")
         assert "by The Coder" in entry.display_str()
 
 
@@ -65,9 +61,7 @@ class TestHistoryRobustness:
         import json
 
         history_file = tmp_path / "history.jsonl"
-        good = HistoryEntry(
-            timestamp="t2", source="s2", source_type="local", title="Good"
-        )
+        good = HistoryEntry(timestamp="t2", source="s2", source_type="local", title="Good")
         history_file.write_text(
             "\n"
             "{not json}\n"
@@ -98,9 +92,7 @@ class TestSearchAndFiltering:
         history.log("/m/focus.mp3", "local", title="Deep Focus")
         return history
 
-    def test_search_matches_title_artist_and_source(
-        self, populated: History
-    ) -> None:
+    def test_search_matches_title_artist_and_source(self, populated: History) -> None:
         by_title = populated.search("chill")
         assert len(by_title) == 1 and by_title[0].artist == "DJ Code"
 

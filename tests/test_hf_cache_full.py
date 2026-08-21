@@ -127,9 +127,7 @@ class TestModelLookup:
             last_accessed=None,
             repo_path=Path("/x"),
         )
-        monkeypatch.setattr(
-            hf_cache_module, "scan_all_cached_models", lambda: {"m": info}
-        )
+        monkeypatch.setattr(hf_cache_module, "scan_all_cached_models", lambda: {"m": info})
         assert get_model_cache_info("m") is info
 
     def test_get_model_cache_info_miss(self, monkeypatch) -> None:
@@ -145,16 +143,12 @@ class TestModelLookup:
             last_accessed=None,
             repo_path=Path("/x"),
         )
-        monkeypatch.setattr(
-            hf_cache_module, "scan_all_cached_models", lambda: {"m": info}
-        )
+        monkeypatch.setattr(hf_cache_module, "scan_all_cached_models", lambda: {"m": info})
         assert is_model_downloaded("m") is True
 
 
 class TestDownloadModel:
-    def test_unavailable_logs_error_and_fails(
-        self, hf_unavailable, caplog
-    ) -> None:
+    def test_unavailable_logs_error_and_fails(self, hf_unavailable, caplog) -> None:
         with caplog.at_level(logging.ERROR):
             assert download_model("facebook/musicgen-small") is False
         assert any("not available" in r.message for r in caplog.records)
@@ -167,9 +161,7 @@ class TestDownloadModel:
             return "/hf-home/snapshot"
 
         monkeypatch.setattr(hf_cache_module, "snapshot_download", fake_snapshot)
-        assert (
-            download_model("facebook/musicgen-small", revision="deadbeef") is True
-        )
+        assert download_model("facebook/musicgen-small", revision="deadbeef") is True
         assert calls == [("facebook/musicgen-small", "deadbeef")]
 
     def test_http_error_is_caught(self, hf_available, monkeypatch, caplog) -> None:
@@ -216,17 +208,13 @@ class TestDeleteModel:
         assert executed == [True]
         assert any("Deleted facebook/musicgen-small" in r.message for r in caplog.records)
 
-    def test_delete_missing_model_warns(
-        self, hf_available, monkeypatch, caplog
-    ) -> None:
+    def test_delete_missing_model_warns(self, hf_available, monkeypatch, caplog) -> None:
         self._install_cache(monkeypatch, [make_repo("other/model")])
         with caplog.at_level(logging.WARNING):
             assert delete_model("ghost/model") == (False, 0)
         assert any("not found in cache" in r.message for r in caplog.records)
 
-    def test_delete_without_revisions_fails(
-        self, hf_available, monkeypatch
-    ) -> None:
+    def test_delete_without_revisions_fails(self, hf_available, monkeypatch) -> None:
         repo = make_repo("facebook/musicgen-small")
         repo.revisions = []
         self._install_cache(monkeypatch, [repo])

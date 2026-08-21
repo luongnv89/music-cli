@@ -43,9 +43,7 @@ class TestScanDirectory:
         source = LocalSource(music_dir=tmp_path)
         assert source.scan_directory(tmp_path / "absent") == []
 
-    def test_scan_finds_supported_files_sorted(
-        self, music_dir: Path
-    ) -> None:
+    def test_scan_finds_supported_files_sorted(self, music_dir: Path) -> None:
         source = LocalSource(music_dir=music_dir)
         found = source.scan_directory()
         assert found == sorted(found)  # deterministic ordering
@@ -69,9 +67,7 @@ class TestRandomAndList:
         assert track.source_type == "local"
         assert track.title in {"song", "track"}  # either supported file is valid
 
-    def test_list_tracks_respects_limit_and_skips_invalid(
-        self, music_dir: Path
-    ) -> None:
+    def test_list_tracks_respects_limit_and_skips_invalid(self, music_dir: Path) -> None:
         source = LocalSource(music_dir=music_dir)
         tracks = source.list_tracks(limit=1)
         assert len(tracks) == 1

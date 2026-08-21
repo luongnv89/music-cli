@@ -55,9 +55,7 @@ class TestLoading:
 
 
 class TestAddAndDedupe:
-    def test_add_entry_inserts_newest_first_and_persists(
-        self, history_file: Path
-    ) -> None:
+    def test_add_entry_inserts_newest_first_and_persists(self, history_file: Path) -> None:
         history = YouTubeHistory(history_file)
         history.add_entry("v1", "https://youtu.be/v1", "One")
         history.add_entry("v2", "https://youtu.be/v2", "Two")
@@ -108,9 +106,7 @@ class TestIndexAccessAndRemoval:
         assert history.remove_by_index(9) is None
         assert history.count() == 2
 
-    def test_clear_removes_everything_and_persists(
-        self, history_file: Path
-    ) -> None:
+    def test_clear_removes_everything_and_persists(self, history_file: Path) -> None:
         history = self._populated(history_file)
         history.clear()
         assert history.count() == 0
@@ -146,9 +142,7 @@ class TestSaveFailure:
 
 
 class TestSingleton:
-    def test_get_youtube_history_creates_and_reuses(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_get_youtube_history_creates_and_reuses(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(yh_module, "_youtube_history", None)
         first = yh_module.get_youtube_history()
         second = yh_module.get_youtube_history()

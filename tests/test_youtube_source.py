@@ -150,9 +150,7 @@ class TestGetTrack:
 
         assert YouTubeSource().get_track("https://youtu.be/vid5") is None
 
-    def test_missing_dependency_reraises_import_error(
-        self, monkeypatch
-    ) -> None:
+    def test_missing_dependency_reraises_import_error(self, monkeypatch) -> None:
         monkeypatch.setitem(sys.modules, "yt_dlp", None)
         with pytest.raises(ImportError, match="yt-dlp"):
             YouTubeSource().get_track("https://youtu.be/vid6")
@@ -172,8 +170,9 @@ class TestChannelFallback:
 
 
 def test_lazy_module_is_cached_on_instance(monkeypatch) -> None:
-    first = install_fake_yt_dlp(monkeypatch, None)
+    install_fake_yt_dlp(monkeypatch, None)
     source = YouTubeSource()
-    assert source._ensure_yt_dlp() is sys.modules["yt_dlp"]
+    handle = source._ensure_yt_dlp()
+    assert source._yt_dlp is sys.modules["yt_dlp"]
     # Second call reuses the cached module handle.
-    assert source._ensure_yt_dlp() is first or isinstance(source._yt_dlp, ModuleType)
+    assert source._ensure_yt_dlp() is handle

@@ -84,9 +84,7 @@ class TestListModels:
     def test_unknown_types_sort_last(self, manager) -> None:
         mgr, config = manager
         exotic = two_model_config()
-        exotic.models["weird"] = ModelConfig(
-            id="weird", hf_model_id="x/y", model_type="alien"
-        )
+        exotic.models["weird"] = ModelConfig(id="weird", hf_model_id="x/y", model_type="alien")
         config.get_ai_models_config.return_value = exotic
         with patch.object(mm_module.hf_cache, "scan_all_cached_models", return_value={}):
             models = mgr.list_models()
@@ -195,9 +193,7 @@ class TestDelete:
                 return_value={"facebook/musicgen-small": info},
             ),
             patch.object(mm_module.hf_cache, "is_available", return_value=True),
-            patch.object(
-                mm_module.hf_cache, "delete_model", return_value=(True, 1024)
-            ),
+            patch.object(mm_module.hf_cache, "delete_model", return_value=(True, 1024)),
             patch("music_cli.sources.ai_models.get_strategy_cache", return_value=fake_cache),
         ):
             ok, msg, freed = mgr.delete_model("small")
@@ -216,9 +212,7 @@ class TestDelete:
                 return_value={"facebook/musicgen-small": info},
             ),
             patch.object(mm_module.hf_cache, "is_available", return_value=True),
-            patch.object(
-                mm_module.hf_cache, "delete_model", return_value=(False, 0)
-            ),
+            patch.object(mm_module.hf_cache, "delete_model", return_value=(False, 0)),
         ):
             ok, msg, freed = mgr.delete_model("small")
         assert ok is False and "Failed to delete" in msg

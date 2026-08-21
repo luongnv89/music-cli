@@ -62,7 +62,7 @@ def install_fake_scipy(monkeypatch: pytest.MonkeyPatch) -> Mock:
     wavfile = ModuleType("scipy.io.wavfile")
     write = Mock()
     wavfile.write = write  # type: ignore[attr-defined]
-    scipy.io = scipy_io  # type: ignore[attr-supported]
+    scipy.io = scipy_io  # type: ignore[attr-defined]
     scipy_io.wavfile = wavfile  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "scipy", scipy)
     monkeypatch.setitem(sys.modules, "scipy.io", scipy_io)
@@ -121,9 +121,7 @@ class TestIsAiAvailable:
 
 
 class TestStrategyCacheHelper:
-    def test_updates_max_size_when_config_changed(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_updates_max_size_when_config_changed(self, monkeypatch: pytest.MonkeyPatch) -> None:
         cache = SimpleNamespace(max_size=5)
         monkeypatch.setattr(
             "music_cli.config.get_config",
@@ -157,11 +155,15 @@ class TestGetStrategy:
         failing = Mock()
         failing.is_loaded = False
         failing.ensure_loaded.return_value = False
-        monkeypatch.setattr(ai_generator_module, "_get_strategy_cache", lambda: SimpleNamespace(
-            get=lambda _: None,
-            get_cached_models=lambda: [],
-            put=lambda *_: None,
-        ))
+        monkeypatch.setattr(
+            ai_generator_module,
+            "_get_strategy_cache",
+            lambda: SimpleNamespace(
+                get=lambda _: None,
+                get_cached_models=lambda: [],
+                put=lambda *_: None,
+            ),
+        )
         monkeypatch.setattr("music_cli.config.get_config", self._config)
         monkeypatch.setattr(
             "music_cli.sources.ai_models.ModelRegistry.create_strategy",
@@ -171,11 +173,15 @@ class TestGetStrategy:
         failing.ensure_loaded.assert_called_once_with()
 
     def test_value_error_returns_none(self, monkeypatch) -> None:
-        monkeypatch.setattr(ai_generator_module, "_get_strategy_cache", lambda: SimpleNamespace(
-            get=lambda _: None,
-            get_cached_models=lambda: [],
-            put=lambda *_: None,
-        ))
+        monkeypatch.setattr(
+            ai_generator_module,
+            "_get_strategy_cache",
+            lambda: SimpleNamespace(
+                get=lambda _: None,
+                get_cached_models=lambda: [],
+                put=lambda *_: None,
+            ),
+        )
         monkeypatch.setattr("music_cli.config.get_config", self._config)
 
         def raise_value_error(_cfg):
@@ -188,11 +194,15 @@ class TestGetStrategy:
         assert _get_strategy("musicgen-small") is None
 
     def test_unexpected_error_returns_none(self, monkeypatch) -> None:
-        monkeypatch.setattr(ai_generator_module, "_get_strategy_cache", lambda: SimpleNamespace(
-            get=lambda _: None,
-            get_cached_models=lambda: [],
-            put=lambda *_: None,
-        ))
+        monkeypatch.setattr(
+            ai_generator_module,
+            "_get_strategy_cache",
+            lambda: SimpleNamespace(
+                get=lambda _: None,
+                get_cached_models=lambda: [],
+                put=lambda *_: None,
+            ),
+        )
         monkeypatch.setattr("music_cli.config.get_config", self._config)
 
         def raise_oops(_cfg):
@@ -230,9 +240,7 @@ class TestGetStrategy:
         assert removed == ["bark"]  # minimax target evicts incompatible cache
 
     def test_non_minimax_pair_is_not_evicted(self, monkeypatch) -> None:
-        cached_cfg = ModelConfig(
-            id="bark", hf_model_id="suno/bark", model_type="bark"
-        )
+        cached_cfg = ModelConfig(id="bark", hf_model_id="suno/bark", model_type="bark")
         cached = Mock(spec=["is_loaded", "ensure_loaded"])
         cached.is_loaded = False
         cached.config = cached_cfg
@@ -289,9 +297,7 @@ class TestGenerate:
             assert generator.generate("beats") is None
 
     @pytest.mark.parametrize("lyrics", [None, "", "   "])
-    def test_requires_lyrics_models_reject_missing_lyrics(
-        self, tmp_path, lyrics
-    ) -> None:
+    def test_requires_lyrics_models_reject_missing_lyrics(self, tmp_path, lyrics) -> None:
         generator, _ = self._generator()
         with patch.object(ai_generator_module, "is_ai_available", return_value=True):
             result = generator.generate("song", model_id="minimax-music3", lyrics=lyrics)
@@ -326,9 +332,7 @@ class TestGenerate:
             patch.object(ai_generator_module, "is_ai_available", return_value=True),
             patch.object(ai_generator_module, "_get_strategy", return_value=strategy),
         ):
-            track = generator.generate(
-                "lofi beats", duration=999, add_looping=True
-            )
+            track = generator.generate("lofi beats", duration=999, add_looping=True)
 
         assert track is not None
         assert track.source_type == "ai"
@@ -343,9 +347,7 @@ class TestGenerate:
         # Audio written via the injected stub writer.
         wav_write.assert_called_once()
 
-    def test_generation_without_looping_keeps_prompt(
-        self, tmp_path, monkeypatch
-    ) -> None:
+    def test_generation_without_looping_keeps_prompt(self, tmp_path, monkeypatch) -> None:
         generator, _ = self._generator()
         strategy = make_strategy()
         install_fake_scipy(monkeypatch)
@@ -366,9 +368,7 @@ class TestGenerate:
             patch.object(ai_generator_module, "is_ai_available", return_value=True),
             patch.object(ai_generator_module, "_get_strategy", return_value=strategy),
         ):
-            generator.generate(
-                "song", model_id="minimax-music3", lyrics="verse one"
-            )
+            generator.generate("song", model_id="minimax-music3", lyrics="verse one")
         kwargs = strategy.generate_audio.call_args[1]
         assert kwargs == {"lyrics": "verse one"}
 
