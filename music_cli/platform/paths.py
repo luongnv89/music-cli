@@ -56,6 +56,20 @@ class PathProvider(ABC):
         """
         return config_dir / "music-cli.pid"
 
+    def get_daemon_log_file(self, config_dir: Path) -> Path:
+        """Get daemon startup log file path.
+
+        The daemon child's stderr is redirected here so a startup failure
+        leaves a readable traceback instead of vanishing into DEVNULL.
+
+        Args:
+            config_dir: The config directory.
+
+        Returns:
+            Path to the daemon log file.
+        """
+        return config_dir / "daemon.log"
+
     def get_ai_music_dir(self, config_dir: Path) -> Path:
         """Get AI-generated music directory.
 

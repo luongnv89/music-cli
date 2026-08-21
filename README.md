@@ -473,6 +473,7 @@ Configuration files location:
 | File | Purpose |
 |------|---------|
 | `config.toml` | Settings (volume, mood mappings, version) |
+| `daemon.log` | Daemon startup errors (stderr) |
 | `radios.txt` | Station URLs (name\|url format) |
 | `history.jsonl` | Play history |
 | `ai_tracks.json` | AI track metadata (prompts, durations) |
