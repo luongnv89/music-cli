@@ -123,14 +123,17 @@ class MusicDaemon(
             for sig in (signal.SIGTERM, signal.SIGINT):
                 loop.add_signal_handler(sig, lambda: self._spawn_task(self.stop()))
 
-        # Start IPC server (platform-specific)
-        await self._ipc_server.start(self._handle_client, socket_path)
-
         # Write PID file with the run's identity so liveness checks can
-        # verify the process behind the PID is this daemon (#68).
+        # verify the process behind the PID is this daemon (#68). This must
+        # happen *before* the IPC server binds: an unwritable config dir
+        # would otherwise kill the daemon while its socket is already
+        # accepting connections (#84, F-BUG-022).
         self.config.pid_file.write_text(
             json.dumps({"pid": os.getpid(), "identity": self._identity})
         )
+
+        # Start IPC server (platform-specific)
+        await self._ipc_server.start(self._handle_client, socket_path)
 
         address_display = self._ipc_server.get_address_display(socket_path)
         logger.info(f"Daemon started, listening on {address_display}")
