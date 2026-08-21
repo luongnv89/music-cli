@@ -148,4 +148,3 @@ skips = [
 
 [tool.coverage.run]
 source = ["music_cli"]
-omit = ["music_cli/sources/ai_generator.py"]  # Skip AI module (optional dependency)
