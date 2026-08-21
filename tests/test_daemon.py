@@ -264,6 +264,11 @@ class TestIdentityLiveness:
         """The real probe returns None against a socket path with no listener."""
         assert _probe_daemon_identity(tmp_path / "no-such.sock", None) is None
 
+    @pytest.mark.skipif(
+        os.name == "nt",
+        reason="socket-file leftovers are Unix-only; the recycled-PID core is "
+        "covered cross-platform by test_live_unrelated_process_is_not_running",
+    )
     def test_recycled_pid_scenario_end_to_end(self, tmp_path: Path) -> None:
         """Unclean exit + PID recycling: stale file cleaned, daemon restartable.
 
