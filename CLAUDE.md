@@ -16,7 +16,7 @@ IMPORTANT: always invoke tools through `.venv/bin/` — bare `pytest`/`mypy` res
 ## Architecture map
 
 - `music_cli/cli.py` — Click CLI (`mc`) front end
-- `music_cli/daemon.py` — background daemon; command handlers registered in `_process_command`
+- `music_cli/daemon.py` — background daemon transport/lifecycle; IPC command handlers live in `music_cli/daemon_handlers.py`, registered via the `COMMAND_HANDLERS` table
 - `music_cli/player/ffplay.py` — `ffplay` (FFmpeg) audio backend
 - `music_cli/sources/` — radio, local, youtube, ai_generator (optional extras)
 - `music_cli/platform/` — OS media controllers

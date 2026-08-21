@@ -209,6 +209,24 @@ class AIGenerator:
         """
         return self._config.list_ai_models(enabled_only=enabled_only)
 
+    def _validated_model_for(self, model_id: str | None, lyrics: str | None) -> Any | None:
+        """Resolve and vet the configured model for a generation request.
+
+        Returns the model configuration, or ``None`` (after logging) when the
+        model is unknown/disabled or the lyrics contract is violated.
+        """
+        configured_model = self._config.get_ai_models_config().get_model(model_id)
+        if configured_model is None:
+            logger.error("Model '%s' is not configured or enabled", model_id)
+            return None
+        if lyrics is not None and not configured_model.supports_lyrics:
+            logger.error("Model '%s' does not support lyrics", model_id)
+            return None
+        if configured_model.requires_lyrics and (not lyrics or not lyrics.strip()):
+            logger.error("Model '%s' requires non-empty lyrics", model_id)
+            return None
+        return configured_model
+
     def generate(
         self,
         prompt: str,
@@ -242,15 +260,8 @@ class AIGenerator:
             model_id = self.get_default_model()
 
         # Validate lyrics capabilities before loading a potentially large model.
-        configured_model = self._config.get_ai_models_config().get_model(model_id)
+        configured_model = self._validated_model_for(model_id, lyrics)
         if configured_model is None:
-            logger.error("Model '%s' is not configured or enabled", model_id)
-            return None
-        if lyrics is not None and not configured_model.supports_lyrics:
-            logger.error("Model '%s' does not support lyrics", model_id)
-            return None
-        if configured_model.requires_lyrics and (not lyrics or not lyrics.strip()):
-            logger.error("Model '%s' requires non-empty lyrics", model_id)
             return None
 
         # Get or create strategy for this model
