@@ -77,7 +77,8 @@ class TestFFplayPlayerImmediateExit:
         assert player.current_track is None
         assert player._process is None
         assert player._monitor_task is None
-        assert mock_process.wait_calls == 1
+        # One wait in the startup probe + one reaping wait in cleanup (#84).
+        assert mock_process.wait_calls == 2
 
     @pytest.mark.asyncio
     async def test_play_succeeds_when_ffplay_stays_alive(self, tmp_path) -> None:
@@ -198,7 +199,7 @@ class TestFFplayPlayerImmediateExit:
 
                         await player.stop()
 
-        assert pipe_process.wait_calls == 1
+        assert pipe_process.wait_calls == 2
 
     @SKIP_WINDOWS_YOUTUBE_PIPE
     @pytest.mark.asyncio
@@ -229,8 +230,8 @@ class TestFFplayPlayerImmediateExit:
         assert player.state == PlayerState.STOPPED
         assert player.current_track is None
         assert player._process is None
-        assert pipe_process.wait_calls == 1
-        assert direct_process.wait_calls == 1
+        assert pipe_process.wait_calls == 2
+        assert direct_process.wait_calls == 2
         mock_killpg.assert_called_once_with(12345, signal.SIGTERM)
 
     @SKIP_WINDOWS_YOUTUBE_PIPE
@@ -261,6 +262,76 @@ class TestFFplayPlayerImmediateExit:
                     await player.stop()
 
         mock_killpg.assert_called_once_with(12345, 15)
+
+
+class TestFFplayPlayerStartupProbe:
+    """Regression tests for #84 (F-BUG-017): race-free startup liveness.
+
+    play() waits on the subprocess with a timeout instead of sleeping and
+    polling returncode, so a death anywhere inside the probe window is seen.
+    """
+
+    @pytest.mark.asyncio
+    async def test_death_within_probe_window_is_detected(self, tmp_path, monkeypatch) -> None:
+        """An exit that lands inside the probe window still fails play()."""
+        player = FFplayPlayer()
+        monkeypatch.setattr("music_cli.player.ffplay.STARTUP_PROBE_TIMEOUT", 0.2)
+        mock_process = FakeProcess(returncode=None)
+
+        with patch.object(asyncio, "create_subprocess_exec", new_callable=AsyncMock) as mock_exec:
+            mock_exec.return_value = mock_process
+
+            track = TrackInfo(
+                source=str(tmp_path / "test.mp3"),
+                source_type="local",
+                title="Test Track",
+            )
+
+            async def die_later() -> None:
+                await asyncio.sleep(0.05)
+                mock_process.kill()
+
+            killer = asyncio.create_task(die_later())
+            try:
+                result = await player.play(track)
+            finally:
+                killer.cancel()
+
+        assert result is False
+        assert player.state == PlayerState.STOPPED
+
+    @pytest.mark.asyncio
+    async def test_death_after_probe_window_reports_playing(self, tmp_path, monkeypatch) -> None:
+        """A death after the probe window is not mistaken for a startup failure.
+
+        With sleep-then-poll this case was indistinguishable from a crash at
+        any point during the window; with wait-for-timeout it deterministically
+        reports PLAYING and leaves detection to the monitor task.
+        """
+        player = FFplayPlayer()
+        monkeypatch.setattr("music_cli.player.ffplay.STARTUP_PROBE_TIMEOUT", 0.02)
+        mock_process = FakeProcess(returncode=None)
+        loop = asyncio.get_running_loop()
+        die_handle = loop.call_later(0.5, mock_process._finished.set)
+
+        try:
+            with patch.object(
+                asyncio, "create_subprocess_exec", new_callable=AsyncMock
+            ) as mock_exec:
+                mock_exec.return_value = mock_process
+
+                track = TrackInfo(
+                    source=str(tmp_path / "test.mp3"),
+                    source_type="local",
+                    title="Test Track",
+                )
+
+                result = await player.play(track)
+                assert result is True
+                assert player.state == PlayerState.PLAYING
+        finally:
+            die_handle.cancel()
+            await player.stop()
 
 
 class TestFFplayPlayerProcessGroup:
