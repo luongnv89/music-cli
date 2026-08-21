@@ -166,7 +166,7 @@ class FFplayPlayer(Player):
                 cmd,
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.DEVNULL,
-                preexec_fn=os.setsid,
+                process_group=0,  # own process group (setsid equivalent, thread-safe; 3.11+)
             )
             self._is_process_group = True
 

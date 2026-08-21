@@ -36,14 +36,15 @@ class FakeProcess:
         self._finished.set()
 
 
-# The YouTube-pipe feature uses os.setsid (preexec_fn) and os.killpg for
-# process-group management, both Unix-only. Production code short-circuits
+# The YouTube-pipe feature puts the shell in its own process group via
+# process_group=0 (the 3.11+ replacement for os.setsid's preexec_fn) and
+# manages it with os.killpg — Unix-only. Production code short-circuits
 # this path on Windows (see FFplayPlayer._play_youtube_pipe), so the three
 # tests below patch os.killpg — which does not exist on Windows — and must
 # be skipped there rather than patched into existence.
 SKIP_WINDOWS_YOUTUBE_PIPE = pytest.mark.skipif(
     sys.platform == "win32",
-    reason="YouTube pipe uses Unix-only os.killpg/os.setsid; Windows falls back to direct URL",
+    reason="YouTube pipe uses Unix-only os.killpg/process_group; Windows falls back to direct URL",
 )
 
 
@@ -260,3 +261,68 @@ class TestFFplayPlayerImmediateExit:
                     await player.stop()
 
         mock_killpg.assert_called_once_with(12345, 15)
+
+
+class TestFFplayPlayerProcessGroup:
+    """Regression tests for issue #59: process_group=0 replaces preexec_fn.
+
+    preexec_fn=os.setsid is documented as unsafe in the presence of threads
+    (cli.py runs ComposingAnimation). On the >=3.11 floor the supported
+    construction is `process_group=0`; killpg semantics are unchanged because
+    the child becomes pgid leader (pgid == pid).
+    """
+
+    @SKIP_WINDOWS_YOUTUBE_PIPE
+    async def test_youtube_pipe_constructs_child_with_process_group_kwarg(self) -> None:
+        """The pipe path passes process_group=0 and never preexec_fn."""
+        player = FFplayPlayer()
+        mock_process = FakeProcess(returncode=None, pid=4242)
+
+        with patch.object(asyncio, "create_subprocess_shell", new_callable=AsyncMock) as mock_shell:
+            mock_shell.return_value = mock_process
+            with patch("music_cli.player.ffplay.shutil.which", return_value="/usr/bin/yt-dlp"):
+                track = TrackInfo(
+                    source="https://youtube.com/watch?v=xxx",
+                    source_type="youtube",
+                    title="YouTube Track",
+                    metadata={"youtube_url": "https://youtube.com/watch?v=xxx"},
+                )
+
+                result = await player.play(track)
+                assert result is True
+
+                kwargs = mock_shell.await_args.kwargs
+                assert "preexec_fn" not in kwargs, (
+                    "preexec_fn must be gone from the spawn call (#59)"
+                )
+                assert kwargs.get("process_group") == 0
+
+                await player.stop()
+
+    @SKIP_WINDOWS_YOUTUBE_PIPE
+    async def test_process_group_child_is_distinct_and_killpg_reaps(self) -> None:
+        """A real child spawned like the pipe path lands in its own group.
+
+        Asserts the mechanism stop() relies on: pgid == child pid (distinct
+        from ours), and killpg(SIGTERM) + wait() reaps it.
+        """
+        import os
+
+        proc = await asyncio.create_subprocess_shell(
+            "sleep 30",
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+            process_group=0,
+        )
+        try:
+            assert proc.pid > 0
+            child_pgid = os.getpgid(proc.pid)
+            assert child_pgid != os.getpgid(0), "child must be in a distinct process group"
+            assert child_pgid == proc.pid, "child must lead its own process group"
+        finally:
+            try:
+                os.killpg(proc.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+            await asyncio.wait_for(proc.wait(), timeout=5.0)
+        assert proc.returncode is not None, "stop() semantics: child was reaped"
