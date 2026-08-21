@@ -140,7 +140,7 @@ def _warn_deprecated_modes(mode: str | None) -> None:
         )
 
 
-def _detect_mode_and_source(options: PlayOptions) -> tuple[str | None, str | None]:
+def _detect_mode_and_source(options: PlayOptions) -> tuple[str, str | None]:
     """Resolve the effective (mode, source), honouring smart auto-detection."""
     # Task 2.1: Smart auto-detection when --mode is NOT given
     if options.mode is None:
