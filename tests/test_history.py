@@ -247,9 +247,17 @@ class TestHistory:
         history_file.write_text("\n".join(lines) + "\n")
         history = History(history_file=history_file)
 
-        start = time.perf_counter()
-        entry = history.get_by_index(1)
-        elapsed = time.perf_counter() - start
+        # Warm up so one-off costs (filesystem cache, allocator, first-call
+        # overhead) don't pollute the timing, then take the best of several
+        # timed calls — stable on shared CI runners while still failing hard
+        # if reads regress to a full-file parse.
+        assert history.get_by_index(1) is not None
+        timings = []
+        for _ in range(5):
+            start = time.perf_counter()
+            entry = history.get_by_index(1)
+            timings.append(time.perf_counter() - start)
+        elapsed = min(timings)
 
         assert entry is not None
         assert entry.title == f"Song {total - 1}"
