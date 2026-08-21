@@ -40,6 +40,18 @@ class TestIsYoutubeUrl:
     def test_detection(self, url: str, expected: bool) -> None:
         assert _is_youtube_url(url) is expected
 
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://evil-youtube.com.attacker.net/x",
+            "https://youtube.com.attacker.net/watch?v=x",
+            "https://notyoutube.com/watch?v=x",
+        ],
+    )
+    def test_lookalike_hosts_rejected(self, url: str) -> None:
+        """Host comparison, not substring matching (#84)."""
+        assert _is_youtube_url(url) is False
+
 
 class TestGetStations:
     def test_youtube_stations_kept_when_available(self, source: RadioSource) -> None:

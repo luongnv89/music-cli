@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any
 from .context.mood import MoodContext
 from .history import HistoryEntry
 from .player.base import TrackInfo
+from .sources.youtube import is_youtube_url
 from .youtube_history import YouTubeHistoryEntry
 
 if TYPE_CHECKING:
@@ -272,7 +273,7 @@ class PlaybackHandlers:
                 track = self.radio_source.get_random_station()
 
         # Handle YouTube URLs in radio stations
-        if track and ("youtube.com" in track.source or "youtu.be" in track.source):
+        if track and is_youtube_url(track.source):
             station_name = track.title
             yt_track = self.youtube_source.get_track(track.source)
             if yt_track:
