@@ -138,7 +138,8 @@ flowchart TD
 
 ## IPC Protocol
 
-Communication uses JSON over IPC (Unix sockets on Linux/macOS, TCP localhost on Windows):
+Communication uses JSON over IPC (Unix sockets on Linux/macOS, TCP localhost
+port 44556 on Windows — `music_cli/platform/ipc.py:25-27`):
 
 ### Request Format
 ```json
@@ -183,17 +184,24 @@ Communication uses JSON over IPC (Unix sockets on Linux/macOS, TCP localhost on 
 └── music-cli.pid    # Daemon PID (runtime)
 ```
 
+File names come from the path providers: `music-cli.pid`
+(`music_cli/platform/paths.py:57`), `daemon.log` (`paths.py:71`),
+`ai_music/` (`paths.py:82`), `history.jsonl` (`paths.py:86`),
+`youtube_cache/` (`paths.py:90`), `music-cli.sock` (`paths.py:120`),
+plus `radios.txt`, `ai_tracks.json`, and `youtube_cache.json`
+created by `music_cli/config.py`.
+
 ## Dependencies
 
 ### Required
-- Python 3.9+
+- Python 3.12+ (`pyproject.toml:10`)
 - FFmpeg (ffplay)
-- click, tomli-w
+- click, tomli-w (`pyproject.toml:33-38`)
 
 ### Optional (AI Mode)
-- PyTorch
-- transformers
-- audiocraft (MusicGen)
+- PyTorch, transformers, diffusers >= 0.39.0, scipy, tqdm (`pyproject.toml:41-49`)
+- MiniMax Music 3 uses the pinned `[minimax]` extra (`pyproject.toml:51-57`)
+- YouTube streaming uses yt-dlp >= 2026.7.4 (`pyproject.toml:58-62`)
 
 ## Design Decisions
 
@@ -212,12 +220,16 @@ music-cli supports Linux, macOS, and Windows 10+ through a platform abstraction 
 
 | Feature | Linux/macOS | Windows |
 |---------|-------------|---------|
-| **IPC** | Unix sockets | TCP localhost (port 44556) |
+| **IPC** | Unix sockets (`music_cli/platform/paths.py:111-120`) | TCP localhost, port 44556 (`music_cli/platform/ipc.py:25-27`) |
 | **Pause/Resume** | SIGSTOP/SIGCONT signals | stdin 'p' command to ffplay |
-| **Config Dir** | `~/.config/music-cli/` | `%LOCALAPPDATA%\music-cli\` |
+| **Config Dir** | `~/.config/music-cli/`, honors `$XDG_CONFIG_HOME` (`music_cli/platform/paths.py:100-109`) | `%LOCALAPPDATA%\music-cli\` (`music_cli/platform/paths.py:130-140`) |
 | **Daemon Spawn** | `start_new_session=True` | `CREATE_NEW_PROCESS_GROUP` |
 | **PID Liveness** | `os.kill(pid, 0)` | `OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION)` |
 | **Shutdown** | SIGTERM signal | IPC shutdown command |
+
+Pause/resume and PID-liveness behavior lives in
+`music_cli/platform/player_control.py`; daemon spawn/shutdown in
+`music_cli/cli/daemon_cmds.py`.
 
 ### Platform Module Structure
 

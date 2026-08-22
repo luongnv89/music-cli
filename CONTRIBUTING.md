@@ -36,7 +36,7 @@ This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.
 
 ### Prerequisites
 
-- Python 3.10+
+- Python 3.12+ (`pyproject.toml:10`)
 - FFmpeg (`brew install ffmpeg` / `sudo apt install ffmpeg` / `choco install ffmpeg`)
 - Git
 
@@ -47,9 +47,9 @@ git clone https://github.com/luongnv89/music-cli
 cd music-cli
 
 # Create and activate a virtual environment
-python -m venv venv
-source venv/bin/activate        # Linux/macOS
-# or: venv\Scripts\activate     # Windows
+python -m venv .venv
+source .venv/bin/activate        # Linux/macOS
+# or: .venv\Scripts\activate     # Windows
 
 # Install with all dev dependencies
 pip install -e ".[dev]"
@@ -69,14 +69,15 @@ or CI and your local results will diverge:
 
 ```bash
 pip install -e ".[ai]"       # AI music generation (PyTorch ~5GB)
-pip install -e ".[youtube]"  # YouTube streaming (yt-dlp ~10MB)
+pip install -e ".[minimax]"  # MiniMax Music 3 lyrics-conditioned generation (`pyproject.toml:51-57`)
+pip install -e ".[youtube]"  # YouTube streaming (yt-dlp, pinned >= 2026.7.4 — `pyproject.toml:58-62`)
 ```
 
 ### Verify setup
 
 ```bash
 music-cli --help
-pytest
+.venv/bin/pytest -q -p no:cacheprovider   # Command of record (docs/AGENT_SETUP.md §4)
 ```
 
 ---
@@ -217,9 +218,9 @@ except (FileNotFoundError, PermissionError) as e:
 New code should come with tests. The test suite uses [pytest](https://pytest.org).
 
 ```bash
-pytest                                          # Run all tests
-pytest --cov=music_cli --cov-report=term-missing  # With coverage
-pytest tests/test_config.py -v                  # Single file
+.venv/bin/pytest -q -p no:cacheprovider          # Run all tests (command of record)
+# Coverage is forced by pytest addopts: --cov=music_cli --cov-fail-under=75 (pyproject.toml:130-136)
+pytest tests/test_config.py -v                   # Single file
 ```
 
 **Guidelines:**

@@ -70,7 +70,8 @@ mc ai model
 
 ## Model Selection Guide
 
-mc supports **9 AI models** across 4 families. Choose based on your use case:
+mc supports **9 AI models** across 4 families
+(`music_cli/sources/ai_models/model_config.py:240-363`). Choose based on your use case:
 
 ### MusicGen Models (Music Generation)
 
@@ -119,7 +120,7 @@ Best for: **Announcements, greetings, short narrations**
 - "Time for a break. Stand up and stretch."
 - "Great job! You've been coding for an hour."
 
-> **Note:** Bark has a token limit that restricts output to ~10-15 seconds maximum.
+> **Note:** Bark has a token limit that restricts output to ~10-15 seconds maximum (`music_cli/sources/ai_models/model_config.py:346,358`).
 
 ### Quick Selection Guide
 
@@ -400,6 +401,9 @@ num_inference_steps = 10  # More = better quality, slower
 guidance_scale = 2.5      # How closely to follow prompt
 ```
 
+Defaults: `music_cli/sources/ai_models/model_config.py:235-239` (default model,
+LRU cache) and `model_config.py:317-320,333-336` (AudioLDM extra params).
+
 ### Disk Space Management
 
 Check your model storage:
@@ -575,7 +579,8 @@ It generates complete songs from a detailed music description and non-empty
 lyrics, including section tags such as `[Verse]` and `[Chorus]`.
 
 Install its isolated optional dependencies. The extra pins Diffusers to the
-0.39.x series, which includes the released ModularPipeline integration:
+0.39.x series, which includes the released ModularPipeline integration
+(`pyproject.toml:51-57`):
 
 ```bash
 pip install 'coder-music-cli[minimax]'

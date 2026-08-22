@@ -1,5 +1,10 @@
 # Code Review Report
 
+> **Snapshot notice:** this is a point-in-time audit of commit `0f00ec5`
+> (2026-08-19). Individual findings are not re-verified against `main` as code
+> changes land; consult the git history and `MODERNIZATION_PLAN.md` for
+> resolution status.
+
 **Date**: 2026-08-19
 **Scope**: Full Audit — `music_cli/` package + `install.sh` (tests excluded by request)
 **Mode**: Mode 1 (inline; 37 files, ~5.9 kLOC — under the 50-file / 5 kLOC subagent threshold)

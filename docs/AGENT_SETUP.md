@@ -61,22 +61,14 @@ as a failure.
 - Run a single file or test when iterating:
   `.venv/bin/pytest tests/test_config.py -q -p no:cacheprovider`
 
-## 5. mypy currently exits 2 (tracked, not a broken environment)
+## 5. mypy floor — resolved
 
-`python_version = "3.10"` is set in `pyproject.toml` → `[tool.mypy]`, but the
-installed numpy stubs require Python 3.12+ syntax, so mypy crashes before
-checking any file:
-
-```bash
-.venv/bin/mypy music_cli    # exits 2 — known, not your fault
-```
-
-Expected error:
-`numpy/__init__.pyi: Type statement is only supported in Python 3.12 and greater`
-
-This is tracked as **`F-CI-002`** (see `MODERNIZATION_PLAN.md` → Task 0.3). Do
-not mistake it for a broken environment, and do not attempt to "fix" it by
-editing `[tool.mypy]` here — Task 0.3 owns that.
+`python_version = "3.12"` is set in `pyproject.toml:119`, aligned with the
+project floor (`requires-python = ">=3.12"`, `pyproject.toml:10`). The earlier
+crash with numpy stubs (`F-CI-002`) is closed: `.venv/bin/mypy music_cli`
+should run to completion. If you still see
+`Type statement is only supported in Python 3.12 and greater`, your checkout
+predates the floor raise — re-sync.
 
 ## 6. Formatting
 
@@ -95,3 +87,7 @@ After the setup above, a green run confirms the environment:
 ```bash
 .venv/bin/pytest -q -p no:cacheprovider
 ```
+
+`scripts/validate-dev-setup.sh --check` verifies the preconditions
+(`.venv`, `ffplay`, pinned tool versions, editable install) without running the
+test suite.

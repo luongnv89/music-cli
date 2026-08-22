@@ -20,7 +20,7 @@ mc stop
 ## Installation
 
 ### Requirements
-- Python 3.10+
+- Python 3.12+ (`pyproject.toml:10`)
 - FFmpeg
 - **Supported Platforms**: Linux, macOS, Windows 10+
 
@@ -107,15 +107,20 @@ pip install 'coder-music-cli[ai]'
 | `mc ai remove <num>` | Remove a track |
 | `mc ai model` | List available AI models |
 
-### YouTube Cache
+### YouTube Replay History
 
 | Command | Description |
 |---------|-------------|
-| `mc yt` | List cached YouTube tracks |
-| `mc yt list` | List cached YouTube tracks |
-| `mc yt play <num>` | Play cached track by number (offline) |
-| `mc yt remove <num>` | Remove a cached track |
-| `mc yt clear` | Clear entire YouTube cache |
+| `mc yt` | List replay history |
+| `mc yt list` | List replay history |
+| `mc yt play <num>` | Replay an entry by number (re-extracts the stream) |
+| `mc yt remove <num>` | Remove a history entry |
+| `mc yt clear` | Clear entire replay history |
+
+Played videos are recorded in `youtube_cache.json` (max 1000 entries,
+`music_cli/youtube_history.py:92-104`). Playback streams via a yt-dlp→ffplay
+pipe; no audio is downloaded (`music_cli/sources/youtube.py:120`,
+`music_cli/player/ffplay.py:156`).
 
 ### History
 
@@ -198,12 +203,15 @@ For the full AI command suite, see [AI Music Generation](#ai-music-generation) o
 ### YouTube Streaming
 
 ```bash
-# Stream and auto-cache
+# Stream via yt-dlp→ffplay pipe (recorded in replay history)
 mc play "https://youtube.com/watch?v=xxx"
 
-# Play from cache (offline)
+# Replay from history
 mc yt play 3
 ```
+
+Audio streams directly to ffplay; nothing is downloaded
+(`music_cli/sources/youtube.py:120`, `music_cli/player/ffplay.py:156`).
 
 ### History Mode
 
@@ -214,11 +222,17 @@ mc history
 # Replay by number
 mc history play 3
 
-# Also: replay via play command
+# Also: replay via play command (deprecated alias; removal planned in v1.0)
 mc play -m history -i 3
 ```
 
+> **Note:** the legacy `-m ai` / `-m history` play modes print deprecation
+> warnings and are slated for removal in v1.0 (`music_cli/cli/playback.py:128-139`).
+
 ## Moods
+
+The eight moods below are defined in the mood context module
+(`music_cli/context/mood.py:7-17`):
 
 | Mood | Description |
 |------|-------------|
@@ -287,9 +301,12 @@ num_inference_steps = 10
 guidance_scale = 2.5
 
 [youtube.cache]
-enabled = true
-max_size_gb = 2.0
+enabled = true    # reserved default; no runtime effect today (`music_cli/config.py:59-64`)
+max_size_gb = 2.0 # read for `mc yt list` stats only (`music_cli/daemon_handlers.py:652`)
 ```
+
+Defaults live in `music_cli/config.py:42-66`; AI model defaults in
+`music_cli/sources/ai_models/model_config.py:235-239`.
 
 ### radios.txt
 
@@ -315,8 +332,8 @@ https://some-stream.example.com/stream.mp3
 | `history.jsonl` | Playback history |
 | `ai_tracks.json` | AI track metadata (prompts, durations) |
 | `ai_music/` | AI-generated audio files |
-| `youtube_cache.json` | YouTube cache metadata |
-| `youtube_cache/` | Cached YouTube audio files |
+| `youtube_cache.json` | YouTube replay history (`music_cli/config.py:304`) |
+| `youtube_cache/` | YouTube cache dir — no automatic writes (`music_cli/platform/paths.py:88-90`) |
 
 ## Workflows
 
@@ -358,17 +375,20 @@ mc ai remove 2                          # Delete track #2
 
 ### Available AI Models
 
+Sizes are expected download sizes from the model registry
+(`music_cli/sources/ai_models/model_config.py:240-363`):
+
 | Model ID | Type | Best For | Size |
 |----------|------|----------|------|
-| `musicgen-small` | MusicGen | Music generation (default) | ~1.5GB |
-| `musicgen-medium` | MusicGen | Higher quality music | ~3GB |
-| `musicgen-large` | MusicGen | Best quality music | ~6GB |
-| `musicgen-melody` | MusicGen | Melody-conditioned music | ~3GB |
-| `audioldm-s-full-v2` | AudioLDM | Sound effects, ambient audio | ~1GB |
-| `audioldm-l-full` | AudioLDM | High-quality audio generation | ~2GB |
-| `bark` | Bark | Speech synthesis, audio with voice | ~5GB |
-| `bark-small` | Bark | Faster speech synthesis | ~1.5GB |
-| `minimax-music3` | MiniMax Music 3 | Lyrics-conditioned songs | ~24GB |
+| `musicgen-small` | MusicGen | Music generation (default) | ~2 GB |
+| `musicgen-medium` | MusicGen | Higher quality music | ~3.5 GB |
+| `musicgen-large` | MusicGen | Best quality music | ~7 GB |
+| `musicgen-melody` | MusicGen | Melody-conditioned music | ~3.5 GB |
+| `audioldm-s-full-v2` | AudioLDM | Sound effects, ambient audio | ~1.5 GB |
+| `audioldm-l-full` | AudioLDM | High-quality audio generation | ~3 GB |
+| `bark` | Bark | Speech synthesis, audio with voice | ~5 GB |
+| `bark-small` | Bark | Faster speech synthesis | ~2 GB |
+| `minimax-music3` | MiniMax Music 3 | Lyrics-conditioned songs | ~24 GB |
 
 For detailed prompt writing tips and recipes, see the [AI Playbook](AI_PLAYBOOK.md).
 
@@ -384,6 +404,8 @@ mc radio update
 # [O] Overwrite - Replace with new defaults (backs up old file)
 # [K] Keep      - Keep your current stations unchanged
 ```
+
+The Merge/Overwrite/Keep prompt is implemented in `music_cli/cli/radio.py:210-212`.
 
 ## Troubleshooting
 
@@ -451,8 +473,9 @@ Softly the world begins to breathe' \
 ```
 
 The model requires non-empty lyrics, CUDA, `bfloat16`, and approximately 24 GB
-of VRAM. The optional dependency uses the released Diffusers 0.39.x series,
-which includes ModularPipeline support. Automated tests
+of VRAM (`music_cli/sources/ai_models/model_config.py:291-304`). The optional
+dependency pins the released Diffusers 0.39.x series, which includes
+ModularPipeline support (`pyproject.toml:51-57`). Automated tests
 mock loading and generation arguments; they do not download model weights or
 verify real inference.
 
@@ -462,4 +485,4 @@ verify real inference.
 - **Aliases**: `alias mplay='mc play'`
 - **Focus**: `mc play -M focus` is the fastest way into a coding session
 - **History grep**: `grep focus ~/.config/music-cli/history.jsonl`
-- **Suppress color**: `mc --no-color status` or set `NO_COLOR=1`
+- **Suppress color/symbols**: `mc --no-color status` or set `NO_COLOR=1` (`music_cli/cli/app.py:52-60`); both also swap emoji symbols for plain text fallbacks (`music_cli/cli/common.py:30-66`)

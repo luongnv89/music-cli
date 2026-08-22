@@ -38,6 +38,6 @@ We take security vulnerabilities seriously. If you discover a security issue, pl
 - Never commit secrets, API keys, or credentials
 - Use environment variables for sensitive configuration
 - Avoid `shell=True` in subprocess calls unless strictly necessary
-  - **Reviewed exception:** `music_cli/player/ffplay.py` uses `asyncio.create_subprocess_shell` to run the `yt-dlp | ffplay` pipeline. A shell pipeline is required for streaming, and every interpolated value (the resolved `yt-dlp` path and the user-supplied URL) is passed through `shlex.quote()`. This usage was reviewed and is accepted; do not add new shell invocations without equivalent quoting and justification.
+  - **Reviewed exception:** `music_cli/player/ffplay.py` uses `asyncio.create_subprocess_shell` to run the `yt-dlp | ffplay` pipeline (`music_cli/player/ffplay.py:131-156`). A shell pipeline is required for streaming, and every interpolated value (the resolved `yt-dlp` path and the user-supplied URL) is passed through `shlex.quote()`. This usage was reviewed and is accepted; do not add new shell invocations without equivalent quoting and justification.
 - Follow OWASP secure coding guidelines
 - Report any security concerns immediately via the process above

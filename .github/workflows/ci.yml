@@ -89,7 +89,14 @@ jobs:
         # `--strict` makes pip-audit return a non-zero exit code when
         # vulnerabilities are found, so CI fails the moment an advisory lands.
         # `-f json -o pip-audit-report.json` writes the machine-readable report.
-        run: pip-audit --strict -f json -o pip-audit-report.json
+        # Requirements mode audits a frozen list that excludes this project:
+        # the unreleased editable local package is absent from PyPI, and
+        # pip-audit 2.10.1 errors on editable distributions in environment
+        # mode even with --skip-editable. This still audits every third-party
+        # dependency installed by `-e ".[dev]"`.
+        run: |
+          pip list --format=freeze | grep -v '^coder-music-cli==' > /tmp/audit-requirements.txt
+          pip-audit --strict -f json -o pip-audit-report.json -r /tmp/audit-requirements.txt
 
       - name: Upload pip-audit report
         if: always()
@@ -231,8 +238,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - name: Run shellcheck against install.sh
+      - name: Run shellcheck against repo shell scripts
         uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # 2.0.0
         with:
           severity: warning
-          additional_files: install.sh
+          additional_files: install.sh scripts/validate-dev-setup.sh
