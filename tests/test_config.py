@@ -238,9 +238,7 @@ class TestRadiosCache:
     """Parsed station list is memoised against radios.txt mtime (#83, F-PERF-004)."""
 
     @staticmethod
-    def _count_radios_reads(
-        monkeypatch: pytest.MonkeyPatch, radios_file: Path
-    ) -> list[Path]:
+    def _count_radios_reads(monkeypatch: pytest.MonkeyPatch, radios_file: Path) -> list[Path]:
         reads: list[Path] = []
         original_read_text = Path.read_text
 
@@ -258,8 +256,7 @@ class TestRadiosCache:
         """A radio-mode play fans out over lookups but parses the file once."""
         config = Config(config_dir=tmp_path)
         config.radios_file.write_text(
-            "# Chill\nJazz Groove|https://stream.example/jazz\n"
-            "Blues|https://stream.example/blues\n"
+            "# Chill\nJazz Groove|https://stream.example/jazz\nBlues|https://stream.example/blues\n"
         )
         reads = self._count_radios_reads(monkeypatch, config.radios_file)
 
@@ -308,14 +305,13 @@ class TestRadiosCache:
 
         radios_file.write_text("New Station|https://stream.example/new\n")
         stat_times = radios_file.stat()
-        os.utime(radios_file, ns=(stat_times.st_atime_ns + 1_000_000,
-                                  stat_times.st_mtime_ns + 1_000_000))
+        os.utime(
+            radios_file, ns=(stat_times.st_atime_ns + 1_000_000, stat_times.st_mtime_ns + 1_000_000)
+        )
 
         assert config.get_radios() == [("New Station", "https://stream.example/new")]
 
-    def test_missing_file_returns_empty_and_recovers(
-        self, tmp_path: Path
-    ) -> None:
+    def test_missing_file_returns_empty_and_recovers(self, tmp_path: Path) -> None:
         """A deleted radios.txt yields [] and recreation is seen again."""
         config = Config(config_dir=tmp_path)
         config.radios_file.write_text("Gone|https://stream.example/gone\n")
