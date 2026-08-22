@@ -115,11 +115,15 @@ class TestAITracksManager:
     @pytest.fixture
     def temp_tracks_file(self):
         """Create a temporary tracks file."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+        f = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
+        try:
             f.write("[]")
+        finally:
+            f.close()
+        try:
             yield Path(f.name)
-        # Clean up
-        Path(f.name).unlink(missing_ok=True)
+        finally:
+            Path(f.name).unlink(missing_ok=True)
 
     @pytest.fixture
     def manager(self, temp_tracks_file):
@@ -234,6 +238,36 @@ class TestAITracksManager:
         assert len(lines) == 2
         for line in lines:
             assert isinstance(json.loads(line), dict)
+
+    def test_append_before_first_read_keeps_legacy_tracks(self, temp_tracks_file):
+        """Test appending to an unmigrated legacy file loses no tracks."""
+        legacy = [
+            {
+                "prompt": "legacy",
+                "file_path": "/legacy.wav",
+                "timestamp": "2025-01-01T00:00:00",
+                "duration": 5,
+                "model": "musicgen-small",
+                "lyrics": None,
+            }
+        ]
+        temp_tracks_file.write_text(json.dumps(legacy))
+
+        manager = AITracksManager(tracks_file=temp_tracks_file)
+        manager.add_track("fresh", "/fresh.wav", 30)
+
+        assert [t.prompt for t in manager.get_all()] == ["fresh", "legacy"]
+        assert manager.count() == 2
+
+    def test_append_before_first_read_on_empty_legacy_array(self, temp_tracks_file):
+        """Test an empty legacy array still accepts appends before any read."""
+        temp_tracks_file.write_text("[]")
+
+        manager = AITracksManager(tracks_file=temp_tracks_file)
+        manager.add_track("fresh", "/fresh.wav", 30)
+
+        assert [t.prompt for t in manager.get_all()] == ["fresh"]
+        assert not temp_tracks_file.read_text().lstrip().startswith("[")
 
     def test_migrated_file_still_accepts_appends(self, temp_tracks_file):
         """Test a migrated file keeps working for subsequent adds."""

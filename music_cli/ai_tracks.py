@@ -115,11 +115,24 @@ class AITracksManager:
     def _migrate_legacy_array(self, text: str) -> list[AITrack]:
         """Convert a legacy JSON-array file to JSON Lines in place."""
         try:
-            data = json.loads(text)
+            data, pos = json.JSONDecoder().raw_decode(text)
             tracks = [AITrack.from_dict(item) for item in data]
         except (json.JSONDecodeError, OSError) as e:
             logger.warning(f"Failed to load AI tracks: {e}")
             return []
+
+        # Records appended before migration ran land on the array's closing
+        # bracket line; recover them so nothing already stored is lost.
+        for line in text[pos:].splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                item = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(item, dict):
+                tracks.append(AITrack.from_dict(item))
 
         tmp_file = self.tracks_file.with_name(self.tracks_file.name + ".tmp")
         tmp_file.write_text("".join(track.to_json_line() for track in tracks))
