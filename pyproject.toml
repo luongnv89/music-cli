@@ -15,7 +15,7 @@ authors = [
 maintainers = [
     {name = "Luong Nguyen", email = "luongnv89@gmail.com"}
 ]
-keywords = ["music", "cli", "daemon", "radio", "ai-music", "focus", "coding", "background-music", "lofi", "productivity", "media-keys", "mpris", "now-playing"]
+keywords = ["music", "cli", "daemon", "radio", "ai-music", "focus", "coding", "background-music", "lofi", "productivity"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
