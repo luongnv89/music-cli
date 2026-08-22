@@ -43,11 +43,11 @@ class TestScanDirectory:
         source = LocalSource(music_dir=tmp_path)
         assert source.scan_directory(tmp_path / "absent") == []
 
-    def test_scan_finds_supported_files_sorted(self, music_dir: Path) -> None:
+    def test_scan_finds_supported_files(self, music_dir: Path) -> None:
         source = LocalSource(music_dir=music_dir)
         found = source.scan_directory()
-        assert found == sorted(found)  # deterministic ordering
-        names = [f.name for f in found]
+        # Issue #81: the shared scan no longer sorts; callers order results.
+        names = {f.name for f in found}
         assert "song.mp3" in names
         assert "track.flac" in names
         assert "notes.txt" not in names

@@ -1,5 +1,7 @@
 """Local MP3 file source."""
 
+import heapq
+import os
 import random
 from pathlib import Path
 
@@ -17,6 +19,8 @@ class LocalSource:
             # Default to ~/Music
             music_dir = Path("~/Music").expanduser()
         self.music_dir = music_dir
+        # Resolved dir -> (root mtime_ns at scan time, files found).
+        self._scan_cache: dict[Path, tuple[int, list[Path]]] = {}
 
     def get_track(self, path: str) -> TrackInfo | None:
         """Get track info for a specific file path.
@@ -62,19 +66,48 @@ class LocalSource:
             metadata={"filename": file_path.name},
         )
 
+    def _scan_uncached(self, directory: Path) -> list[Path]:
+        """Single recursive traversal collecting supported audio files.
+
+        One ``os.walk`` pass filtered on a lowercased suffix replaces the
+        per-extension ``rglob`` storm (F-PERF-001): six full traversals
+        become one. Unreadable directories are skipped rather than fatal,
+        matching the old ``rglob`` behaviour.
+        """
+        found: list[Path] = []
+        supported = self.SUPPORTED_EXTENSIONS
+        for root, _dirs, names in os.walk(directory, onerror=lambda _e: None):
+            for name in names:
+                if Path(name).suffix.lower() in supported:
+                    found.append(Path(root) / name)
+        return found
+
     def scan_directory(self, directory: Path | None = None) -> list[Path]:
-        """Scan a directory for music files."""
+        """Scan a directory for music files.
+
+        Performs exactly one traversal and caches the result against the
+        scanned directory's mtime, so repeated scans of an unchanged
+        library (e.g. auto-play advancing at every track end) cost one
+        ``stat`` instead of a full walk. The cache is keyed by resolved
+        directory; only direct changes to that directory bump its mtime.
+        Returns an unsorted copy — callers order results themselves.
+        """
         if directory is None:
             directory = self.music_dir
 
-        if not directory.exists():
+        try:
+            key = Path(directory).resolve()
+            mtime_ns = key.stat().st_mtime_ns
+        except OSError:
             return []
 
-        files: list[Path] = []
-        for ext in self.SUPPORTED_EXTENSIONS:
-            files.extend(directory.rglob(f"*{ext}"))
+        cached = self._scan_cache.get(key)
+        if cached is not None and cached[0] == mtime_ns:
+            return list(cached[1])
 
-        return sorted(files)
+        files = self._scan_uncached(key)
+        self._scan_cache[key] = (mtime_ns, files)
+        return list(files)
 
     def get_random_track(self, directory: Path | None = None) -> TrackInfo | None:
         """Get a random track from the directory."""
@@ -86,13 +119,21 @@ class LocalSource:
         return self.get_track(str(chosen))
 
     def list_tracks(self, directory: Path | None = None, limit: int = 50) -> list[TrackInfo]:
-        """List tracks in a directory."""
-        files = self.scan_directory(directory)
-        tracks = []
+        """List tracks in a directory, sorted, limited during iteration."""
+        if limit <= 0:
+            return []
 
-        for f in files[:limit]:
-            track = self.get_track(str(f))
-            if track:
-                tracks.append(track)
-
-        return tracks
+        # nsmallest keeps deterministic (sorted) order while stopping once
+        # `limit` entries are known (F-PERF-007/005): no full sort of the
+        # whole listing, and tracks are built straight from scan results
+        # instead of re-stating every file through get_track().
+        files = heapq.nsmallest(limit, self.scan_directory(directory))
+        return [
+            TrackInfo(
+                source=str(f),
+                source_type="local",
+                title=f.stem,
+                metadata={"filename": f.name},
+            )
+            for f in files
+        ]
