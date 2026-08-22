@@ -7,7 +7,7 @@
   <a href="https://pepy.tech/project/coder-music-cli"><img src="https://static.pepy.tech/badge/coder-music-cli" alt="PyPI Downloads"></a>
   <a href="https://github.com/luongnv89/music-cli/stargazers"><img src="https://img.shields.io/github/stars/luongnv89/music-cli?style=social" alt="GitHub Stars"></a>
   <a href="https://github.com/luongnv89/music-cli/network/members"><img src="https://img.shields.io/github/forks/luongnv89/music-cli?style=social" alt="GitHub Forks"></a>
-  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10+-blue.svg" alt="Python 3.10+"></a>
+  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.12+-blue.svg" alt="Python 3.12+"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 </p>
 
@@ -41,7 +41,7 @@ Developers deserve a music player that respects the way they work: in the termin
 - **Always playing.** A persistent background daemon means your music survives terminal closes, SSH sessions, and IDE restarts.
 - **40+ curated radio stations.** Lo-fi, synthwave, deep house, jazz — ready out of the box. No account required.
 - **AI-generated music.** Generate unique focus tracks with MusicGen, AudioLDM, or Bark. Your music, your mood, no subscription.
-- **YouTube audio streaming.** Paste a URL, get audio. Tracks are cached automatically for offline replay.
+- **YouTube audio streaming.** Paste a URL, get audio — streamed via a yt-dlp→ffplay pipe, nothing downloaded to disk (`music_cli/sources/youtube.py:120`, `music_cli/player/ffplay.py:156`). Played videos land in a replay history you can revisit with `mc yt`.
 
 ```bash
 mc play -M focus    # Start focus music
@@ -81,9 +81,9 @@ mc status           # What's playing + an inspirational quote
 | Feature | Details |
 |---------|---------|
 | **Background daemon** | Music survives terminal closes and IDE restarts |
-| **40+ radio stations** | Lo-fi, synthwave, deep house, jazz, French, Spanish, Italian stations — no account needed |
+| **40+ radio stations** | Lo-fi, synthwave, deep house, jazz, French, Spanish, Italian stations — no account needed (41 pre-configured, `music_cli/config.py:207-281`) |
 | **AI music generation** | MusicGen, AudioLDM, Bark — generate unique tracks from text prompts |
-| **YouTube audio** | Paste a URL, stream audio. Automatic offline caching (2GB LRU) |
+| **YouTube audio** | Paste a URL, stream audio via yt-dlp→ffplay. Played videos are kept in a replay history (`mc yt`) for one-command replay (`music_cli/youtube_history.py:92-104`) |
 | **Context-aware** | Auto-selects music based on time of day and your mood |
 | **Local MP3 playback** | Shuffle your own library with `--auto` |
 | **Inspirational quotes** | Every `status` check comes with a random music quote |
@@ -160,7 +160,7 @@ If verification fails, do not run the script — re-download or report it via [S
 Yes, 100%. music-cli is MIT licensed, open source, and always will be. No accounts, no subscriptions, no ads.
 
 **Does it work on my OS?**
-Linux, macOS, and Windows 10+ are all supported. You need Python 3.10+ and FFmpeg.
+Linux, macOS, and Windows 10+ are all supported. You need Python 3.12+ (`pyproject.toml:10`) and FFmpeg.
 
 **How much disk space does AI music need?**
 The base install is tiny. The `[ai]` extra downloads ~5GB (PyTorch + HuggingFace models). Models download on first use, not at install time.
@@ -169,7 +169,7 @@ The base install is tiny. The `[ai]` extra downloads ~5GB (PyTorch + HuggingFace
 music-cli is not a replacement for your music library. It's a lightweight, terminal-native player for background music while coding. No browser tabs, no electron apps, no accounts.
 
 **Is it actively maintained?**
-Yes. The latest release is v0.10.1. Check the [changelog](CHANGELOG.md) for recent updates.
+Yes. The latest release is v0.10.1 (`music_cli/__init__.py:3`). Check the [changelog](CHANGELOG.md) for recent updates.
 
 **Can I add my own radio stations?**
 Absolutely. Run `mc radio add` or edit `~/.config/music-cli/radios.txt` directly. Format: `Station Name|stream-url`.
@@ -197,6 +197,8 @@ curl -fsSL https://raw.githubusercontent.com/luongnv89/music-cli/main/install.sh
 | [AI Playbook](docs/AI_PLAYBOOK.md) | AI music generation guide with examples |
 | [Architecture](docs/architecture.md) | System design and diagrams |
 | [Development](docs/development.md) | Contributing guide |
+| [Troubleshooting](docs/troubleshooting.md) | Validated fixes from runbook checks |
+| [Decisions Log](docs/DECISIONS.md) | Doc-reconciliation decisions with sources |
 | [Changelog](CHANGELOG.md) | Version history and release notes |
 
 <details>
@@ -220,9 +222,9 @@ mc radio remove N           # remove station
 mc radio update             # update station list
 
 mc yt play URL              # stream YouTube audio
-mc yt / mc yt list          # list cached tracks
-mc yt play N                # replay cached track
-mc yt remove N / clear      # manage cache
+mc yt / mc yt list          # list replay history
+mc yt play N                # replay a history entry
+mc yt remove N / clear      # manage history
 
 mc ai play [-p PROMPT]      # generate AI music
 mc ai play --lyrics LYRICS  # lyrics-conditioned models such as MiniMax Music 3
@@ -309,7 +311,7 @@ mc radio remove 10
 
 ### Pre-configured Stations
 
-40 stations across multiple genres and languages:
+41 stations across multiple genres and languages (`music_cli/config.py:207-281`):
 
 - **Chill/Lo-fi**: ChillHop, SomaFM (Groove Salad, Drone Zone, Space Station)
 - **Electronic**: Deep House, DEF CON Radio, Beat Blender
@@ -345,15 +347,17 @@ mc ai remove 2                          # Delete track #2
 
 | Model ID | Type | Best For | Size |
 |----------|------|----------|------|
-| `musicgen-small` | MusicGen | Music generation (default) | ~1.5GB |
-| `musicgen-medium` | MusicGen | Higher quality music | ~3GB |
-| `musicgen-large` | MusicGen | Best quality music | ~6GB |
-| `musicgen-melody` | MusicGen | Melody-conditioned music | ~3GB |
-| `audioldm-s-full-v2` | AudioLDM | Sound effects, ambient audio | ~1GB |
-| `audioldm-l-full` | AudioLDM | High-quality audio generation | ~2GB |
-| `bark` | Bark | Speech synthesis, audio with voice | ~5GB |
-| `bark-small` | Bark | Faster speech synthesis | ~1.5GB |
-| `minimax-music3` | MiniMax Music 3 | Lyrics-conditioned songs | ~24GB |
+| `musicgen-small` | MusicGen | Music generation (default) | ~2 GB |
+| `musicgen-medium` | MusicGen | Higher quality music | ~3.5 GB |
+| `musicgen-large` | MusicGen | Best quality music | ~7 GB |
+| `musicgen-melody` | MusicGen | Melody-conditioned music | ~3.5 GB |
+| `audioldm-s-full-v2` | AudioLDM | Sound effects, ambient audio | ~1.5 GB |
+| `audioldm-l-full` | AudioLDM | High-quality audio generation | ~3 GB |
+| `bark` | Bark | Speech synthesis, audio with voice | ~5 GB |
+| `bark-small` | Bark | Faster speech synthesis | ~2 GB |
+| `minimax-music3` | MiniMax Music 3 | Lyrics-conditioned songs | ~24 GB |
+
+Sizes are the expected download sizes from the model registry (`music_cli/sources/ai_models/model_config.py:240-363`).
 
 ### AI Command Suite
 
@@ -405,54 +409,44 @@ guidance_scale = 2.5      # How closely to follow prompt
 </details>
 
 <details>
-<summary><strong>YouTube Audio Streaming & Cache</strong></summary>
+<summary><strong>YouTube Audio Streaming &amp; Replay History</strong></summary>
 
-Stream audio directly from YouTube URLs with automatic offline caching:
+Stream audio directly from YouTube URLs; every video you play is recorded in a replay history:
 
 ```bash
-# Play YouTube audio (automatically cached)
+# Stream audio from a URL (recorded in replay history)
 mc play "https://youtube.com/watch?v=..."
 mc play "https://youtu.be/..."
 
-# Manage cached tracks
-mc yt                    # List all cached tracks
+# Manage replay history
+mc yt                    # List replay history
 mc yt list               # Same as above
-mc yt play 3             # Play cached track #3 (works offline)
-mc yt remove 1           # Remove cached track #1
-mc yt clear              # Clear entire cache
+mc yt play 3             # Replay history entry #3 (re-extracts the stream)
+mc yt remove 1           # Remove history entry #1
+mc yt clear              # Clear entire history
 ```
 
 ### YouTube Command Suite
 
 | Command | Description |
 |---------|-------------|
-| `mc yt` | List all cached tracks (default) |
-| `mc yt list` | List cached tracks with cache statistics |
-| `mc yt play <num>` | Play cached track by number (offline) |
-| `mc yt remove <num>` | Remove a cached track |
-| `mc yt clear` | Clear all cached tracks |
+| `mc yt` | List replay history (default) |
+| `mc yt list` | List replay history entries |
+| `mc yt play <num>` | Replay an entry by number |
+| `mc yt remove <num>` | Remove a history entry |
+| `mc yt clear` | Clear all history entries |
 
-### YouTube Features
-- **Automatic caching** — Audio cached in background while streaming
-- **Offline playback** — Play cached tracks without internet
-- **LRU eviction** — 2GB cache limit with automatic cleanup of oldest tracks
-- **M4A format** — 192kbps quality for good balance of size and quality
-- **Instant replay** — Cached tracks play immediately
+### How It Works
+- **Streaming playback** — Audio is extracted with yt-dlp and piped straight into ffplay; nothing is downloaded to disk (`music_cli/sources/youtube.py:112-120`, `music_cli/player/ffplay.py:156`)
+- **Replay history** — Played videos are recorded with title/artist/duration, newest first (`music_cli/youtube_history.py:92-107`)
+- **History cap** — At most 1000 entries are kept (`music_cli/youtube_history.py:96`)
+- **Replay** — `mc yt play <num>` re-extracts the stream from the stored URL; if a `<video_id>.m4a` file was placed manually in `youtube_cache/`, it is played directly instead (`music_cli/daemon_handlers.py:686-708`)
+- Requires the `[youtube]` extra, pinned to yt-dlp ≥ 2026.7.4 (`pyproject.toml:58-62`)
 
-### YouTube Configuration
+### Storage Location
 
-Configure in `~/.config/music-cli/config.toml`:
-
-```toml
-[youtube.cache]
-enabled = true          # Enable/disable automatic caching
-max_size_gb = 2.0       # Maximum cache size in GB
-```
-
-### Cache Location
-
-- **Linux/macOS**: `~/.config/music-cli/youtube_cache/`
-- **Windows**: `%LOCALAPPDATA%\music-cli\youtube_cache\`
+- **Linux/macOS**: `~/.config/music-cli/youtube_cache.json` (history metadata) and `youtube_cache/` (`music_cli/config.py:304`, `music_cli/platform/paths.py:88-90`)
+- **Windows**: `%LOCALAPPDATA%\music-cli\youtube_cache\` (`music_cli/platform/paths.py:130-140`)
 
 </details>
 
@@ -478,8 +472,8 @@ Configuration files location:
 | `history.jsonl` | Play history |
 | `ai_tracks.json` | AI track metadata (prompts, durations) |
 | `ai_music/` | AI-generated audio files |
-| `youtube_cache.json` | YouTube cache metadata |
-| `youtube_cache/` | Cached YouTube audio files |
+| `youtube_cache.json` | YouTube replay history (`music_cli/config.py:304`) |
+| `youtube_cache/` | YouTube cache dir — no automatic writes; see replay notes above |
 
 ### Version Updates
 
@@ -532,7 +526,7 @@ GitHub: https://github.com/luongnv89/music-cli
 
 ## Requirements
 
-- Python 3.10+
+- Python 3.12+ (`pyproject.toml:10`)
 - FFmpeg
 - **Supported Platforms**: Linux, macOS, Windows 10+
 

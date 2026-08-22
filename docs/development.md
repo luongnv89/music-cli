@@ -2,11 +2,14 @@
 
 Guide for contributing to music-cli.
 
+Related docs: [Agent setup](AGENT_SETUP.md) · [Brand kit](brand-kit.md) ·
+[Troubleshooting](troubleshooting.md) · [Decisions log](DECISIONS.md)
+
 ## Setup
 
 ### Prerequisites
 
-- Python 3.10+
+- Python 3.12+ (`pyproject.toml:10`)
 - FFmpeg
 - Git
 
@@ -17,9 +20,9 @@ git clone https://github.com/luongnv89/music-cli
 cd music-cli
 
 # Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Linux/macOS
-# or: venv\Scripts\activate  # Windows
+python -m venv .venv
+source .venv/bin/activate  # Linux/macOS
+# or: .venv\Scripts\activate  # Windows
 
 # Install with dev dependencies
 pip install -e ".[dev]"
@@ -28,39 +31,43 @@ pip install -e ".[dev]"
 pre-commit install
 ```
 
+`scripts/validate-dev-setup.sh --check` verifies these preconditions
+(`.venv`, `ffplay`, pinned tool versions, editable install) without running the
+test suite.
+
 ## Project Structure
 
 ```
 music-cli/
 ├── music_cli/
-│   ├── __init__.py         # Package version
-│   ├── __main__.py          # Module entry point
-│   ├── cli/                 # Click CLI package (one module per command group)
-│   ├── client.py            # Socket client
-│   ├── config.py            # Configuration management
-│   ├── daemon.py            # Background daemon
-│   ├── history.py           # Playback history
-│   ├── context/
-│   │   ├── mood.py          # Mood-based selection
-│   │   └── temporal.py      # Time-based selection
-│   ├── player/
-│   │   ├── base.py          # Abstract player
-│   │   └── ffplay.py        # FFplay implementation
-│   └── sources/
-│       ├── local.py         # Local files
-│       ├── radio.py         # Radio streams
-│       └── ai_generator.py  # MusicGen (optional)
-├── tests/
-│   ├── test_config.py
-│   ├── test_context.py
-│   └── test_history.py
+│   ├── __init__.py            # Package version (`__version__`)
+│   ├── __main__.py            # Module entry point
+│   ├── cli/                   # Click CLI package (one module per command group)
+│   │   ├── app.py             # Click group + global flags (--no-color)
+│   │   ├── playback.py        # play/pause/resume/stop/next/vol/status
+│   │   ├── radio.py           # radio subcommands
+│   │   ├── youtube.py         # yt replay-history subcommands
+│   │   ├── ai.py / ai_models.py  # ai generation and model management
+│   │   ├── history.py / misc.py / daemon_cmds.py / runtime.py / common.py
+│   ├── client.py              # IPC client
+│   ├── daemon.py              # Background daemon
+│   ├── daemon_handlers.py     # Daemon command handlers (@handles registry)
+│   ├── ipc_framing.py         # JSON message framing over IPC
+│   ├── config.py              # Configuration management + default stations/models
+│   ├── history.py             # Playback history (JSONL)
+│   ├── youtube_history.py     # YouTube replay history
+│   ├── ai_tracks.py           # AI track metadata store
+│   ├── hf_cache.py            # HuggingFace cache helpers
+│   ├── model_manager.py       # Model download/delete/default management
+│   ├── context/               # mood.py, temporal.py — smart selection
+│   ├── player/                # base.py, ffplay.py — playback backends
+│   ├── sources/               # local.py, radio.py, youtube.py, ai_generator.py
+│   │   └── ai_models/         # Per-model generation strategies + registry
+│   └── platform/              # paths.py, ipc.py, player_control.py
+├── tests/                     # ~37 pytest modules (tests/test_*.py)
 ├── docs/
-│   ├── architecture.md
-│   ├── development.md
-│   └── user-guide.md
-├── .github/workflows/
-│   ├── ci.yml
-│   └── release.yml
+├── .github/workflows/ci.yml   # lint/audit/test/build/pre-commit/shellcheck
+├── .github/workflows/release.yml
 ├── pyproject.toml
 ├── .pre-commit-config.yaml
 └── README.md
@@ -82,7 +89,7 @@ python -m music_cli.daemon
 ### Code Quality
 
 ```bash
-# Format code
+# Format code (Ruff formatter — Black is not used)
 ruff format music_cli/
 
 # Lint
@@ -98,14 +105,18 @@ bandit -c pyproject.toml -r music_cli/
 pre-commit run --all-files
 ```
 
+Ruff is pinned to `0.16.4` and mypy to `2.3.1` in `pyproject.toml:70-71`,
+matching the pre-commit hook revs in `.pre-commit-config.yaml:20-38`, so lint
+results are identical locally, in hooks, and in CI.
+
 ### Testing
 
 ```bash
-# Run all tests
-pytest
+# Run all tests (command of record)
+.venv/bin/pytest -q -p no:cacheprovider
 
-# With coverage
-pytest --cov=music_cli --cov-report=term-missing
+# Coverage is always on: pyproject.toml addopts force
+# --cov=music_cli --cov-report=term-missing --cov-fail-under=75 (pyproject.toml:130-136)
 
 # Specific test file
 pytest tests/test_config.py -v
@@ -204,8 +215,8 @@ class MyPlayer(Player):
 
 ### Formatting
 
-- Black with 100-char line length
-- Ruff for imports and linting
+- Ruff formatter with 100-char line length (`pyproject.toml:96-98`) — Black was removed
+- Ruff for imports and linting (`pyproject.toml:100-111`)
 
 ### Type Hints
 
@@ -288,27 +299,34 @@ def test_with_config(config):
 
 ### GitHub Actions
 
-- **ci.yml**: Runs on push/PR
-  - Lint (Black, Ruff, mypy, Bandit)
-  - Test (Python 3.10-3.12, macOS + Linux)
-  - Build verification
+Two workflows live in `.github/workflows/`:
 
-- **release.yml**: Runs on version tags
-  - Build package
-  - Create GitHub release
-  - (Optional) Publish to PyPI
+- **ci.yml**: runs on push/PR to main/master/develop, skipping `docs/**` and `*.md` (`ci.yml:6-16`)
+  - **lint** — Ruff format check, Ruff lint, mypy, Bandit; no Black (`ci.yml:28-61`)
+  - **audit** — pip-audit with `--strict` (`ci.yml:63-99`)
+  - **test** — Python 3.12/3.13/3.14 on ubuntu/macos/windows; Windows+3.14 excluded; 75% coverage gate on ubuntu/py3.12 only (`ci.yml:101-179`)
+  - **build** — `python -m build` + `twine check dist/*` (`ci.yml:181-202`)
+  - **pre-commit** and **shellcheck** on `install.sh` (`ci.yml:210-238`)
+
+- **release.yml**: runs on tags matching `v*` (`release.yml:6-9`)
+  - Builds the package and creates a GitHub release attaching `dist/*` plus an `install.sh.sha256` checksum asset (`release.yml:53-64`)
+  - PyPI publishing is present but fully commented out (`release.yml:66-84`) — releases go to GitHub only until it is enabled
 
 ### Creating a Release
 
 ```bash
-# Update version in music_cli/__init__.py
+# Update version in BOTH places:
+#   music_cli/__init__.py (__version__) and pyproject.toml ([project].version)
 # Commit changes
-git add -A && git commit -m "Bump version to 0.2.0"
+git add -A && git commit -m "Bump version to 0.11.0"
 
-# Create and push tag
-git tag v0.2.0
+# Create and push tag — release.yml does the rest
+git tag v0.11.0
 git push origin main --tags
 ```
+
+Note: no workflow verifies that the pushed tag matches `__version__`; keep the
+three values in sync manually.
 
 ## Troubleshooting Development
 
