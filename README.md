@@ -553,8 +553,6 @@ music-cli is built with these excellent open-source libraries:
 | [Click](https://github.com/pallets/click) | [Pallets](https://github.com/pallets) | CLI framework for building commands and argument parsing |
 | [tomli](https://github.com/hukkin/tomli) | [hukkin](https://github.com/hukkin) | TOML parser for reading configuration files |
 | [tomli-w](https://github.com/hukkin/tomli-w) | [hukkin](https://github.com/hukkin) | TOML writer for saving configuration files |
-| [pyobjc](https://github.com/ronaldoussoren/pyobjc) | [Ronald Oussoren](https://github.com/ronaldoussoren) | macOS framework bindings for media key support |
-| [dbus-next](https://github.com/altdesktop/python-dbus-next) | [altdesktop](https://github.com/altdesktop) | D-Bus client for Linux MPRIS media controls |
 | [PyTorch](https://github.com/pytorch/pytorch) | [PyTorch Team](https://github.com/pytorch) | Deep learning framework powering AI music generation |
 | [Transformers](https://github.com/huggingface/transformers) | [Hugging Face](https://github.com/huggingface) | Pre-trained models for MusicGen and Bark |
 | [Diffusers](https://github.com/huggingface/diffusers) | [Hugging Face](https://github.com/huggingface) | Diffusion models for AudioLDM audio generation |
