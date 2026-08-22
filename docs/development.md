@@ -135,7 +135,7 @@ python -m build
 twine check dist/*
 
 # Install locally built package
-pip install dist/coder_music_cli-0.10.1-py3-none-any.whl
+pip install dist/coder_music_cli-0.11.0-py3-none-any.whl
 ```
 
 ## Adding Features

@@ -7,26 +7,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-- Realign the documentation with the code: the Building guide's local-install step now uses the real package name and current version (`pip install dist/coder_music_cli-0.10.1-py3-none-any.whl` instead of the nonexistent `music_cli-0.1.0` wheel), the PyPI keywords no longer advertise the media-controller support removed by Task 2.1 (`media-keys`, `mpris`, `now-playing` dropped), and the README Acknowledgements no longer credit pyobjc/dbus-next for that absent support (`F-DOCS-001/003/004`) ([#85](https://github.com/luongnv89/music-cli/issues/85)).
-- Fix YouTube URL detection to compare the parsed hostname instead of substring matching, so look-alike hosts such as `evil-youtube.com.attacker.net` are no longer routed to yt-dlp or filtered incorrectly; the check is shared by `RadioSource`, the daemon's radio-mode handler, and `YouTubeSource.get_track` ([#84](https://github.com/luongnv89/music-cli/issues/84)).
-- Narrow installer-adjacent URL cleaning so only copy/paste corruption backslashes (before `. ? & = % -`) are stripped; legitimate URLs containing other backslashes are no longer altered before extraction ([#84](https://github.com/luongnv89/music-cli/issues/84)).
-- Fix a startup liveness race in `ffplay` playback: the 0.1 s sleep-then-poll is replaced by waiting on the subprocess with a timeout, so a process that dies anywhere inside the probe window is reliably detected as a failed start, for both direct and YouTube-pipe playback ([#84](https://github.com/luongnv89/music-cli/issues/84)).
-- Fail daemon startup *before* binding the IPC socket when the PID file cannot be written, instead of killing an already-listening daemon afterwards ([#84](https://github.com/luongnv89/music-cli/issues/84)).
-- Fix `install.sh`: color codes are passed as `printf` arguments rather than interpolated into format strings (`SC2059`, hardening against user-controlled `INSTALL_DIR`/`EXTRAS`), and the Python version gate compares tuples so any interpreter ≥3.10 — including a hypothetical Python 4.0 — is accepted ([#84](https://github.com/luongnv89/music-cli/issues/84)).
+## [0.11.0] - 2026-08-22
 
-### Changed
-- Cap the playback history at 1000 entries (configurable via `history.max_entries` in `config.toml`), rotating the oldest entries out on write, matching the YouTube history's bound; `history play N` now reads small indexes from the tail of the file instead of parsing it whole, keeping replay fast on large history files (`F-PERF-002`) ([#80](https://github.com/luongnv89/music-cli/issues/80)).
-- Raise the supported Python floor from `>=3.10` to `>=3.12` (`F-DEP-001`). **Decision rationale:** Python 3.10 reaches end-of-life on **2026-10-31** — about ten weeks after the audit — so committing to test it until then buys nothing; `>=3.11` was rejected because the installed numpy stubs use PEP 695 `type` statements, which mypy rejects when targeting <3.12, leaving `[tool.mypy] python_version` permanently out of sync with the floor; `>=3.12` is therefore the only value that lets all declaration sites (`requires-python`, classifiers, ruff/black target-version, mypy python_version, CI matrix) agree, aligns with the existing CI matrix, and root-causes the numpy-stub conflict behind `F-CI-002` rather than working around it. The dead `tomli` shim (`python_version<'3.11'`) and its fallback import are removed; standalone CI jobs move 3.11 → 3.12 ([#58](https://github.com/luongnv89/music-cli/issues/58)).
+### Breaking Changes
+- Raise the supported Python floor from `>=3.10` to `>=3.12` (`F-DEP-001`). **Upgrade:** install and run under Python 3.12+; the dead `tomli` shim (`python_version<'3.11'`) and its fallback import are removed, and standalone CI jobs move 3.11 → 3.12. **Decision rationale:** Python 3.10 reaches end-of-life on **2026-10-31**, so committing to test it until then buys nothing; `>=3.11` was rejected because the installed numpy stubs use PEP 695 `type` statements, which mypy rejects when targeting <3.12; `>=3.12` is the only value that lets all declaration sites (`requires-python`, classifiers, ruff/black target-version, mypy python_version, CI matrix) agree ([#111](https://github.com/luongnv89/music-cli/pull/111), [#58](https://github.com/luongnv89/music-cli/issues/58)).
+- Migrate the `ai` and `minimax` extras to transformers 5.x: both extras now require `transformers>=5,<6`, with MusicGen, AudioLDM/Bark strategies and the MiniMax Music 3 Diffusers pipeline validated against the transformers 5.x API ([#113](https://github.com/luongnv89/music-cli/pull/113)).
+
+**Upgrade notes:** users on Python 3.10 or 3.11 must upgrade their interpreter before installing this release (pip will refuse older interpreters via `requires-python`). If you use AI generation (`ai`) or MiniMAX (`minimax`) extras, re-install them to pick up transformers 5.x: `pip install --upgrade 'coder-music-cli[ai,minimax]'` (or run `pip install --upgrade 'transformers>=5,<6'` in an existing environment). No action is needed for radio/local/YouTube playback.
 
 ### Added
 - Add `pip-audit` to the `dev` extra and a `Dependency Audit` CI job that runs `pip-audit --strict -f json` and uploads the machine-readable report, establishing the advisory baseline for milestone `M1` ([#44](https://github.com/luongnv89/music-cli/issues/44)).
 
+### Performance
+- Cap the playback history at 1000 entries (configurable via `history.max_entries` in `config.toml`), rotating the oldest entries out on write to match the YouTube history's bound; `history play N` now reads small indexes from the tail of the file instead of parsing it whole, keeping replay fast on large history files (`F-PERF-002`) ([#80](https://github.com/luongnv89/music-cli/issues/80)).
+- Scan the local music library in a single pass keyed by file mtime, so unchanged tracks are no longer rescanned on every library refresh ([#81](https://github.com/luongnv89/music-cli/issues/81)).
+- Store AI-generated tracks in an append-only JSONL log with transparent migration of legacy array-format stores, avoiding full-file rewrites on every generation ([#82](https://github.com/luongnv89/music-cli/issues/82)).
+- Cache parsed radio stations at startup so repeated radio commands stop re-parsing the station list ([#83](https://github.com/luongnv89/music-cli/issues/83)).
+
 ### Fixed
-- Pin `setuptools==83.0.0` in `constraints-dev.txt` and install it in the audit CI job, resolving `PYSEC-2026-3447` / `CVE-2026-59890` (a `MANIFEST.in` exclude bypass via Unicode normalization) that the baseline scan surfaced in the runner's pre-installed `setuptools==79.0.1` ([#44](https://github.com/luongnv89/music-cli/issues/44)).
+- Fix YouTube URL detection to compare the parsed hostname instead of substring matching, so look-alike hosts such as `evil-youtube.com.attacker.net` are no longer routed to yt-dlp or filtered incorrectly; the check is shared by `RadioSource`, the daemon's radio-mode handler, and `YouTubeSource.get_track` ([#84](https://github.com/luongnv89/music-cli/issues/84)).
+- Narrow installer-adjacent URL cleaning so only copy/paste corruption backslashes (before `. ? & = % -`) are stripped; legitimate URLs containing other backslashes are no longer altered before extraction ([#84](https://github.com/luongnv89/music-cli/issues/84)).
+- Fix a startup liveness race in `ffplay` playback: the 0.1 s sleep-then-poll is replaced by waiting on the subprocess with a timeout, so a process that dies anywhere inside the probe window is reliably detected as a failed start, for both direct and YouTube-pipe playback ([#84](https://github.com/luongnv89/music-cli/issues/84)).
+- Fail daemon startup *before* binding the IPC socket when the PID file cannot be written, instead of killing an already-listening daemon afterwards ([#84](https://github.com/luongnv89/music-cli/issues/84)).
+- Fix `install.sh`: color codes are passed as `printf` arguments rather than interpolated into format strings (`SC2059`, hardening against user-controlled `INSTALL_DIR`/`EXTRAS`), and the Python version gate compares tuples instead of fragile string prefixes ([#84](https://github.com/luongnv89/music-cli/issues/84)).
+- Surface daemon startup failures to the CLI via `daemon.log` instead of failing silently ([#71](https://github.com/luongnv89/music-cli/issues/71)).
+- Make daemon liveness identity-checked so a stale or recycled PID file can no longer make a foreign process look like a running daemon ([#68](https://github.com/luongnv89/music-cli/issues/68)).
+- Serialize daemon command handlers and track background tasks, preventing interleaved command execution and lost async work ([#67](https://github.com/luongnv89/music-cli/issues/67)).
+- Replace `preexec_fn=os.setsid` with `process_group=0` when spawning `ffplay`, avoiding fork-safety issues in threaded/async contexts ([#112](https://github.com/luongnv89/music-cli/pull/112)).
+- Remove the dead media-controller platform surface left behind by earlier removals ([#53](https://github.com/luongnv89/music-cli/issues/53)).
+- Pin HuggingFace model revisions for reproducible downloads and un-skip the B615 check ([#49](https://github.com/luongnv89/music-cli/issues/49)).
+- Fix `install.sh` venv layout detection and stop it from clobbering an unrelated existing `mc` command ([#50](https://github.com/luongnv89/music-cli/issues/50)).
+- Repair the mypy CI gate so it actually runs ([#37](https://github.com/luongnv89/music-cli/issues/37)).
+- Skip Unix-only YouTube-pipe `ffplay` tests on Windows ([#35](https://github.com/luongnv89/music-cli/issues/35)).
+- Fix HuggingFace download compatibility and upgrade the installer flow ([#31](https://github.com/luongnv89/music-cli/pull/31)).
 
 ### Security
-- Establish the `pip-audit` advisory baseline: the initial recorded audit surfaced one advisory (`setuptools` 79.0.1, `PYSEC-2026-3447` / `CVE-2026-59890`), which is fixed in this PR by pinning `setuptools==83.0.0`; a re-run reports **0 High or Critical advisories**, making `M1`'s exit condition measurable ([#44](https://github.com/luongnv89/music-cli/issues/44)).
+- Harden config defaults, IPC authentication, and file/directory permissions for the daemon socket and state ([#45](https://github.com/luongnv89/music-cli/issues/45)).
+- Confine local playback to the configured music directory, rejecting paths that escape it ([#46](https://github.com/luongnv89/music-cli/issues/46)).
+- Harden the documented install flow against injection and unsafe defaults ([#52](https://github.com/luongnv89/music-cli/issues/52)).
+- Establish the `pip-audit` advisory baseline: the initial recorded audit surfaced one advisory (`setuptools` 79.0.1, `PYSEC-2026-3447` / `CVE-2026-59890`), fixed by pinning `setuptools==83.0.0` in `constraints-dev.txt`; a re-run reports **0 High or Critical advisories**, making `M1`'s exit condition measurable ([#44](https://github.com/luongnv89/music-cli/issues/44)).
+
+### Documentation
+- Realign the documentation with the code: the Building guide's local-install step now uses the real package name and current version (`pip install dist/coder_music_cli-<version>-py3-none-any.whl` instead of the nonexistent `music_cli-0.1.0` wheel), the PyPI keywords no longer advertise the media-controller support removed by Task 2.1 (`media-keys`, `mpris`, `now-playing` dropped), and the README Acknowledgements no longer credit pyobjc/dbus-next for that absent support (`F-DOCS-001/003/004`), followed up by a reconciliation pass over the remaining docs ([#85](https://github.com/luongnv89/music-cli/issues/85)).
+- Add `CLAUDE.md` with build/test commands ([#33](https://github.com/luongnv89/music-cli/issues/33)).
+- Add `AGENTS.md` with subagent definitions ([#34](https://github.com/luongnv89/music-cli/issues/34)).
+- Record agent install/run/verify instructions ([#32](https://github.com/luongnv89/music-cli/issues/32)).
+- Document in CONTRIBUTING that a red `main` blocks merges until fixed ([#36](https://github.com/luongnv89/music-cli/issues/36)).
+- Add the modernization audit report and phased plan.
+
+### Dependencies
+- Prune orphaned dependencies, raise the `yt-dlp` floor, and fix project classifiers ([#54](https://github.com/luongnv89/music-cli/issues/54)).
+- Refresh pre-commit hooks and unify ruff at 0.16.4 ([#55](https://github.com/luongnv89/music-cli/issues/55)).
+- Bump actions/checkout v4→v7 and setup-python v5→v7 ([#107](https://github.com/luongnv89/music-cli/pull/107)).
+- Bump artifact actions — upload v4→v7, download v4→v8 ([#108](https://github.com/luongnv89/music-cli/pull/108)).
+- Bump codecov/codecov-action v4→v7 ([#109](https://github.com/luongnv89/music-cli/pull/109)).
+- Bump action-gh-release v1→v3 and SHA-pin every GitHub Action ([#110](https://github.com/luongnv89/music-cli/pull/110)).
+
+### Other Changes
+- Refactor the CLI entrypoint: split `cli.py` into a per-group command package ([#76](https://github.com/luongnv89/music-cli/issues/76)).
+- Refactor the daemon: split out the command registry and AI handlers ([#74](https://github.com/luongnv89/music-cli/issues/74)); decompose `_cmd_play` into per-mode handlers ([#73](https://github.com/luongnv89/music-cli/issues/73)).
+- Standardize formatting on `ruff format` and group wide parameter lists ([#78](https://github.com/luongnv89/music-cli/issues/78)); remove dead code and mark ARG002 interface conformance ([#79](https://github.com/luongnv89/music-cli/issues/79)).
+- Test: characterize all 19 daemon command handlers ([#70](https://github.com/luongnv89/music-cli/issues/70)); make coverage honest and enforce a 75 percent floor ([#72](https://github.com/luongnv89/music-cli/issues/72)); make the test suite hermetic ([#43](https://github.com/luongnv89/music-cli/issues/43)).
+- CI: enforce a derived 53% coverage floor (superseded by the 75 percent floor above) ([#41](https://github.com/luongnv89/music-cli/issues/41)); test the Python floor the package declares ([#39](https://github.com/luongnv89/music-cli/issues/39)); pin lint tool revs, add shellcheck, arm pre-commit ([#40](https://github.com/luongnv89/music-cli/issues/40)); scope the ci workflow token to `contents: read` ([#42](https://github.com/luongnv89/music-cli/issues/42)).
+- Build: commit pinned dev constraints for reproducible installs ([#38](https://github.com/luongnv89/music-cli/issues/38)).
+
+**Full Changelog**: https://github.com/luongnv89/music-cli/compare/v0.10.1...v0.11.0
 
 ## [0.10.1] - 2026-08-17
 
