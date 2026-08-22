@@ -232,3 +232,98 @@ class TestAuthTokenStorage:
     def test_read_missing_token_returns_none(self, tmp_path: Path) -> None:
         cfg = Config(config_dir=tmp_path / "cfg")
         assert cfg.read_auth_token() is None
+
+
+class TestRadiosCache:
+    """Parsed station list is memoised against radios.txt mtime (#83, F-PERF-004)."""
+
+    @staticmethod
+    def _count_radios_reads(
+        monkeypatch: pytest.MonkeyPatch, radios_file: Path
+    ) -> list[Path]:
+        reads: list[Path] = []
+        original_read_text = Path.read_text
+
+        def counting_read_text(self: Path, *args: object, **kwargs: object) -> str:
+            if self == radios_file:
+                reads.append(self)
+            return original_read_text(self, *args, **kwargs)  # type: ignore[arg-type]
+
+        monkeypatch.setattr(Path, "read_text", counting_read_text)
+        return reads
+
+    def test_repeated_lookups_in_one_play_read_radios_once(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A radio-mode play fans out over lookups but parses the file once."""
+        config = Config(config_dir=tmp_path)
+        config.radios_file.write_text(
+            "# Chill\nJazz Groove|https://stream.example/jazz\n"
+            "Blues|https://stream.example/blues\n"
+        )
+        reads = self._count_radios_reads(monkeypatch, config.radios_file)
+
+        assert config.get_radios() == [
+            ("Jazz Groove", "https://stream.example/jazz"),
+            ("Blues", "https://stream.example/blues"),
+        ]
+        assert config.get_radio_by_index(2) == ("Blues", "https://stream.example/blues")
+        assert config.get_station_by_name("JAZZ GROOVE") == (
+            "Jazz Groove",
+            "https://stream.example/jazz",
+        )
+        assert config.get_station_by_name("missing") is None
+        assert config.get_radios() == config.get_radios()
+
+        assert len(reads) == 1
+
+    def test_single_play_through_radio_source_reads_at_most_once(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """RadioSource lookups within one play hit radios.txt at most once."""
+        from music_cli.sources.radio import RadioSource
+
+        config = Config(config_dir=tmp_path)
+        config.radios_file.write_text("Jazz Groove|https://stream.example/jazz\n")
+        source = RadioSource()
+        source.config = config
+        source._youtube_available = True
+        reads = self._count_radios_reads(monkeypatch, config.radios_file)
+
+        track = source.get_station_by_index(1)
+        assert track is not None and track.title == "Jazz Groove"
+        by_name = source.get_station_by_name("groove")
+        assert by_name is not None and by_name.source == "https://stream.example/jazz"
+
+        assert len(reads) <= 1
+
+    def test_edit_is_picked_up_on_next_call(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Editing radios.txt invalidates the cache on the next call."""
+        config = Config(config_dir=tmp_path)
+        radios_file = config.radios_file
+        radios_file.write_text("Old Station|https://stream.example/old\n")
+        assert config.get_radios() == [("Old Station", "https://stream.example/old")]
+
+        radios_file.write_text("New Station|https://stream.example/new\n")
+        stat_times = radios_file.stat()
+        os.utime(radios_file, ns=(stat_times.st_atime_ns + 1_000_000,
+                                  stat_times.st_mtime_ns + 1_000_000))
+
+        assert config.get_radios() == [("New Station", "https://stream.example/new")]
+
+    def test_missing_file_returns_empty_and_recovers(
+        self, tmp_path: Path
+    ) -> None:
+        """A deleted radios.txt yields [] and recreation is seen again."""
+        config = Config(config_dir=tmp_path)
+        config.radios_file.write_text("Gone|https://stream.example/gone\n")
+        assert len(config.get_radios()) == 1
+
+        config.radios_file.unlink()
+        assert config.get_radios() == []
+        assert config.get_radios() == []
+
+        config.radios_file.write_text("Back|https://stream.example/back\n")
+        assert config.get_radios() == [("Back", "https://stream.example/back")]
