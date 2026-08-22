@@ -180,9 +180,7 @@ class TestAITracksManager:
         # whole-file rewrite ("w").
         assert opened_modes == ["a"]
 
-        lines = [
-            line for line in manager.tracks_file.read_text().splitlines() if line
-        ]
+        lines = [line for line in manager.tracks_file.read_text().splitlines() if line]
         assert len(lines) == 2
         assert json.loads(lines[-1])["prompt"] == "track2"
 

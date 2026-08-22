@@ -128,9 +128,7 @@ class AITracksManager:
 
     def _save_tracks(self, tracks: list[AITrack]) -> None:
         """Save tracks to the JSON Lines file."""
-        self.tracks_file.write_text(
-            "".join(track.to_json_line() for track in tracks)
-        )
+        self.tracks_file.write_text("".join(track.to_json_line() for track in tracks))
 
     def _append_track(self, track: AITrack) -> None:
         """Append a single track without reading or rewriting the file."""
