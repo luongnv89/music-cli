@@ -1,5 +1,6 @@
 """Tests for LocalSource relative-path resolution (issue #18)."""
 
+import time
 from pathlib import Path
 
 from music_cli.sources.local import LocalSource
@@ -173,8 +174,6 @@ class TestCachedScan:
     def test_scan_10k_files_within_100ms(self, tmp_path):
         lib = self._build_library(tmp_path)
         source = LocalSource(music_dir=lib)
-
-        import time
 
         start = time.perf_counter()
         found = source.scan_directory()
