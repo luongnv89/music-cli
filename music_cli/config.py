@@ -17,6 +17,10 @@ from .platform import get_path_provider
 
 logger = logging.getLogger(__name__)
 
+# Playback history cap (F-PERF-002). Shared default so the config file and
+# the History class agree with youtube_history's 1000-entry bound.
+DEFAULT_HISTORY_MAX_ENTRIES = 1000
+
 
 def _recursive_mapping_merge(
     defaults: Mapping[str, Any], overrides: Mapping[str, Any]
@@ -48,6 +52,9 @@ class Config:
         "context": {
             "enabled": True,
             "use_ai": False,
+        },
+        "history": {
+            "max_entries": DEFAULT_HISTORY_MAX_ENTRIES,
         },
         "youtube": {
             "cache": {
