@@ -89,7 +89,9 @@ jobs:
         # `--strict` makes pip-audit return a non-zero exit code when
         # vulnerabilities are found, so CI fails the moment an advisory lands.
         # `-f json -o pip-audit-report.json` writes the machine-readable report.
-        run: pip-audit --strict -f json -o pip-audit-report.json
+        # `--skip-editable` skips this project itself (editable install): an
+        # unreleased local version is not on PyPI and would trip --strict.
+        run: pip-audit --strict --skip-editable -f json -o pip-audit-report.json
 
       - name: Upload pip-audit report
         if: always()
