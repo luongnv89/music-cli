@@ -1,4 +1,9 @@
-"""AI track management for music-cli."""
+"""AI track management for music-cli.
+
+Tracks are stored as JSON Lines (one track object per line) so adding a
+track is a plain O(1) append, matching the playback-history format
+(F-PERF-003). Legacy JSON-array files migrate to JSON Lines on first read.
+"""
 
 import json
 import logging
@@ -32,6 +37,10 @@ class AITrack:
             "model": self.model,
             "lyrics": self.lyrics,
         }
+
+    def to_json_line(self) -> str:
+        """Serialize as one JSON Lines record (with trailing newline)."""
+        return json.dumps(self.to_dict()) + "\n"
 
     @classmethod
     def from_dict(cls, data: dict) -> "AITrack":
@@ -74,21 +83,70 @@ class AITracksManager:
     def _ensure_file(self) -> None:
         """Create the tracks file if it doesn't exist."""
         if not self.tracks_file.exists():
-            self.tracks_file.write_text("[]")
+            self.tracks_file.write_text("")
 
     def _load_tracks(self) -> list[AITrack]:
-        """Load tracks from JSON file."""
+        """Load tracks from the JSON Lines file.
+
+        Legacy JSON-array files (pre-JSONL) are migrated to JSON Lines on
+        first read without data loss.
+        """
+        if not self.tracks_file.exists():
+            return []
+
+        text = self.tracks_file.read_text()
+        if not text.strip():
+            return []
+
+        if text.lstrip().startswith("["):
+            return self._migrate_legacy_array(text)
+
+        tracks: list[AITrack] = []
+        for line in text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                tracks.append(AITrack.from_dict(json.loads(line)))
+            except json.JSONDecodeError:
+                continue
+        return tracks
+
+    def _migrate_legacy_array(self, text: str) -> list[AITrack]:
+        """Convert a legacy JSON-array file to JSON Lines in place."""
         try:
-            data = json.loads(self.tracks_file.read_text())
-            return [AITrack.from_dict(item) for item in data]
+            data, pos = json.JSONDecoder().raw_decode(text)
+            tracks = [AITrack.from_dict(item) for item in data]
         except (json.JSONDecodeError, OSError) as e:
             logger.warning(f"Failed to load AI tracks: {e}")
             return []
 
+        # Records appended before migration ran land on the array's closing
+        # bracket line; recover them so nothing already stored is lost.
+        for line in text[pos:].splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                item = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(item, dict):
+                tracks.append(AITrack.from_dict(item))
+
+        tmp_file = self.tracks_file.with_name(self.tracks_file.name + ".tmp")
+        tmp_file.write_text("".join(track.to_json_line() for track in tracks))
+        tmp_file.replace(self.tracks_file)
+        return tracks
+
     def _save_tracks(self, tracks: list[AITrack]) -> None:
-        """Save tracks to JSON file."""
-        data = [track.to_dict() for track in tracks]
-        self.tracks_file.write_text(json.dumps(data, indent=2))
+        """Save tracks to the JSON Lines file."""
+        self.tracks_file.write_text("".join(track.to_json_line() for track in tracks))
+
+    def _append_track(self, track: AITrack) -> None:
+        """Append a single track without reading or rewriting the file."""
+        with self.tracks_file.open("a") as f:
+            f.write(track.to_json_line())
 
     def get_all(self) -> list[AITrack]:
         """Get all AI tracks.
@@ -109,6 +167,9 @@ class AITracksManager:
     ) -> AITrack:
         """Add a new AI track.
 
+        Appends a single JSON Lines record without reading or rewriting
+        the existing file (F-PERF-003).
+
         Args:
             prompt: The prompt used for generation.
             file_path: Path to the generated audio file.
@@ -128,9 +189,7 @@ class AITracksManager:
             lyrics=lyrics,
         )
 
-        tracks = self._load_tracks()
-        tracks.append(track)
-        self._save_tracks(tracks)
+        self._append_track(track)
 
         return track
 

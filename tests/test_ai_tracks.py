@@ -1,5 +1,6 @@
 """Tests for AI tracks management."""
 
+import json
 import tempfile
 from pathlib import Path
 
@@ -114,11 +115,15 @@ class TestAITracksManager:
     @pytest.fixture
     def temp_tracks_file(self):
         """Create a temporary tracks file."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+        f = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
+        try:
             f.write("[]")
+        finally:
+            f.close()
+        try:
             yield Path(f.name)
-        # Clean up
-        Path(f.name).unlink(missing_ok=True)
+        finally:
+            Path(f.name).unlink(missing_ok=True)
 
     @pytest.fixture
     def manager(self, temp_tracks_file):
@@ -158,6 +163,133 @@ class TestAITracksManager:
         assert tracks[0].prompt == "track3"
         assert tracks[1].prompt == "track2"
         assert tracks[2].prompt == "track1"
+
+    def test_add_track_opens_file_in_append_mode(self, manager, monkeypatch):
+        """Test add_track appends without reading or rewriting the file."""
+        manager.add_track("track1", "/path1.wav", 30)
+
+        opened_modes: list[str] = []
+        real_open = Path.open
+
+        def spy_open(self, mode="r", *args, **kwargs):
+            opened_modes.append(mode)
+            return real_open(self, mode, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "open", spy_open)
+        track = manager.add_track("track2", "/path2.wav", 30)
+        monkeypatch.undo()
+
+        assert track.prompt == "track2"
+        # Exactly one open, and it is an append — no read ("r"), no
+        # whole-file rewrite ("w").
+        assert opened_modes == ["a"]
+
+        lines = [line for line in manager.tracks_file.read_text().splitlines() if line]
+        assert len(lines) == 2
+        assert json.loads(lines[-1])["prompt"] == "track2"
+
+    def test_add_track_preserves_existing_content(self, manager):
+        """Test repeated appends never lose previously stored tracks."""
+        for i in range(25):
+            manager.add_track(f"track{i}", f"/path{i}.wav", 30)
+
+        assert manager.count() == 25
+        newest = manager.get_by_index(1)
+        oldest = manager.get_by_index(25)
+        assert newest.prompt == "track24"
+        assert oldest.prompt == "track0"
+
+    def test_migrates_legacy_json_array_on_first_read(self, temp_tracks_file):
+        """Test legacy JSON-array files migrate to JSON Lines on read."""
+        legacy = [
+            {
+                "prompt": "old one",
+                "file_path": "/one.wav",
+                "timestamp": "2025-01-01T00:00:00",
+                "duration": 10,
+                "model": "musicgen-small",
+                "lyrics": "[Verse] one",
+            },
+            {
+                "prompt": "old two",
+                "file_path": "/two.wav",
+                "timestamp": "2025-06-01T00:00:00",
+                "duration": 20,
+                "model": "minimax-music3",
+                "lyrics": None,
+            },
+        ]
+        temp_tracks_file.write_text(json.dumps(legacy, indent=2))
+
+        manager = AITracksManager(tracks_file=temp_tracks_file)
+        tracks = manager.get_all()
+
+        # No data loss; newest first.
+        assert [t.prompt for t in tracks] == ["old two", "old one"]
+        assert tracks[0].lyrics is None
+        assert tracks[0].model == "minimax-music3"
+        assert tracks[1].lyrics == "[Verse] one"
+        assert tracks[1].file_path == "/one.wav"
+
+        # The file itself was rewritten as JSON Lines.
+        text = temp_tracks_file.read_text()
+        assert not text.lstrip().startswith("[")
+        lines = [line for line in text.splitlines() if line.strip()]
+        assert len(lines) == 2
+        for line in lines:
+            assert isinstance(json.loads(line), dict)
+
+    def test_append_before_first_read_keeps_legacy_tracks(self, temp_tracks_file):
+        """Test appending to an unmigrated legacy file loses no tracks."""
+        legacy = [
+            {
+                "prompt": "legacy",
+                "file_path": "/legacy.wav",
+                "timestamp": "2025-01-01T00:00:00",
+                "duration": 5,
+                "model": "musicgen-small",
+                "lyrics": None,
+            }
+        ]
+        temp_tracks_file.write_text(json.dumps(legacy))
+
+        manager = AITracksManager(tracks_file=temp_tracks_file)
+        manager.add_track("fresh", "/fresh.wav", 30)
+
+        assert [t.prompt for t in manager.get_all()] == ["fresh", "legacy"]
+        assert manager.count() == 2
+
+    def test_append_before_first_read_on_empty_legacy_array(self, temp_tracks_file):
+        """Test an empty legacy array still accepts appends before any read."""
+        temp_tracks_file.write_text("[]")
+
+        manager = AITracksManager(tracks_file=temp_tracks_file)
+        manager.add_track("fresh", "/fresh.wav", 30)
+
+        assert [t.prompt for t in manager.get_all()] == ["fresh"]
+        assert not temp_tracks_file.read_text().lstrip().startswith("[")
+
+    def test_migrated_file_still_accepts_appends(self, temp_tracks_file):
+        """Test a migrated file keeps working for subsequent adds."""
+        legacy = [
+            {
+                "prompt": "legacy",
+                "file_path": "/legacy.wav",
+                "timestamp": "2025-01-01T00:00:00",
+                "duration": 5,
+                "model": "musicgen-small",
+                "lyrics": None,
+            }
+        ]
+        temp_tracks_file.write_text(json.dumps(legacy))
+
+        manager = AITracksManager(tracks_file=temp_tracks_file)
+        assert manager.count() == 1
+        manager.add_track("fresh", "/fresh.wav", 30)
+
+        assert manager.count() == 2
+        assert manager.get_by_index(1).prompt == "fresh"
+        assert manager.get_by_index(2).prompt == "legacy"
 
     def test_get_by_index_valid(self, manager):
         """Test get_by_index with valid index."""
