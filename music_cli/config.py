@@ -304,6 +304,7 @@ Radio Capital|https://icecast.unitedradio.it/Capital.mp3
         self.youtube_cache_file = self.config_dir / "youtube_cache.json"
         self.ai_tracks_file = self.config_dir / "ai_tracks.json"
         self._config: dict[str, Any] = {}
+        self._radios_cache: tuple[int, list[tuple[str, str]]] | None = None
         self._ensure_config_dir()
         self._load_config()
 
@@ -399,12 +400,23 @@ Radio Capital|https://icecast.unitedradio.it/Capital.mp3
     def get_radios(self) -> list[tuple[str, str]]:
         """Load radio stations from radios.txt.
 
-        Returns list of (name, url) tuples.
+        Returns list of (name, url) tuples. The parsed list is cached
+        against the file's mtime (#83, F-PERF-004): repeated lookups
+        within one play cost one ``stat`` instead of re-reading and
+        re-parsing the file, while edits to radios.txt are picked up
+        on the next call.
         """
-        radios: list[tuple[str, str]] = []
-        if not self.radios_file.exists():
-            return radios
+        try:
+            mtime_ns = self.radios_file.stat().st_mtime_ns
+        except OSError:
+            self._radios_cache = None
+            return []
 
+        cached = self._radios_cache
+        if cached is not None and cached[0] == mtime_ns:
+            return list(cached[1])
+
+        radios: list[tuple[str, str]] = []
         for line in self.radios_file.read_text().splitlines():
             line = line.strip()
             if not line or line.startswith("#"):
@@ -414,7 +426,8 @@ Radio Capital|https://icecast.unitedradio.it/Capital.mp3
                 radios.append((name.strip(), url.strip()))
             else:
                 radios.append((line, line))
-        return radios
+        self._radios_cache = (mtime_ns, radios)
+        return list(radios)
 
     def get_radios_categorized(self) -> list[dict]:
         """Load radio stations with category information.
