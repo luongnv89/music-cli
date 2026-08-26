@@ -532,77 +532,6 @@ class _BaseSchema:
         self._data: dict[str, Any] = data
 
     @classmethod
-    def validate(cls, data: Any) -> list[str]:  # type: ignore[override]
-        return cls._validator(data)
-
-    def instance_validate(self) -> list[str]:
-        return self.__class__.validate(self._data)
-
-    # alias so callers can do obj.validate()
-    def validate_instance(self) -> list[str]:
-        return self.instance_validate()
-
-    # instance validate() that mirrors classmethod when called on instance
-    # We keep classmethod as primary; instance fallback is via __get__ trick
-    # Instead expose instance method under different path and make __call__ aware
-    # Simpler: instance.validate() -> validate self._data
-    # Achieved by defining validate as both classmethod and instance-aware below.
-
-    @classmethod
-    def model_validate(cls, data: Any) -> Any:
-        errs = cls.validate(data)
-        if errs:
-            raise ValueError("; ".join(errs))
-        return cls(data)
-
-    def to_dict(self) -> dict[str, Any]:
-        return dict(self._data)
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({self._data!r})"
-
-
-# We need instance .validate() to work as well. The classmethod above shadows it.
-# Patch by adding an instance-level method via __getattr__ trick is overkill.
-# Instead each subclass defines explicit instance method `validate_self`.
-# But spec says "Each schema has a `validate()` method that returns a list of errors".
-# Tests likely call `CreativePlan.validate(data)` (classmethod) OR `plan.validate()`.
-# We make `validate` work for both by using a descriptor.
-
-
-class _ValidateDescriptor:
-    def __init__(self, func):
-        self.func = func
-
-    def __get__(self, obj, objtype=None):
-        if obj is None:
-            # class access: return function that takes data
-            return self.func
-
-        # instance access: return bound method that validates obj._data with no args
-        def bound(*args, **kwargs):
-            if args or kwargs:
-                # if called as instance.validate(data) forward to class validate
-                return self.func(args[0] if args else kwargs)
-            return objtype.validate(obj._data) if objtype else self.func(obj._data)
-
-        return bound
-
-
-# Redefine base to use descriptor for validate
-class _BaseSchema2:
-    _validator: Any = staticmethod(lambda data, prefix="": [])
-
-    def __init__(self, data: dict[str, Any] | None = None, **kwargs: Any) -> None:
-        if data is not None and kwargs:
-            raise ValueError("pass either data dict or kwargs, not both")
-        if data is None:
-            data = kwargs
-        if not isinstance(data, dict):
-            raise TypeError("data must be dict")
-        self._data: dict[str, Any] = data
-
-    @classmethod
     def _cls_validate(cls, data: Any) -> list[str]:
         return cls._validator(data)
 
@@ -623,42 +552,28 @@ class _BaseSchema2:
         return f"{self.__class__.__name__}({self._data!r})"
 
 
-# Attach descriptor after class definition to avoid metaclass complexity
-def _make_schema_class(name: str, validator):
-    cls = type(name, (_BaseSchema2,), {"_validator": staticmethod(validator)})
+class _BothDescriptor:
+    """Descriptor so ``Cls.validate(data)`` and ``inst.validate()`` both work."""
 
-    # classmethod validate(data) -> list[str]
-    def cls_validate(c, data):
-        return c._validator(data)
+    def __get__(self, obj: Any, objtype: Any = None) -> Any:
+        if obj is None:
 
-    cls.validate = classmethod(cls_validate)  # type: ignore[assignment]
+            def class_call(data: Any) -> list[str]:
+                return objtype._validator(data)
 
-    # instance validate() -> list[str] — we need both to work.
-    # Python's classmethod descriptor wins on instance too, so instance.validate()
-    # would still require data arg. Add instance helper `validate_self` and also
-    # make instance.validate work by providing __get__ fallback via instance dict?
-    # Workaround: after creation, monkey-patch instance __class__.validate to be
-    # a custom descriptor that handles both.
-    # Instead we attach a separate descriptor that handles both — replace class attr.
+            return class_call
 
-    class _BothDescriptor:
-        def __get__(self, obj, objtype=None):
-            if obj is None:
-                # class access
-                def class_call(data):
-                    return objtype._validator(data)  # type: ignore[attr-defined]
+        def inst_call(data: Any = None) -> list[str]:
+            if data is not None:
+                return objtype._validator(data)
+            return objtype._validator(obj._data)
 
-                return class_call
-            else:
-                # instance access
-                def inst_call(data=None):
-                    if data is not None:
-                        return objtype._validator(data)  # type: ignore[attr-defined]
-                    return objtype._validator(obj._data)  # type: ignore[attr-defined]
+        return inst_call
 
-                return inst_call
 
-    cls.validate = _BothDescriptor()  # type: ignore[assignment]
+def _make_schema_class(name: str, validator: Any) -> Any:
+    cls = type(name, (_BaseSchema,), {"_validator": staticmethod(validator)})
+    cls.validate = _BothDescriptor()  # type: ignore[attr-defined]
     return cls
 
 
