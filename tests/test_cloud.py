@@ -72,9 +72,7 @@ class TestKeySetGet:
 class TestKeyDeleteList:
     def test_delete_removes_entry(self, runner, fake_keyring):
         runner.invoke(main, ["cloud", "key", "set", "gmi"], input=f"{SECRET}\n")
-        result = runner.invoke(
-            main, ["cloud", "key", "delete", "gmi"], input="y\n"
-        )
+        result = runner.invoke(main, ["cloud", "key", "delete", "gmi"], input="y\n")
         assert result.exit_code == 0, result.output
         assert fake_keyring.get_password(KEYRING_SERVICE, "gmi") is None
 
@@ -131,8 +129,7 @@ class TestGmiExtraDeclaration:
         )
 
         declared = {
-            dep.split("[", 1)[0].split(">", 1)[0].split("=", 1)[0].split("<", 1)[0]
-            .strip().lower()
+            dep.split("[", 1)[0].split(">", 1)[0].split("=", 1)[0].split("<", 1)[0].strip().lower()
             for dep in extras["gmi"]
         }
         assert {"keyring", "httpx"} <= declared, (
