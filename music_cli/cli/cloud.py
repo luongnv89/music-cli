@@ -112,3 +112,10 @@ def key_list():
     click.echo("Stored cloud API keys:")
     for provider in stored:
         click.echo(f"  - {provider}")
+
+
+# Registered at the bottom so cloud_smoke's own `from .cloud import` sees the
+# fully-initialized names above (issue #152).
+from .cloud_smoke import register_cloud_smoke  # noqa: E402
+
+register_cloud_smoke(cloud_group)

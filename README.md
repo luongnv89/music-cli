@@ -241,6 +241,7 @@ mc mood [MOOD]              # list moods or play mood radio
 
 mc config                   # show config paths
 mc cloud key set gmi        # store GMI Cloud API key in the system keyring
+mc cloud smoke              # one real call per free MiniMax model -> dist/_smoke/
 mc daemon start|stop|status # manage daemon
 ```
 
