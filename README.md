@@ -136,6 +136,9 @@ pip install 'coder-music-cli[ai]'
 # MiniMax Music 3 (~24GB VRAM; CUDA/bfloat16 required)
 pip install 'coder-music-cli[minimax]'
 
+# GMI Cloud credentials (keyring-backed API key storage for `mc cloud`)
+pip install 'coder-music-cli[gmi]'
+
 # Both
 pip install 'coder-music-cli[youtube,ai]'
 ```
@@ -237,6 +240,7 @@ mc history play N            # replay from history
 mc mood [MOOD]              # list moods or play mood radio
 
 mc config                   # show config paths
+mc cloud key set gmi        # store GMI Cloud API key in the system keyring
 mc daemon start|stop|status # manage daemon
 ```
 

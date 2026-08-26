@@ -60,6 +60,12 @@ youtube = [
     # YouTube. 2026.7.4 is the newest release verified to extract successfully.
     "yt-dlp>=2026.7.4",
 ]
+# GMI Cloud credentials + adapter layer (issue #151). API keys are stored in
+# the OS keyring via `mc cloud key set gmi` and never in files or env vars.
+gmi = [
+    "keyring>=24",
+    "httpx>=0.27",
+]
 dev = [
     "pytest>=7.0",
     "pytest-asyncio>=0.21",
