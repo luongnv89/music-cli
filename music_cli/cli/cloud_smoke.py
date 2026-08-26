@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -184,12 +185,12 @@ def run_all_checks(
 ) -> list[dict]:
     """Run each enabled smoke check with its own client; never raises."""
     results: list[dict] = []
-    plans = [
+    plans: list[tuple[str, Callable[..., dict]]] = [
         ("m3", run_m3),
         ("music", run_music_plan),
         ("speech", run_speech_plan),
     ]
-    plan_kwargs = {
+    plan_kwargs: dict[str, dict] = {
         "m3": {"model": m3_model},
         "music": {
             "output_path": output_dir / "music.mp3",
