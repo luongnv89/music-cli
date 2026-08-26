@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import sys
 
 import click
@@ -20,15 +19,11 @@ KEYRING_SERVICE = "coder-music-cli"
 SUPPORTED_PROVIDERS = ("gmi",)
 
 
-class CloudKeyError(Exception):
-    """Raised when a cloud key operation cannot be completed."""
-
-
 def _load_keyring():
     try:
         import keyring
     except ImportError as exc:
-        raise CloudKeyError(
+        raise click.ClickException(
             "The 'keyring' package is not installed.\n"
             "Install it with: pip install 'coder-music-cli[gmi]'"
         ) from exc
@@ -117,11 +112,3 @@ def key_list():
     click.echo("Stored cloud API keys:")
     for provider in stored:
         click.echo(f"  - {provider}")
-
-
-def _assert_secret_not_in_env(secret: str, environ=None) -> None:
-    """Guard used by tests/docs: the secret must never leak into the environment."""
-    env = os.environ if environ is None else environ
-    for name, value in env.items():
-        if secret and secret in value:
-            raise AssertionError(f"secret leaked into environment variable {name}")
