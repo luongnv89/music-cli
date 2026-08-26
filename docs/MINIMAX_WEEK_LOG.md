@@ -53,3 +53,33 @@ Fill one row per real call from `dist/_smoke/summary.json`:
 - If any model turns out unreachable or unusable on first run, record the
   failure row verbatim from `summary.json` here and pivot to whatever is
   reachable.
+
+## Day 3 — Pre.3: Confirm pre-existing-repo eligibility with organizers (#153)
+
+Date: 2026-08-26
+
+### Status
+
+**Pending** — question not yet sent; awaiting organizer reply.
+
+- [ ] Question sent through the documented channel (campaign form or contact email)
+- [ ] Reply received and pasted into this log
+- [x] Fallback defined if rejected (below)
+
+### Question to send
+
+> Is a pre-existing public repo allowed if the GMI/MiniMax integration, the
+> `studio` command group, and the audiovisual pipeline are built during the
+> 14-day window?
+
+Send via the campaign form or the organizers' contact email (whichever channel
+the campaign documents). Paste the verbatim reply under **Reply** below.
+
+### Reply
+
+_pending_
+
+### Fallback if rejected
+
+Relocate all `feat/minimax-week-studio` work to a fresh repository before the
+window opens.
