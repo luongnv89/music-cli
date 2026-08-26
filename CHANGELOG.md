@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Add the `mc cloud key` command group (`set`/`get`/`delete`/`list`) storing cloud provider API keys in the OS keyring via `keyring`; provider `gmi` (GMI Cloud) is supported, and keys never touch config files, environment variables, or git ([#151](https://github.com/luongnv89/music-cli/issues/151)).
+- Add the `gmi` optional extra (`pip install 'coder-music-cli[gmi]'`) declaring `keyring>=24` and `httpx>=0.27` for the upcoming GMI Cloud / MiniMax adapter layer ([#151](https://github.com/luongnv89/music-cli/issues/151)).
+
 ## [0.11.0] - 2026-08-22
 
 ### Breaking Changes

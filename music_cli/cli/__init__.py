@@ -15,6 +15,7 @@ from .ai_models import (
     ai_models_set_default,
 )
 from .app import _check_for_updates_once, main
+from .cloud import KEYRING_SERVICE, cloud_group, key_delete, key_get, key_list, key_set
 from .common import (
     _ICON_FALLBACKS,
     INSPIRATIONAL_QUOTES,
@@ -63,6 +64,7 @@ from .youtube import youtube_cached, youtube_clear, youtube_group, youtube_play,
 
 __all__ = [
     "INSPIRATIONAL_QUOTES",
+    "KEYRING_SERVICE",
     "AliasedGroup",
     "ComposingAnimation",
     "PlayOptions",
@@ -91,6 +93,7 @@ __all__ = [
     "ai_play",
     "ai_remove",
     "ai_replay",
+    "cloud_group",
     "daemon_control",
     "ensure_daemon",
     "get_random_quote",
@@ -98,6 +101,10 @@ __all__ = [
     "history_list",
     "history_play",
     "icon",
+    "key_delete",
+    "key_get",
+    "key_list",
+    "key_set",
     "list_moods",
     "main",
     "next_track",
