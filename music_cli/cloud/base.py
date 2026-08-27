@@ -69,33 +69,6 @@ def idempotency_key(provider: str, model: str, prompt: str, params: dict | None 
     return hashlib.sha256(material.encode("utf-8")).hexdigest()
 
 
-def httpx_transport() -> Transport:
-    """Build the default transport from ``httpx`` (imported lazily).
-
-    Keeps the adapter modules importable without the ``gmi`` extra installed
-    (mirrors the lazy-import pattern in ``music_cli.cli.cloud_smoke``).
-    """
-    try:
-        import httpx
-    except ImportError as exc:  # pragma: no cover - exercised only without httpx
-        raise AdapterError(
-            "The 'httpx' package is not installed.\n"
-            "Install it with: pip install 'coder-music-cli[gmi]'"
-        ) from exc
-
-    client = httpx.AsyncClient(timeout=60.0)
-
-    async def transport(method, url, headers, payload):
-        response = await client.request(method, url, headers=headers, json=payload)
-        try:
-            body: Any = response.json()
-        except ValueError:
-            body = {}
-        return response.status_code, body
-
-    return transport
-
-
 class BaseAdapter:
     """Common retry / poll / cache plumbing for the cloud adapters.
 
@@ -106,7 +79,9 @@ class BaseAdapter:
     cache:
         Optional :class:`~music_cli.cloud.strategy_cache.DiskStrategyCache`.
     transport:
-        Optional async transport override (recorded fixtures in tests).
+        Optional async transport override (recorded fixtures in tests). When
+        omitted, an ``httpx.AsyncClient`` is created lazily on first request
+        and owned by the adapter; close it with :meth:`aclose`.
     """
 
     provider: str = ""
@@ -126,10 +101,48 @@ class BaseAdapter:
         self._api_key = api_key
         self._cache = cache
         self._transport = transport
+        self._client: Any | None = None
         self._max_attempts = max(1, max_attempts)
         self._backoff_base = backoff_base
         self._poll_interval = poll_interval
         self._poll_timeout = poll_timeout
+
+    # ------------------------------------------------------------------
+    # transport
+    # ------------------------------------------------------------------
+    def _get_transport(self) -> Transport:
+        """Return the injected transport, or build an owned httpx one."""
+        if self._transport is not None:
+            return self._transport
+        try:
+            import httpx
+        except ImportError as exc:  # pragma: no cover - only without httpx
+            raise AdapterError(
+                "The 'httpx' package is not installed.\n"
+                "Install it with: pip install 'coder-music-cli[gmi]'"
+            ) from exc
+
+        client = httpx.AsyncClient(timeout=60.0)
+        self._client = client
+
+        async def transport(method, url, headers, payload):
+            response = await client.request(method, url, headers=headers, json=payload)
+            try:
+                body: Any = response.json()
+            except ValueError:
+                logger.warning("%s: non-JSON response from %s %s", self.provider, method, url)
+                body = {}
+            return response.status_code, body
+
+        self._transport = transport
+        return transport
+
+    async def aclose(self) -> None:
+        """Close the lazily-created httpx client (no-op with an injected transport)."""
+        if self._client is not None:
+            await self._client.aclose()
+            self._client = None
+            self._transport = None
 
     # ------------------------------------------------------------------
     # transport
@@ -150,9 +163,7 @@ class BaseAdapter:
         payload: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
     ) -> Any:
-        if self._transport is None:
-            self._transport = httpx_transport()
-        status, body = await self._transport(method, url, headers or self._headers(), payload)
+        status, body = await self._get_transport()(method, url, headers or self._headers(), payload)
         if status >= 500 or status in TRANSIENT_STATUSES:
             raise TransientError(f"{self.provider}: HTTP {status} from {method} {url}")
         if status >= 400:
@@ -211,7 +222,10 @@ class BaseAdapter:
         Cancellation is cooperative: ``should_cancel`` is checked before each
         poll and a ``True`` return raises :class:`PollCancelledError` so
         callers can stop waiting cleanly. Genuine ``CancelledError`` (the
-        enclosing task being cancelled) propagates untouched.
+        enclosing task being cancelled) propagates untouched. Timing out
+        raises :class:`AdapterError`; the job's pending cache entry (if any)
+        stays valid, so a later call resumes polling it rather than
+        submitting a duplicate.
         """
         loop = asyncio.get_running_loop()
         deadline = loop.time() + self._poll_timeout
@@ -283,7 +297,9 @@ class BaseAdapter:
         - A completed cache hit returns instantly, with no HTTP traffic.
         - A pending cache entry (journaled before the first poll) resumes
           polling the recorded job id instead of submitting a duplicate, so
-          work survives a process restart.
+          work survives a process restart. If a resumed job has vanished
+          (404/410), the stale entry is discarded and a fresh job is
+          submitted — a dead journal must not poison the key forever.
         - Every submit/poll request carries the shared ``Idempotency-Key``.
         """
         cache = self._cache
@@ -296,28 +312,52 @@ class BaseAdapter:
         idem = idempotency_key(self.provider, model, prompt, params)
         headers = self._headers(idem)
         job_id: str | None = None
+        resumed = False
         if cache is not None and key is not None:
             pending = cache.get(key)
             if pending is not None and pending.get("status") == "pending":
-                job_id = pending.get("job_id")
-                logger.info("%s: resuming queued job %s from cache", self.provider, job_id)
+                candidate = pending.get("job_id")
+                if isinstance(candidate, str) and candidate:
+                    job_id = candidate
+                    resumed = True
+                    logger.info("%s: resuming queued job %s from cache", self.provider, job_id)
 
         def poll_url() -> str:
             return f"{submit_url.rstrip('/')}/{job_id}"
 
-        async def operation() -> dict[str, Any]:
+        async def submit() -> None:
             nonlocal job_id
+            body = await self._send("POST", submit_url, submit_payload(idem), headers)
+            job_id = body.get("request_id") or body.get("job_id") or body.get("id")
+            if not job_id:
+                raise AdapterError(f"{self.provider}: queue returned no job id: {body!r}")
+            if cache is not None and key is not None:
+                cache.put(
+                    key,
+                    {"status": "pending", "provider": self.provider, "job_id": job_id},
+                )
+
+        async def operation() -> dict[str, Any]:
+            nonlocal job_id, resumed
             if job_id is None:
-                body = await self._send("POST", submit_url, submit_payload(idem), headers)
-                job_id = body.get("request_id") or body.get("job_id") or body.get("id")
-                if not job_id:
-                    raise AdapterError(f"{self.provider}: queue returned no job id: {body!r}")
-                if cache is not None and key is not None:
-                    cache.put(
-                        key,
-                        {"status": "pending", "provider": self.provider, "job_id": job_id},
+                await submit()
+            try:
+                return await self.poll(poll_url(), headers=headers)
+            except AdapterError as exc:
+                # A journaled job that has vanished (404/410) is stale: drop
+                # it once and submit a fresh job instead of failing forever.
+                if resumed and any(code in str(exc) for code in ("HTTP 404", "HTTP 410")):
+                    logger.warning(
+                        "%s: resumed job %s is gone (%s); submitting a fresh job",
+                        self.provider,
+                        job_id,
+                        exc,
                     )
-            return await self.poll(poll_url(), headers=headers)
+                    job_id = None
+                    resumed = False
+                    await submit()
+                    return await self.poll(poll_url(), headers=headers)
+                raise
 
         outcome = await self.run(operation)
         result = result_of(outcome)

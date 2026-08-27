@@ -15,7 +15,6 @@ return instantly on a cache hit and resume journaled jobs after a restart.
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import Any
 
 from .base import BaseAdapter
@@ -104,7 +103,7 @@ class GMIAdapter(BaseAdapter):
         return await self.submit_and_poll(
             model=MUSIC_MODEL,
             prompt=prompt,
-            params={**clean, "lyrics": lyrics} if lyrics else clean,
+            params={**clean, "lyrics": lyrics} if lyrics is not None else clean,
             submit_url=self.queue_url,
             submit_payload=payload,
             result_of=_audio_result,
@@ -134,12 +133,8 @@ class GMIAdapter(BaseAdapter):
         return await self.submit_and_poll(
             model=SPEECH_MODEL,
             prompt=text,
-            params={**clean, "voice": voice} if voice else clean,
+            params={**clean, "voice": voice} if voice is not None else clean,
             submit_url=self.queue_url,
             submit_payload=payload,
             result_of=_audio_result,
         )
-
-
-# Re-exported for callers wiring the adapter without touching internals.
-AudioResultFactory = Callable[[dict[str, Any]], dict[str, Any]]

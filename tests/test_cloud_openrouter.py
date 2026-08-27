@@ -7,7 +7,7 @@ touches the network.
 
 from __future__ import annotations
 
-import asyncio
+import inspect
 import json
 from pathlib import Path
 from typing import Any
@@ -70,7 +70,7 @@ def test_openrouter_adapter_exposes_task_methods():
     for name in ("m3_chat", "m27_chat", "speech28_synthesize"):
         method = getattr(adapter, name, None)
         assert callable(method), f"OpenRouterAdapter missing task method {name}"
-        assert asyncio.iscoroutinefunction(method)
+        assert inspect.iscoroutinefunction(method)
 
 
 # ---------------------------------------------------------------------------

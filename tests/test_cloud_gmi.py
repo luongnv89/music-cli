@@ -8,6 +8,7 @@ the network.
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 from pathlib import Path
 from typing import Any
@@ -111,7 +112,7 @@ def test_gmi_adapter_exposes_task_methods():
     ):
         method = getattr(adapter, name, None)
         assert callable(method), f"GMIAdapter missing task method {name}"
-        assert asyncio.iscoroutinefunction(method)
+        assert inspect.iscoroutinefunction(method)
 
 
 # ---------------------------------------------------------------------------
@@ -220,6 +221,43 @@ async def test_pending_job_is_resumed_not_resubmitted(tmp_path):
     assert cache.get(key)["status"] == "completed"
 
 
+async def test_stale_pending_job_is_resubmitted_after_gone(tmp_path):
+    """A resumed job that has vanished (404) must not poison the key forever."""
+    fixture = load_fixture()
+    cache = DiskStrategyCache(tmp_path / "cache")
+    prompt = "indie folk, melancholic"
+    key = cache_key(MUSIC_MODEL, prompt, {})
+    cache.put(key, {"status": "pending", "provider": "gmi", "job_id": "dead-job"})
+    transport = RecordedTransport(
+        [("GET", GMI_QUEUE_URL, 404, {"error": "no such request"})] + music_script(fixture)
+    )
+    adapter = make_adapter(transport, tmp_path)
+    result = await adapter.music3_generate(prompt)
+    assert result["audio_url"] == fixture["music_poll_completed"]["body"]["audio_url"]
+    # 404 poll of the dead job, then a fresh submit + full poll cycle.
+    assert [call["method"] for call in transport.calls] == [
+        "GET",
+        "POST",
+        "GET",
+        "GET",
+        "GET",
+    ]
+    assert cache.get(key)["status"] == "completed"
+
+
+async def test_invalid_pending_job_id_is_ignored(tmp_path):
+    fixture = load_fixture()
+    cache = DiskStrategyCache(tmp_path / "cache")
+    prompt = "indie folk, melancholic"
+    key = cache_key(MUSIC_MODEL, prompt, {})
+    cache.put(key, {"status": "pending", "provider": "gmi", "job_id": None})
+    transport = RecordedTransport(music_script(fixture))
+    adapter = make_adapter(transport, tmp_path)
+    result = await adapter.music3_generate(prompt)
+    assert result["audio_url"] == fixture["music_poll_completed"]["body"]["audio_url"]
+    assert [call["method"] for call in transport.calls] == ["POST", "GET", "GET", "GET"]
+
+
 # ---------------------------------------------------------------------------
 # run(): retries with exponential backoff
 # ---------------------------------------------------------------------------
@@ -283,6 +321,27 @@ async def test_poll_cancellation_is_cooperative(tmp_path):
     )
     with pytest.raises(PollCancelledError):
         await cancelled
+
+
+async def test_task_cancellation_propagates_from_poll(tmp_path):
+    """Genuine task cancellation must surface as CancelledError, not AdapterError."""
+    transport = RecordedTransport(
+        [("GET", GMI_QUEUE_URL, 200, {"status": "running"}) for _ in range(50)]
+    )
+    adapter = make_adapter(transport, tmp_path)
+    task = asyncio.ensure_future(adapter.poll(f"{GMI_QUEUE_URL}/job-1"))
+    await asyncio.sleep(0.01)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+
+def test_cache_key_distinguishes_model_prompt_and_params():
+    assert cache_key("m", "prompt") == cache_key("m", "prompt")
+    assert cache_key("m", "prompt") != cache_key("m2", "prompt")
+    assert cache_key("m", "prompt") != cache_key("m", "prompt2")
+    assert cache_key("m", "prompt", {"a": 1}) != cache_key("m", "prompt", {"a": 2})
+    assert cache_key("m", "prompt", {"a": 1}) == cache_key("m", "prompt", {"a": 1})
 
 
 async def test_poll_times_out_when_job_never_completes(tmp_path):
