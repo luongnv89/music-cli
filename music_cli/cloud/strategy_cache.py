@@ -61,13 +61,34 @@ class DiskStrategyCache:
     def _path(self, key: str) -> Path:
         return self.root / f"{key}.json"
 
+    _VALID_STATUS = frozenset({"pending", "completed"})
+
     def get(self, key: str) -> dict[str, Any] | None:
-        """Return the record for ``key``, or ``None`` if absent/unreadable."""
+        """Return the record for ``key``, or ``None`` if absent/unreadable.
+
+        Records that do not match one of the two documented shapes (a
+        ``completed`` record without ``result``, a ``pending`` record without
+        a usable ``job_id``, an unknown ``status``) are treated as corrupt and
+        ignored, per the module contract.
+        """
         try:
             record = json.loads(self._path(key).read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return None
-        return record if isinstance(record, dict) and "status" in record else None
+        if not isinstance(record, dict):
+            return None
+        status = record.get("status")
+        if status not in self._VALID_STATUS:
+            return None
+        if status == "completed" and "result" not in record:
+            logger.warning("cache: ignoring corrupt entry %s (completed, no result)", key)
+            return None
+        if status == "pending":
+            job_id = record.get("job_id")
+            if not isinstance(job_id, str) or not job_id:
+                logger.warning("cache: ignoring corrupt entry %s (pending, bad job id)", key)
+                return None
+        return record
 
     def put(self, key: str, record: dict[str, Any]) -> None:
         """Atomically store ``record`` under ``key``."""

@@ -258,6 +258,60 @@ async def test_invalid_pending_job_id_is_ignored(tmp_path):
     assert [call["method"] for call in transport.calls] == ["POST", "GET", "GET", "GET"]
 
 
+async def test_hostile_pending_job_id_is_ignored(tmp_path):
+    """A tampered cache id must not rewrite the poll URL path or query."""
+    fixture = load_fixture()
+    cache = DiskStrategyCache(tmp_path / "cache")
+    prompt = "indie folk, melancholic"
+    key = cache_key(MUSIC_MODEL, prompt, {})
+    cache.put(
+        key,
+        {"status": "pending", "provider": "gmi", "job_id": "../../other/endpoint?x=1"},
+    )
+    transport = RecordedTransport(music_script(fixture))
+    adapter = make_adapter(transport, tmp_path)
+    result = await adapter.music3_generate(prompt)
+    assert result["audio_url"] == fixture["music_poll_completed"]["body"]["audio_url"]
+    # The hostile id was never polled: a fresh submit happened instead.
+    assert [call["method"] for call in transport.calls] == ["POST", "GET", "GET", "GET"]
+    assert all("other/endpoint" not in call["url"] for call in transport.calls)
+
+
+async def test_resumed_job_failure_with_404_text_is_not_resubmitted(tmp_path):
+    """A *failed* job whose error text mentions "HTTP 404" must fail, not resubmit.
+
+    The stale-job recovery branches on the structural status code, never on
+    the exception message.
+    """
+    cache = DiskStrategyCache(tmp_path / "cache")
+    prompt = "indie folk, melancholic"
+    key = cache_key(MUSIC_MODEL, prompt, {})
+    cache.put(key, {"status": "pending", "provider": "gmi", "job_id": "rec-music-001"})
+    transport = RecordedTransport(
+        [("GET", GMI_QUEUE_URL, 200, {"status": "failed", "error": "upstream returned HTTP 404"})]
+    )
+    adapter = make_adapter(transport, tmp_path)
+    with pytest.raises(AdapterError, match="job failed"):
+        await adapter.music3_generate(prompt)
+    assert [call["method"] for call in transport.calls] == ["GET"]
+
+
+async def test_corrupt_completed_entry_without_result_is_a_miss(tmp_path):
+    """A completed record missing ``result`` is corrupt: ignored, then rebuilt."""
+    fixture = load_fixture()
+    cache = DiskStrategyCache(tmp_path / "cache")
+    prompt = "indie folk, melancholic"
+    key = cache_key(MUSIC_MODEL, prompt, {})
+    cache.put(key, {"status": "completed"})
+    assert cache.get(key) is None  # shape-validated at the cache boundary
+    transport = RecordedTransport(music_script(fixture))
+    adapter = make_adapter(transport, tmp_path)
+    result = await adapter.music3_generate(prompt)
+    assert result["audio_url"] == fixture["music_poll_completed"]["body"]["audio_url"]
+    assert len(transport.calls) == 4
+    assert cache.get(key)["status"] == "completed"
+
+
 # ---------------------------------------------------------------------------
 # run(): retries with exponential backoff
 # ---------------------------------------------------------------------------

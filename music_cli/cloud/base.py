@@ -21,6 +21,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import re
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -35,6 +36,17 @@ DEFAULT_BACKOFF_BASE = 0.2
 #: HTTP statuses worth retrying (timeouts, rate limits).
 TRANSIENT_STATUSES = frozenset({408, 425, 429})
 
+#: Queue/job ids that are safe to append to a poll URL path (no ``/``, ``?``,
+#: ``#`` or whitespace, so a tampered cache entry cannot rewrite the request).
+_JOB_ID_RE = re.compile(r"[A-Za-z0-9._-]+")
+
+
+def _usable_job_id(candidate: Any) -> str | None:
+    """Return ``candidate`` if it is safe to append to a poll URL path."""
+    if isinstance(candidate, str) and _JOB_ID_RE.fullmatch(candidate):
+        return candidate
+    return None
+
 
 class AdapterError(Exception):
     """Non-retryable adapter failure (bad request, failed job, timeout)."""
@@ -42,6 +54,19 @@ class AdapterError(Exception):
 
 class TransientError(AdapterError):
     """Retryable failure (server error, rate limit)."""
+
+
+class HttpStatusError(AdapterError):
+    """Non-retryable failure carrying the HTTP status code structurally.
+
+    Callers that need to branch on a specific status (e.g. the stale-job
+    recovery path treating 404/410 as "job gone") must use ``exc.status``
+    rather than matching the message text, which is not a stable contract.
+    """
+
+    def __init__(self, message: str, *, status: int) -> None:
+        super().__init__(message)
+        self.status = status
 
 
 class PollCancelledError(AdapterError):
@@ -167,7 +192,9 @@ class BaseAdapter:
         if status >= 500 or status in TRANSIENT_STATUSES:
             raise TransientError(f"{self.provider}: HTTP {status} from {method} {url}")
         if status >= 400:
-            raise AdapterError(f"{self.provider}: HTTP {status} from {method} {url}")
+            raise HttpStatusError(
+                f"{self.provider}: HTTP {status} from {method} {url}", status=status
+            )
         return body
 
     # ------------------------------------------------------------------
@@ -316,8 +343,8 @@ class BaseAdapter:
         if cache is not None and key is not None:
             pending = cache.get(key)
             if pending is not None and pending.get("status") == "pending":
-                candidate = pending.get("job_id")
-                if isinstance(candidate, str) and candidate:
+                candidate = _usable_job_id(pending.get("job_id"))
+                if candidate is not None:
                     job_id = candidate
                     resumed = True
                     logger.info("%s: resuming queued job %s from cache", self.provider, job_id)
@@ -329,8 +356,8 @@ class BaseAdapter:
             nonlocal job_id
             body = await self._send("POST", submit_url, submit_payload(idem), headers)
             job_id = body.get("request_id") or body.get("job_id") or body.get("id")
-            if not job_id:
-                raise AdapterError(f"{self.provider}: queue returned no job id: {body!r}")
+            if _usable_job_id(job_id) is None:
+                raise AdapterError(f"{self.provider}: queue returned no usable job id: {body!r}")
             if cache is not None and key is not None:
                 cache.put(
                     key,
@@ -343,10 +370,14 @@ class BaseAdapter:
                 await submit()
             try:
                 return await self.poll(poll_url(), headers=headers)
+            except PollCancelledError:
+                raise
             except AdapterError as exc:
                 # A journaled job that has vanished (404/410) is stale: drop
                 # it once and submit a fresh job instead of failing forever.
-                if resumed and any(code in str(exc) for code in ("HTTP 404", "HTTP 410")):
+                # Branch on the structural status, never on message text —
+                # a job *failure* payload may itself contain "HTTP 404".
+                if resumed and isinstance(exc, HttpStatusError) and exc.status in (404, 410):
                     logger.warning(
                         "%s: resumed job %s is gone (%s); submitting a fresh job",
                         self.provider,
