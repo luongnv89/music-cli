@@ -42,9 +42,8 @@ def _load_keyring():
     """Return the ``keyring`` module (tests patch this seam)."""
     try:
         return _secrets.load_keyring()
-    except _secrets.KeyringUnavailable as exc:
+    except _secrets.KeyringUnavailableError as exc:
         raise click.ClickException(str(exc)) from exc
-    return keyring
 
 
 def _validate_provider(provider: str) -> str:
@@ -208,9 +207,7 @@ def cloud_ping(provider, timeout):
 
     for res in results:
         if res["ok"]:
-            click.echo(
-                f"{res['provider']}: reachable ({res['model']}, {res['latency']:.2f}s)"
-            )
+            click.echo(f"{res['provider']}: reachable ({res['model']}, {res['latency']:.2f}s)")
         else:
             click.echo(f"{res['provider']}: unreachable ({res['error']})", err=True)
     if any(not res["ok"] for res in results):

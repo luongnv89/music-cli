@@ -27,8 +27,12 @@ SERVICE = "coder-music-cli"
 PROVIDERS = ("gmi", "openrouter")
 
 
-class KeyringUnavailable(RuntimeError):
+class KeyringUnavailableError(RuntimeError):
     """The optional ``keyring`` dependency is not installed."""
+
+
+#: Backwards-compatible alias (PR #161 originally shipped ``KeyringUnavailable``).
+KeyringUnavailable = KeyringUnavailableError
 
 
 def load_keyring() -> Any:
@@ -36,13 +40,13 @@ def load_keyring() -> Any:
 
     Raises
     ------
-    KeyringUnavailable
+    KeyringUnavailableError
         If the optional ``keyring`` package is missing.
     """
     try:
         import keyring
     except ImportError as exc:
-        raise KeyringUnavailable(
+        raise KeyringUnavailableError(
             "The 'keyring' package is not installed.\n"
             "Install it with: pip install 'coder-music-cli[gmi]'"
         ) from exc

@@ -88,6 +88,7 @@ class TestKeyRoundTrip:
         assert result.exit_code != 0
         assert "unsupported provider" in result.output
 
+
 # ---------------------------------------------------------------------------
 # `mc cloud ping`
 # ---------------------------------------------------------------------------
@@ -128,9 +129,7 @@ def patch_adapter(monkeypatch):
 
 
 class TestCloudPing:
-    def test_reachable_reports_latency_and_exits_zero(
-        self, runner, fake_keyring, patch_adapter
-    ):
+    def test_reachable_reports_latency_and_exits_zero(self, runner, fake_keyring, patch_adapter):
         fake_keyring.set_password(KEYRING_SERVICE, "gmi", SECRET)
         patch_adapter({"gmi": FakeAdapter(ok=True)})
         result = runner.invoke(main, ["cloud", "ping", "gmi"])
@@ -158,9 +157,7 @@ class TestCloudPing:
         assert adapter.api_key == SECRET
         assert SECRET not in result.output
 
-    def test_unreachable_reports_error_and_exits_nonzero(
-        self, runner, fake_keyring, patch_adapter
-    ):
+    def test_unreachable_reports_error_and_exits_nonzero(self, runner, fake_keyring, patch_adapter):
         fake_keyring.set_password(KEYRING_SERVICE, "gmi", SECRET)
         patch_adapter({"gmi": FakeAdapter(ok=False, error="HTTP 503")})
         result = runner.invoke(main, ["cloud", "ping", "gmi"])
@@ -168,9 +165,7 @@ class TestCloudPing:
         assert "gmi: unreachable" in result.output
         assert SECRET not in result.output
 
-    def test_missing_key_reports_unreachable_without_network(
-        self, runner, fake_keyring
-    ):
+    def test_missing_key_reports_unreachable_without_network(self, runner, fake_keyring):
         result = runner.invoke(main, ["cloud", "ping", "gmi"])
         assert result.exit_code == 1
         assert "unreachable" in result.output
