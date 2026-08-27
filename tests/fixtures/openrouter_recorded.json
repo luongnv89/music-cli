@@ -1,0 +1,53 @@
+{
+  "_comment": "Recorded OpenRouter transcript for tests/test_cloud_openrouter.py. No live calls in CI.",
+  "recorded_at": "2026-08-27T00:00:00Z",
+  "source": "OpenRouter chat-completions response shapes; values are placeholders",
+  "m3_chat_completion": {
+    "status_code": 200,
+    "body": {
+      "id": "or-rec-m3-001",
+      "model": "minimax/minimax-m3",
+      "choices": [
+        {
+          "index": 0,
+          "message": {"role": "assistant", "content": "M3 via OpenRouter: plan draft"},
+          "finish_reason": "stop"
+        }
+      ],
+      "usage": {"prompt_tokens": 12, "completion_tokens": 10, "total_tokens": 22}
+    }
+  },
+  "m27_chat_completion": {
+    "status_code": 200,
+    "body": {
+      "id": "or-rec-m27-001",
+      "model": "minimax/minimax-m2.7",
+      "choices": [
+        {
+          "index": 0,
+          "message": {"role": "assistant", "content": "M2.7 via OpenRouter"},
+          "finish_reason": "stop"
+        }
+      ],
+      "usage": {"prompt_tokens": 8, "completion_tokens": 7, "total_tokens": 15}
+    }
+  },
+  "speech28_completion": {
+    "status_code": 200,
+    "body": {
+      "id": "or-rec-speech-001",
+      "model": "minimax/speech-2.8",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "content": "audio: https://openrouter-cdn.example/speech-rec-001.mp3"
+          },
+          "finish_reason": "stop"
+        }
+      ],
+      "usage": {"prompt_tokens": 10, "completion_tokens": 14, "total_tokens": 24}
+    }
+  }
+}

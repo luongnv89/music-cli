@@ -1,0 +1,75 @@
+{
+  "_comment": "Recorded GMI Cloud transcript for tests/test_cloud_gmi.py. No live calls in CI.",
+  "recorded_at": "2026-08-27T00:00:00Z",
+  "source": "mc cloud smoke transcript shapes (#152); values are placeholders",
+  "m3_chat_completion": {
+    "status_code": 200,
+    "body": {
+      "id": "cmpl-rec-m3-001",
+      "model": "MiniMax-M3",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "content": "PLAN: 4 scenes, lo-fi focus arc, warm analog texture"
+          },
+          "finish_reason": "stop"
+        }
+      ],
+      "usage": {"prompt_tokens": 18, "completion_tokens": 24, "total_tokens": 42}
+    }
+  },
+  "h3_chat_completion": {
+    "status_code": 200,
+    "body": {
+      "id": "cmpl-rec-h3-001",
+      "model": "MiniMax-H3",
+      "choices": [
+        {
+          "index": 0,
+          "message": {"role": "assistant", "content": "H3 generated completion"},
+          "finish_reason": "stop"
+        }
+      ],
+      "usage": {"prompt_tokens": 9, "completion_tokens": 6, "total_tokens": 15}
+    }
+  },
+  "music_submit": {
+    "status_code": 200,
+    "body": {"request_id": "rec-music-001", "status": "queued"}
+  },
+  "music_poll_queued": {
+    "status_code": 200,
+    "body": {"status": "queued"}
+  },
+  "music_poll_running": {
+    "status_code": 200,
+    "body": {"status": "running", "progress": 0.4}
+  },
+  "music_poll_completed": {
+    "status_code": 200,
+    "body": {
+      "status": "completed",
+      "audio_url": "https://cdn.gmicloud.ai/recorded/music-rec-001.mp3",
+      "duration_s": 96
+    }
+  },
+  "speech_submit": {
+    "status_code": 200,
+    "body": {"request_id": "rec-speech-001", "status": "queued"}
+  },
+  "speech_poll_queued": {
+    "status_code": 200,
+    "body": {"status": "queued"}
+  },
+  "speech_poll_completed": {
+    "status_code": 200,
+    "body": {
+      "status": "completed",
+      "media_urls": [
+        {"url": "https://cdn.gmicloud.ai/recorded/speech-rec-001.mp3", "format": "mp3"}
+      ]
+    }
+  }
+}
