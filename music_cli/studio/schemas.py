@@ -452,6 +452,10 @@ _PLAN_DIFF_ALLOWED = {
     "removed",
     "modified",
     "summary",
+    # P2.1 (#135): M3Director.revise() records which nodes survive a revision
+    # untouched and which must regenerate. Optional lists of node ids.
+    "locked_nodes",
+    "regenerate_nodes",
 }
 
 
@@ -472,7 +476,7 @@ def _validate_plan_diff(data: Any, prefix: str = "") -> list[str]:
             for i, a in enumerate(v):
                 if not _is_non_empty_str(a):
                     errs.append(_err(prefix, f"affected_nodes[{i}]: must be non-empty string"))
-    for lf in ("added", "removed", "modified"):
+    for lf in ("added", "removed", "modified", "locked_nodes", "regenerate_nodes"):
         if lf in data and data[lf] is not None:
             v = data[lf]
             if not isinstance(v, list):
