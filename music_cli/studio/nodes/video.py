@@ -13,6 +13,7 @@ P4.1 asset and cost boundary that stage consumes.
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import html
 import json
@@ -336,6 +337,11 @@ class VideoNode(BaseNode):
         self._ffmpeg_runner = ffmpeg_runner
         self._manifest = manifest
 
+    def _refresh_manifest_spend(self) -> None:
+        """Pick up spend reserved by another node sharing this manifest."""
+        if self._manifest_budget_block is not None and "spent" in self._manifest_budget_block:
+            self.budget.spent = _decimal(self._manifest_budget_block["spent"], "budget spent")
+
     def _sync_manifest_spend(self) -> None:
         """Mirror reserved spend into a mutable ProjectManifest budget block."""
         if self._manifest_budget_block is not None:
@@ -385,16 +391,21 @@ class VideoNode(BaseNode):
             use_confirm = self.confirm if confirm is None else bool(confirm)
             # This is deliberately before _synthesize: a blocked projection
             # must not invoke the provider or create a partial output.
+            self._refresh_manifest_spend()
             self.budget.reserve(self.estimated_cost, confirm=use_confirm)
             self._sync_manifest_spend()
             url, destination = await self._synthesize(prompt, scene_duration)
             self._nodes_dir.mkdir(parents=True, exist_ok=True)
             try:
                 await self._downloader(url, destination)
-            except BaseException:
+            except asyncio.CancelledError:
                 self._remove_output(destination)
                 self._path = None
                 raise
+            except Exception as exc:
+                self._remove_output(destination)
+                self._path = None
+                raise NodeError(f"scene: could not download H3 output: {exc}") from exc
 
         return self._finish(destination)
 
@@ -403,10 +414,14 @@ class VideoNode(BaseNode):
         self._path = destination
         try:
             report = self._probe(destination)
-        except BaseException:
+        except asyncio.CancelledError:
             self._remove_output(destination)
             self._path = None
             raise
+        except Exception as exc:
+            self._remove_output(destination)
+            self._path = None
+            raise NodeError(f"scene: probe failed for {destination}: {exc}") from exc
         if not report.get("ok"):
             self._remove_output(destination)
             self._path = None

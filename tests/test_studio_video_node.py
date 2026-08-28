@@ -184,6 +184,20 @@ class TestBudget:
         assert first.budget.spent == Decimal("2")
         assert manifest.to_dict()["budget"]["spent"] == 2.0
 
+    async def test_preconstructed_mapping_nodes_refresh_shared_spend(self, tmp_path):
+        manifest = {
+            "budget": {"per_build_cap": 1},
+        }
+        adapter = FakeH3Adapter()
+        first, _ = _node(tmp_path / "first", adapter=adapter, manifest=manifest)
+        second, _ = _node(tmp_path / "second", adapter=adapter, manifest=manifest)
+
+        await first.generate("one", 1)
+        with pytest.raises(BudgetExceeded):
+            await second.generate("two", 1)
+
+        assert manifest["budget"]["spent"] == 1.0
+
 
 class TestH3Generation:
     async def test_generate_calls_h3_writes_scene_and_probes(self, tmp_path):
