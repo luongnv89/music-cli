@@ -7,13 +7,16 @@ without making a live request or depending on media binaries.
 
 from __future__ import annotations
 
+import asyncio
 from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from click.testing import CliRunner
 
+from music_cli.cli import main
 from music_cli.studio import BudgetExceeded, BuildBudget, ProjectManifest, VideoNode
 from music_cli.studio.nodes import VideoNode as NodesVideoNode
 from music_cli.studio.nodes.base import NodeError, NodeLockedError
@@ -159,6 +162,28 @@ class TestBudget:
 
         assert node.budget.spent == Decimal("1")
 
+    async def test_nodes_sharing_a_manifest_share_one_build_budget(self, tmp_path):
+        manifest = ProjectManifest(
+            {
+                "project_id": "demo-project",
+                "plan_id": "plan-1",
+                "budget": {"per_build_cap": 2},
+            }
+        )
+        adapter = FakeH3Adapter()
+        first, _ = _node(tmp_path / "first", adapter=adapter, manifest=manifest)
+        second, _ = _node(tmp_path / "second", adapter=adapter, manifest=manifest)
+        third, _ = _node(tmp_path / "third", adapter=adapter, manifest=manifest)
+
+        await first.generate("one", 1)
+        await second.generate("two", 1)
+        with pytest.raises(BudgetExceeded):
+            await third.generate("three", 1)
+
+        assert first.budget is second.budget is third.budget
+        assert first.budget.spent == Decimal("2")
+        assert manifest.to_dict()["budget"]["spent"] == 2.0
+
 
 class TestH3Generation:
     async def test_generate_calls_h3_writes_scene_and_probes(self, tmp_path):
@@ -186,6 +211,25 @@ class TestH3Generation:
         with pytest.raises(NodeError, match="no usable video URL"):
             _video_url({"text": "not a media response"})
 
+    async def test_cancelled_download_removes_partial_output(self, tmp_path):
+        async def cancelled_download(_url: str, destination: Path) -> int:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(b"partial")
+            raise asyncio.CancelledError()
+
+        node = VideoNode(
+            FakeH3Adapter(),
+            proj_dir=tmp_path,
+            downloader=cancelled_download,
+            probe=_probe,
+        )
+
+        with pytest.raises(asyncio.CancelledError):
+            await node.generate("cancelled", 2)
+
+        assert node.path is None
+        assert not list((tmp_path / NODES_DIRNAME).glob("scene-*.mp4"))
+
     async def test_missing_video_url_is_an_error_after_budget_reservation(self, tmp_path):
         adapter = FakeH3Adapter({"text": "H3 returned prose"})
         node, _ = _node(tmp_path, adapter=adapter)
@@ -199,9 +243,18 @@ class TestH3Generation:
 
 class TestStaticFallback:
     @staticmethod
-    def _runner(calls: list[tuple[list[str], Path]], *, fail_cover: bool = False):
+    def _runner(
+        calls: list[tuple[list[str], Path]],
+        *,
+        fail_cover: bool = False,
+        caption_contents: list[str] | None = None,
+    ):
         def run(command: list[str], *, cwd: Path):
             calls.append((command, cwd))
+            if caption_contents is not None:
+                caption_path = cwd / f"caption-{Path(command[-1]).stem.split('-')[-1]}.txt"
+                if caption_path.exists():
+                    caption_contents.append(caption_path.read_text(encoding="utf-8"))
             if fail_cover and "-loop" in command:
                 return SimpleNamespace(returncode=1, stderr="unsupported image", stdout="")
             Path(command[-1]).write_bytes(b"fallback-mp4")
@@ -228,11 +281,12 @@ class TestStaticFallback:
             }
         )
         calls: list[tuple[list[str], Path]] = []
+        caption_contents: list[str] = []
         node, adapter = _node(
             tmp_path,
             manifest=manifest,
             no_h3=True,
-            ffmpeg_runner=self._runner(calls),
+            ffmpeg_runner=self._runner(calls, caption_contents=caption_contents),
         )
 
         output = await node.generate("caption text", 4)
@@ -245,8 +299,8 @@ class TestStaticFallback:
         assert "-loop" in command
         assert str(cover) in command
         assert "drawtext" in command[command.index("-vf") + 1]
-        caption_file = tmp_path / NODES_DIRNAME / "caption-1.txt"
-        assert caption_file.read_text(encoding="utf-8") == "caption text"
+        assert caption_contents == ["caption text"]
+        assert not (tmp_path / NODES_DIRNAME / "caption-1.txt").exists()
 
     async def test_no_h3_without_cover_uses_generated_color_visual(self, tmp_path):
         calls: list[tuple[list[str], Path]] = []
@@ -286,18 +340,20 @@ class TestStaticFallback:
 
     async def test_caption_text_is_not_interpolated_into_filtergraph(self, tmp_path):
         calls: list[tuple[list[str], Path]] = []
+        caption_contents: list[str] = []
         caption = "$(touch hacked);: scary\\caption"
         node, _adapter = _node(
             tmp_path,
             no_h3=True,
-            ffmpeg_runner=self._runner(calls),
+            ffmpeg_runner=self._runner(calls, caption_contents=caption_contents),
         )
 
         await node.generate("prompt", 2, caption=caption)
 
         command, _cwd = calls[0]
         assert caption not in " ".join(command)
-        assert caption in (tmp_path / NODES_DIRNAME / "caption-1.txt").read_text()
+        assert caption_contents == [caption]
+        assert not (tmp_path / NODES_DIRNAME / "caption-1.txt").exists()
         assert not (tmp_path / "hacked").exists()
 
     async def test_invalid_duration_has_no_side_effects(self, tmp_path):
@@ -340,3 +396,10 @@ class TestExports:
     def test_video_node_is_exported_from_studio_packages(self):
         assert NodesVideoNode is VideoNode
         assert ProjectManifest is not None
+
+    def test_studio_build_exposes_h3_controls(self):
+        result = CliRunner().invoke(main, ["studio", "build", "--help"])
+
+        assert result.exit_code == 0
+        assert "--confirm" in result.output
+        assert "--no-h3" in result.output

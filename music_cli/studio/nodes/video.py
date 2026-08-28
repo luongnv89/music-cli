@@ -13,12 +13,13 @@ P4.1 asset and cost boundary that stage consumes.
 
 from __future__ import annotations
 
+import base64
 import html
 import json
 import math
 import shutil
 import subprocess
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, MutableMapping
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -255,11 +256,13 @@ class VideoNode(BaseNode):
         adapter: Any,
         *,
         proj_dir: str | Path,
-        budget: BuildBudget | Mapping[str, Any] | None = None,
+        budget: BuildBudget | Mapping[str, Any] | Decimal | int | float | str | None = None,
         manifest: Any | None = None,
+        project_manifest: Any | None = None,
         estimated_cost: Decimal | int | float | str = DEFAULT_H3_CALL_COST,
         cost_per_call: Decimal | int | float | str | None = None,
         h3_cost: Decimal | int | float | str | None = None,
+        budget_cap: Decimal | int | float | str | None = None,
         confirm: bool = False,
         no_h3: bool = False,
         cover_art: str | Path | None = None,
@@ -269,6 +272,10 @@ class VideoNode(BaseNode):
         probe: Callable[[Path], dict[str, Any]] | None = None,
         probe_runner: Callable[[Path], dict[str, Any]] | None = None,
     ) -> None:
+        if manifest is not None and project_manifest is not None:
+            raise TypeError("pass either manifest or project_manifest, not both")
+        if manifest is None:
+            manifest = project_manifest
         if probe is None:
             probe = probe_runner
         super().__init__(
@@ -277,8 +284,28 @@ class VideoNode(BaseNode):
             downloader=downloader,
             probe=probe,
         )
+        self._manifest_budget_block: MutableMapping[str, Any] | None = None
         if budget is None:
-            self.budget = BuildBudget.from_manifest(manifest)
+            existing_budget = getattr(manifest, "_video_build_budget", None)
+            if isinstance(existing_budget, BuildBudget):
+                self.budget = existing_budget
+            elif budget_cap is not None:
+                manifest_budget = _manifest_budget(manifest)
+                self.budget = BuildBudget(
+                    cap=budget_cap,
+                    spent=manifest_budget.get("spent", 0) if manifest_budget else 0,
+                    currency=manifest_budget.get("currency", "USD") if manifest_budget else "USD",
+                )
+            else:
+                self.budget = BuildBudget.from_manifest(manifest)
+            manifest_budget = _manifest_budget(manifest)
+            if isinstance(manifest_budget, MutableMapping):
+                self._manifest_budget_block = manifest_budget
+            if manifest is not None and not isinstance(manifest, Mapping):
+                try:
+                    manifest._video_build_budget = self.budget
+                except (AttributeError, TypeError):
+                    pass
         elif isinstance(budget, BuildBudget):
             self.budget = budget
         elif isinstance(budget, Mapping):
@@ -289,8 +316,10 @@ class VideoNode(BaseNode):
                 spent=budget.get("spent", 0),
                 currency=budget.get("currency", "USD"),
             )
+        elif isinstance(budget, (Decimal, int, float, str)):
+            self.budget = BuildBudget(cap=budget)
         else:
-            raise TypeError("budget must be a BuildBudget or mapping")
+            raise TypeError("budget must be a BuildBudget, amount, or mapping")
 
         selected_cost = (
             cost_per_call
@@ -306,6 +335,11 @@ class VideoNode(BaseNode):
         self._ffmpeg = str(ffmpeg) if ffmpeg is not None else None
         self._ffmpeg_runner = ffmpeg_runner
         self._manifest = manifest
+
+    def _sync_manifest_spend(self) -> None:
+        """Mirror reserved spend into a mutable ProjectManifest budget block."""
+        if self._manifest_budget_block is not None:
+            self._manifest_budget_block["spent"] = float(self.budget.spent)
 
     async def _synthesize(self, prompt: str, duration: float) -> tuple[str, Path]:
         """Call H3 and return its media URL plus the scene destination."""
@@ -352,14 +386,15 @@ class VideoNode(BaseNode):
             # This is deliberately before _synthesize: a blocked projection
             # must not invoke the provider or create a partial output.
             self.budget.reserve(self.estimated_cost, confirm=use_confirm)
+            self._sync_manifest_spend()
             url, destination = await self._synthesize(prompt, scene_duration)
             self._nodes_dir.mkdir(parents=True, exist_ok=True)
             try:
                 await self._downloader(url, destination)
-            except Exception as exc:
+            except BaseException:
                 self._remove_output(destination)
                 self._path = None
-                raise NodeError(f"scene: could not download H3 output: {exc}") from exc
+                raise
 
         return self._finish(destination)
 
@@ -368,7 +403,7 @@ class VideoNode(BaseNode):
         self._path = destination
         try:
             report = self._probe(destination)
-        except Exception:
+        except BaseException:
             self._remove_output(destination)
             self._path = None
             raise
@@ -464,6 +499,7 @@ class VideoNode(BaseNode):
         binary: str,
         caption_file: Path,
         image_path: Path,
+        cover: Path | None,
     ) -> list[str]:
         """Return ImageMagick argv for a captioned PNG fallback."""
         font_candidates = (
@@ -472,12 +508,22 @@ class VideoNode(BaseNode):
             Path("/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf"),
         )
         font = next((path for path in font_candidates if path.is_file()), None)
-        command = [
-            binary,
-            "-size",
-            DEFAULT_VIDEO_SIZE,
-            "xc:black",
-        ]
+        command = [binary]
+        if cover is None:
+            command.extend(["-size", DEFAULT_VIDEO_SIZE, "xc:black"])
+        else:
+            command.extend(
+                [
+                    cover.resolve().as_posix(),
+                    "-resize",
+                    f"{DEFAULT_VIDEO_SIZE}^",
+                    "-gravity",
+                    "center",
+                    "-crop",
+                    f"{DEFAULT_VIDEO_SIZE}+0+0",
+                    "+repage",
+                ]
+            )
         if font is not None:
             command.extend(["-font", font.as_posix()])
         command.extend(
@@ -500,13 +546,14 @@ class VideoNode(BaseNode):
         destination: Path,
         duration: float,
         caption_file: Path,
+        cover: Path | None,
     ) -> None:
         """Render a caption image when drawtext is unavailable."""
         binary = shutil.which("magick") or shutil.which("convert")
         if binary is None:
             raise NodeError("scene: no ImageMagick caption fallback is available")
         image_path = self._nodes_dir / f"{destination.stem}.png"
-        command = self._image_fallback_command(binary, caption_file, image_path)
+        command = self._image_fallback_command(binary, caption_file, image_path, cover)
         try:
             result = subprocess.run(
                 command,
@@ -563,16 +610,28 @@ class VideoNode(BaseNode):
         ]
 
     @staticmethod
-    def _write_caption_svg(path: Path, caption: str) -> None:
+    def _write_caption_svg(path: Path, caption: str, cover: Path | None = None) -> None:
         """Write a self-contained caption card without putting text in argv."""
         lines = [html.escape(line) for line in caption.splitlines()] or [""]
         tspans = "".join(
             f'<tspan x="640" dy="{48 if index else 0}">{line}</tspan>'
             for index, line in enumerate(lines)
         )
+        background = '<rect width="1280" height="720" fill="#000000"/>'
+        if cover is not None:
+            try:
+                encoded = base64.b64encode(cover.read_bytes()).decode("ascii")
+            except OSError:
+                encoded = ""
+            if encoded:
+                suffix = cover.suffix.lower().lstrip(".") or "png"
+                background = (
+                    f'<image href="data:image/{html.escape(suffix)};base64,{encoded}" '
+                    'width="1280" height="720" preserveAspectRatio="xMidYMid slice"/>'
+                )
         svg = (
             '<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720">'
-            '<rect width="1280" height="720" fill="#000000"/>'
+            f"{background}"
             '<text x="640" y="340" fill="#ffffff" font-size="36" '
             'font-family="sans-serif" text-anchor="middle">'
             f"{tspans}</text></svg>"
@@ -584,10 +643,11 @@ class VideoNode(BaseNode):
         destination: Path,
         duration: float,
         caption: str,
+        cover: Path | None = None,
     ) -> None:
         """Render a caption card when the local ffmpeg lacks drawtext."""
         svg_path = self._nodes_dir / f"{destination.stem}.svg"
-        self._write_caption_svg(svg_path, caption)
+        self._write_caption_svg(svg_path, caption, cover=cover)
         try:
             ffmpeg_bin = self._ffmpeg or DEFAULT_FFMPEG
             self._run_ffmpeg(self._still_image_command(ffmpeg_bin, destination, duration, svg_path))
@@ -645,26 +705,13 @@ class VideoNode(BaseNode):
         caption_file.write_text(caption, encoding="utf-8")
         cover = self._resolve_cover_art(cover_art)
         ffmpeg_bin = self._ffmpeg or DEFAULT_FFMPEG
+        auxiliary = (
+            caption_file,
+            self._nodes_dir / f"{destination.stem}.png",
+            self._nodes_dir / f"{destination.stem}.svg",
+        )
 
         try:
-            self._run_ffmpeg(
-                self._static_command(
-                    ffmpeg_bin,
-                    destination,
-                    duration,
-                    caption_file,
-                    cover,
-                )
-            )
-            if not destination.exists():
-                raise NodeError("scene: ffmpeg fallback produced no output")
-            return
-        except NodeError:
-            self._remove_output(destination)
-
-        # A present cover can be corrupt or unsupported.  A generated colour
-        # visual keeps the no-H3 path usable without fetching a remote asset.
-        if cover is not None:
             try:
                 self._run_ffmpeg(
                     self._static_command(
@@ -672,7 +719,7 @@ class VideoNode(BaseNode):
                         destination,
                         duration,
                         caption_file,
-                        None,
+                        cover,
                     )
                 )
                 if not destination.exists():
@@ -680,23 +727,44 @@ class VideoNode(BaseNode):
                 return
             except NodeError:
                 self._remove_output(destination)
-                try:
-                    self._render_image_fallback(destination, duration, caption_file)
-                    return
-                except NodeError as image_error:
-                    try:
-                        self._render_svg_fallback(destination, duration, caption)
-                        return
-                    except NodeError as svg_error:
-                        raise svg_error from image_error
 
-        try:
-            self._render_image_fallback(destination, duration, caption_file)
-        except NodeError as image_error:
+            # A present cover can be corrupt or unsupported.  A generated
+            # colour visual keeps the no-H3 path usable without fetching an
+            # arbitrary remote asset.
+            if cover is not None:
+                try:
+                    self._run_ffmpeg(
+                        self._static_command(
+                            ffmpeg_bin,
+                            destination,
+                            duration,
+                            caption_file,
+                            None,
+                        )
+                    )
+                    if not destination.exists():
+                        raise NodeError("scene: ffmpeg fallback produced no output")
+                    return
+                except NodeError:
+                    self._remove_output(destination)
+
             try:
-                self._render_svg_fallback(destination, duration, caption)
-            except NodeError as svg_error:
-                raise svg_error from image_error
+                self._render_image_fallback(
+                    destination,
+                    duration,
+                    caption_file,
+                    cover,
+                )
+                return
+            except NodeError as image_error:
+                try:
+                    self._render_svg_fallback(destination, duration, caption, cover)
+                    return
+                except NodeError as svg_error:
+                    raise svg_error from image_error
+        finally:
+            for path in auxiliary:
+                self._remove_output(path)
 
     @staticmethod
     def _remove_output(path: Path) -> None:
