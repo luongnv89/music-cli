@@ -103,7 +103,7 @@ def run_ffprobe(path: Path) -> dict[str, Any]:
 def _urllib_fetch(url: str, dest: Path) -> int:
     import urllib.request
 
-    with urllib.request.urlopen(url, timeout=120) as resp:  # noqa: S310
+    with urllib.request.urlopen(url, timeout=120) as resp:  # noqa: S310  # nosec B310
         data = resp.read()
         dest.write_bytes(data)
         return len(data)
