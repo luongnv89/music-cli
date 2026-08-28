@@ -23,6 +23,7 @@ import click
 
 from ..studio import trace as _trace
 from ..studio.build import BuildError, BuildService, load_brief_from_yaml
+from ..studio.doctor import run_doctor
 from .app import main
 from .common import AliasedGroup
 
@@ -38,6 +39,24 @@ def _resolve_project(project: str, dist_dir: str) -> Path:
 @main.group("studio", cls=AliasedGroup)
 def studio_group() -> None:
     """Creative-compiler build pipeline (`mc studio`)."""
+
+
+@studio_group.command("doctor")
+@click.option(
+    "--dist-dir",
+    default=str(_trace.DEFAULT_DIST_DIR),
+    show_default=True,
+    help="Directory holding build projects.",
+)
+def studio_doctor(dist_dir: str) -> None:
+    """Check dependencies and the output directory for an audio build."""
+    results = run_doctor(dist_dir)
+    for check in results:
+        click.echo(f"{check.status}: {check.name}: {check.message}")
+        if check.status != "OK" and check.fix:
+            click.echo(f"  fix: {check.fix}", err=True)
+    if any(check.status == "FAIL" for check in results):
+        raise click.exceptions.Exit(1)
 
 
 @studio_group.command("plan")
@@ -79,7 +98,7 @@ def studio_trace(project: str, dist_dir: str) -> None:
 
 
 @studio_group.command("build")
-@click.argument("brief", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.argument("brief", type=click.Path(exists=True, dir_okay=False))
 @click.option(
     "--dist-dir",
     default=str(_trace.DEFAULT_DIST_DIR),
@@ -87,13 +106,21 @@ def studio_trace(project: str, dist_dir: str) -> None:
     help="Directory holding build projects.",
 )
 @click.option(
+    "--resume",
+    is_flag=True,
+    default=False,
+    help="Resume from the persisted plan and completed audio nodes.",
+)
+@click.option(
     "--force",
     is_flag=True,
     default=False,
     help="Regenerate every audio node, ignoring the lock state.",
 )
-def studio_build(brief: Path, dist_dir: str, force: bool) -> None:
+def studio_build(brief: str, dist_dir: str, resume: bool, force: bool) -> None:
     """Run the audio-only build for the YAML BRIEF file."""
+    if resume and force:
+        raise click.UsageError("--resume and --force cannot be used together")
     try:
         parsed = load_brief_from_yaml(brief)
     except BuildError as exc:
@@ -102,7 +129,7 @@ def studio_build(brief: Path, dist_dir: str, force: bool) -> None:
     try:
         result = service.run(parsed, force=force)
     except BuildError as exc:
-        hint = f" Resume with `mc studio build {brief}`." if exc.stage != "plan" else ""
+        hint = f" Resume with `mc studio build --resume {brief}`." if exc.stage != "plan" else ""
         raise click.ClickException(f"{exc}{hint}") from exc
     click.echo(
         f"build ok: project={result.project_dir.name} "

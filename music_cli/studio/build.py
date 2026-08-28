@@ -33,6 +33,8 @@ wrapper can render an actionable ``mc studio build --resume`` hint.
 from __future__ import annotations
 
 import asyncio
+import math
+import re
 import shutil
 import subprocess
 from collections.abc import Callable, Iterable
@@ -51,9 +53,11 @@ from .trace import (
     NODES_DIRNAME,
     PLAN_FILENAME,
     PREMIERE_FILENAME,
+    TRACE_FILENAME,
     TraceWriter,
     dump_plan_yaml,
     init_project_layout,
+    load_plan_yaml,
     project_paths,
     write_plan_yaml,
 )
@@ -66,6 +70,7 @@ TRACE_COMPOSE = "compose"
 
 #: Premiere container — audio-only MP4 with the SRT muxed as a subtitle.
 PREMIERE_CODEC = "aac"
+_PROJECT_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{1,62}$")
 
 
 class BuildError(RuntimeError):
@@ -128,21 +133,30 @@ class Brief:
         if not isinstance(data, dict):
             raise BuildError("plan", f"brief must be a mapping, got {type(data).__name__}")
         try:
-            project_id = str(data["project_id"]).strip()
+            raw_project_id = data["project_id"]
         except KeyError as exc:
             raise BuildError("plan", "brief missing 'project_id'") from exc
-        if not project_id:
-            raise BuildError("plan", "brief.project_id must be non-empty")
-        description = str(data.get("description") or data.get("brief") or "").strip()
-        if not description:
+        if not isinstance(raw_project_id, str):
+            raise BuildError("plan", "brief.project_id must be a string")
+        project_id = raw_project_id.strip()
+        if not _PROJECT_ID_RE.fullmatch(project_id):
+            raise BuildError(
+                "plan",
+                "brief.project_id must be a lowercase slug (2-63 characters)",
+            )
+        raw_description = data.get("description") or data.get("brief")
+        if not isinstance(raw_description, str) or not raw_description.strip():
             raise BuildError("plan", "brief.description (or brief) must be non-empty")
+        description = raw_description.strip()
         duration = data.get("duration_seconds")
         if duration is not None:
+            if isinstance(duration, bool):
+                raise BuildError("plan", "brief.duration_seconds must be a number")
             try:
                 duration = float(duration)
             except (TypeError, ValueError) as exc:
                 raise BuildError("plan", "brief.duration_seconds must be a number") from exc
-            if duration <= 0:
+            if not math.isfinite(duration) or duration <= 0:
                 raise BuildError("plan", "brief.duration_seconds must be > 0")
         taste = data.get("taste")
         if taste is not None and not isinstance(taste, dict):
@@ -173,22 +187,28 @@ def default_adapter_factory(
     here; for the audio-only MVP we keep the trio lazy so callers can
     inject a fake adapter via :attr:`BuildService.adapter_factory`.
     """
-    # Lazy import: the cloud adapter is only required at runtime, not at
-    # import time, so unit tests can exercise BuildService without
-    # keyring/httpx.
-    from ..cloud.gmi import GMIAdapter  # noqa: WPS433 — intentional lazy import
-    from .nodes.base import default_download
-    from .nodes.ffmpeg import DEFAULT_FFPROBE
+    # Lazy imports keep the studio package importable without the optional
+    # cloud dependencies. Credentials are loaded from the same OS keyring
+    # used by ``mc cloud key set gmi``; they never come from the brief.
+    from ..cloud.gmi import GMIAdapter
+    from ..cloud.secrets import get_api_key
+    from .nodes.base import FfprobeProbe, default_download
 
-    adapter = GMIAdapter()
+    try:
+        api_key = get_api_key("gmi")
+    except Exception as exc:
+        raise BuildError("plan", f"could not load the GMI Cloud API key: {exc}") from exc
+    if not api_key:
+        raise BuildError(
+            "plan",
+            "no GMI Cloud API key stored; set one with: mc cloud key set gmi",
+        )
+
+    adapter = GMIAdapter(api_key)
     director = M3Director(adapter, trace_path=proj_dir / "trace.jsonl")
-    music = MusicNode(adapter, proj_dir=proj_dir, downloader=default_download, probe=None)
-    speech = SpeechNode(adapter, proj_dir=proj_dir, downloader=default_download, probe=None)
-    # attach the default probe explicitly to mirror the FFmpegProbe binary
-    from .nodes.base import FfprobeProbe
-
-    music._probe = FfprobeProbe(DEFAULT_FFPROBE)  # type: ignore[attr-defined]
-    speech._probe = FfprobeProbe(DEFAULT_FFPROBE)  # type: ignore[attr-defined]
+    probe = FfprobeProbe()
+    music = MusicNode(adapter, proj_dir=proj_dir, downloader=default_download, probe=probe)
+    speech = SpeechNode(adapter, proj_dir=proj_dir, downloader=default_download, probe=probe)
     _ = brief  # factory is per-brief, no per-brief state yet
     return director, music, speech
 
@@ -230,24 +250,52 @@ class BuildService:
             raise BuildError("plan", f"brief must be a Brief, got {type(brief).__name__}")
         proj_dir = init_project_layout(self.dist_dir, brief.project_id)
         paths = project_paths(proj_dir)
-        trace_path = paths[PLAN_FILENAME].parent / "trace.jsonl"
+        trace_path = paths[TRACE_FILENAME]
         result = BuildResult(project_dir=proj_dir, plan={})
 
-        director, music_node, speech_node = self.adapter_factory(proj_dir, brief)
-        # re-point the director at the project's trace so all lines land
-        # in the right file regardless of what the factory set up.
+        try:
+            director, music_node, speech_node = self.adapter_factory(proj_dir, brief)
+        except BuildError:
+            raise
+        except Exception as exc:
+            raise BuildError("plan", f"adapter setup failed: {exc}") from exc
+        # Re-point the director at the project's trace so all lines land in
+        # the right file regardless of what the factory set up.
         director.trace_path = trace_path
 
         with TraceWriter(trace_path) as trace:
-            # ---- plan ----------------------------------------------------
-            plan = self._plan(director, brief, trace)
-            result.plan = plan.to_dict()
-            self._write_plan(paths[PLAN_FILENAME], result.plan)
-            self._write_manifest(proj_dir, brief, result.plan, trace_path)
+            # A non-forced invocation is also the resume path. Reuse the
+            # persisted plan so a no-op cannot pair freshly planned metadata
+            # with old node artifacts. ``--force`` intentionally starts over.
+            plan = None
+            persisted_plan = False
+            if not force and paths[PLAN_FILENAME].exists():
+                plan = self._load_persisted_plan(paths[PLAN_FILENAME], brief, trace)
+                persisted_plan = plan is not None
+            if plan is None:
+                plan = self._plan(director, brief, trace)
+                result.plan = plan.to_dict()
+                self._write_plan(paths[PLAN_FILENAME], result.plan)
+            else:
+                result.plan = plan.to_dict()
+
+            plan_data = result.plan
+            if plan_data.get("project_id") != brief.project_id:
+                raise BuildError(
+                    "plan",
+                    "director plan project_id does not match the brief project_id",
+                )
+
+            # Reuse node files only when the persisted manifest describes
+            # this exact plan's node identities and prompts. A valid but
+            # unrelated plan must not inherit assets merely by ordinal.
+            node_force = force or not (
+                persisted_plan and self._manifest_matches(proj_dir, plan_data, brief)
+            )
 
             # ---- generate audio nodes ------------------------------------
             nodes, captions, any_regen = self._generate_nodes(
-                brief, plan, music_node, speech_node, trace, force=force
+                brief, plan, music_node, speech_node, trace, force=node_force
             )
             result.nodes = nodes
             result.regenerated = any_regen
@@ -255,39 +303,117 @@ class BuildService:
             if not nodes:
                 raise BuildError(
                     "generate",
-                    f"plan {plan.plan_id!r} produced no audio nodes; nothing to build",
+                    f"plan {plan_data.get('plan_id')!r} produced no audio nodes; nothing to build",
                 )
+            self._write_manifest(
+                proj_dir,
+                brief,
+                plan_data,
+                trace_path,
+                nodes=nodes,
+            )
 
             # ---- probe & mix ---------------------------------------------
-            node_paths = [Path(n["output_path"]) for n in nodes if n.get("output_path")]
-            mix = self._mix_node or MixNode(ffmpeg=self._ffmpeg)
-            try:
-                wav_out = proj_dir / NODES_DIRNAME / "premiere.wav"
-                mix.run(node_paths, captions, wav_out)
-            except (MixNodeError, NodeError) as exc:
-                raise BuildError("compose", f"mix failed: {exc}") from exc
+            node_paths = [
+                Path(n["output_path"])
+                for n in nodes
+                if n.get("output_path") and n.get("type") == "music"
+            ]
+            narration = [
+                (Path(n["output_path"]), float(n.get("start") or 0.0))
+                for n in nodes
+                if n.get("output_path") and n.get("type") == "speech"
+            ]
+            if not node_paths:
+                raise BuildError("generate", "plan produced no music tracks; nothing to mix")
+            wav_out = proj_dir / NODES_DIRNAME / "premiere.wav"
+            srt_src = wav_out.parent / "captions.srt"
+            need_mix = any_regen or not wav_out.exists() or not srt_src.exists()
+            if need_mix:
+                mix = self._mix_node or MixNode(ffmpeg=self._ffmpeg)
+                try:
+                    mix.run(
+                        node_paths,
+                        captions,
+                        wav_out,
+                        duration=float(plan_data["duration_seconds"]),
+                        narration=narration,
+                    )
+                except (MixNodeError, NodeError) as exc:
+                    raise BuildError("compose", f"mix failed: {exc}") from exc
             result.premiere_wav = wav_out
 
             # The SRT was written next to the WAV by MixNode.run; copy it
             # next to the project root so ``dist/<project>/captions.srt``
             # mirrors what the on-disk spec describes.
-            srt_src = wav_out.parent / "captions.srt"
-            srt_dst = paths["captions.srt"] if "captions.srt" in paths else None
+            srt_dst = proj_dir / "captions.srt"
             if srt_src.exists():
-                if srt_dst is None:
-                    srt_dst = proj_dir / "captions.srt"
                 shutil.copy2(srt_src, srt_dst)
                 result.captions_srt = srt_dst
             self._trace(
-                trace, TRACE_COMPOSE, node_id=plan.to_dict().get("plan_id"), payload=str(wav_out)
+                trace,
+                TRACE_COMPOSE,
+                node_id=plan_data.get("plan_id"),
+                payload=str(wav_out),
             )
 
             # ---- mux to MP4 ---------------------------------------------
-            if any_regen or not (paths[PREMIERE_FILENAME]).exists():
-                mp4 = self._mux_mp4(wav_out, srt_src, paths[PREMIERE_FILENAME])
-                result.premiere_mp4 = mp4
+            mp4_path = paths[PREMIERE_FILENAME]
+            if any_regen or need_mix or not mp4_path.exists():
+                result.premiere_mp4 = self._mux_mp4(wav_out, srt_src, mp4_path)
+            else:
+                result.premiere_mp4 = mp4_path
 
         return result
+
+    @staticmethod
+    def _load_persisted_plan(
+        path: Path,
+        brief: Brief,
+        trace: TraceWriter,
+    ) -> CreativePlan | None:
+        """Load a valid plan from disk for a resume/no-op build."""
+        try:
+            data = load_plan_yaml(path)
+            plan = CreativePlan.model_validate(data)
+        except (OSError, TypeError, ValueError):
+            return None
+        plan_data = plan.to_dict()
+        if plan_data.get("project_id") != brief.project_id:
+            return None
+        BuildService._trace(
+            trace,
+            TRACE_PLAN,
+            node_id=plan_data.get("plan_id"),
+            payload=dump_plan_yaml(plan_data),
+        )
+        return plan
+
+    @staticmethod
+    def _manifest_matches(
+        proj_dir: Path,
+        plan_data: dict[str, Any],
+        brief: Brief,
+    ) -> bool:
+        """Return whether persisted node metadata matches the current plan."""
+        try:
+            manifest = load_plan_yaml(proj_dir / "manifest.yaml")
+        except (OSError, TypeError, ValueError):
+            return False
+        if manifest.get("plan_id") != plan_data.get("plan_id"):
+            return False
+        actual = manifest.get("nodes")
+        if not isinstance(actual, list):
+            return False
+        expected = _expected_node_specs(plan_data, brief)
+        if len(actual) != len(expected):
+            return False
+        for item, spec in zip(actual, expected, strict=True):
+            if not isinstance(item, dict):
+                return False
+            if any(item.get(key) != value for key, value in spec.items()):
+                return False
+        return True
 
     # -- pipeline stages ---------------------------------------------------
 
@@ -303,17 +429,11 @@ class BuildService:
             raise BuildError("plan", f"director.plan failed: {exc}") from exc
         try:
             plan_obj = asyncio.run(coro)
-        except DirectorError as exc:
+        except Exception as exc:
+            # ``BuildService.run`` is synchronous, so an active event loop is
+            # an unsupported caller context just like an adapter failure.
+            coro.close()
             raise BuildError("plan", f"director.plan failed: {exc}") from exc
-        except RuntimeError:
-            # already inside a loop — unlikely in the CLI but defensible
-            loop = asyncio.new_event_loop()
-            try:
-                plan_obj = loop.run_until_complete(coro)
-            except DirectorError as exc:
-                raise BuildError("plan", f"director.plan failed: {exc}") from exc
-            finally:
-                loop.close()
         # ``director.plan`` returns a :class:`CreativePlan` already; if a
         # custom adapter returns a raw dict, validate it now.
         if isinstance(plan_obj, CreativePlan):
@@ -332,6 +452,31 @@ class BuildService:
             payload=dump_plan_yaml(plan.to_dict()),
         )
         return plan
+
+    @staticmethod
+    def _prepare_node(
+        node: MusicNode | SpeechNode,
+        ordinal: int,
+        *,
+        force: bool,
+    ) -> bool:
+        """Select a valid persisted node output or prepare regeneration."""
+        node._ordinal = ordinal - 1
+        node._path = None
+        existing = node._next_path()
+        node._ordinal = ordinal - 1
+        if not force and existing.exists():
+            node._path = existing
+            try:
+                report = node.probe()
+            except Exception:
+                report = None
+            if report is not None and report.get("ok"):
+                node.lock()
+                return True
+        node._path = None
+        node.unlock()
+        return False
 
     def _generate_nodes(
         self,
@@ -359,30 +504,28 @@ class BuildService:
         for idx, track in enumerate(_iter_tracks(plan_dict), start=1):
             prompt = str(track.get("prompt") or brief.description)
             lyrics = track.get("lyrics")
-            duration = _coerce_duration(track.get("duration_seconds")) or brief.duration_seconds
-            music_node._ordinal = idx - 1  # type: ignore[attr-defined]
-            music_node._path = None
-            existing = music_node._next_path()  # type: ignore[attr-defined]
-            music_node._ordinal = idx - 1  # type: ignore[attr-defined]
-            locked = (not force) and existing.exists()
-            if locked:
-                music_node._path = existing  # type: ignore[attr-defined]
-                music_node.lock()
-            else:
-                music_node.unlock()
+            duration = _coerce_duration(track.get("duration_seconds"))
+            if duration is None:
+                duration = brief.duration_seconds
+            self._prepare_node(music_node, idx, force=force)
             self._trace(trace, TRACE_GENERATE, node_id=f"music-{idx}", payload=prompt)
             try:
                 audio_path = asyncio.run(
                     music_node.generate(prompt, lyrics=lyrics, duration=duration)
                 )
                 any_regen = True
-            except NodeLockedError:
-                if not music_node.path:
-                    raise
+            except NodeLockedError as exc:
+                if music_node.path is None:
+                    raise BuildError(
+                        "generate", f"music node {idx} is locked without an output"
+                    ) from exc
                 audio_path = music_node.path
-            except (NodeError, ValueError, TypeError) as exc:
+            except Exception as exc:
                 raise BuildError("generate", f"music node {idx} failed: {exc}") from exc
-            report = music_node.probe()
+            try:
+                report = music_node.probe()
+            except Exception as exc:
+                raise BuildError("probe", f"music node {idx} failed: {exc}") from exc
             self._trace(
                 trace,
                 TRACE_PROBE,
@@ -405,39 +548,36 @@ class BuildService:
             text = str(line.get("text") or "").strip()
             if not text:
                 continue
-            start = _coerce_duration(line.get("start")) or 0.0
-            end = _coerce_duration(line.get("end")) or (
-                start + max(0.0, brief.duration_seconds or 0.0)
+            start_value = _coerce_duration(line.get("start"))
+            start = start_value if start_value is not None else 0.0
+            end_value = _coerce_duration(line.get("end"))
+            end = (
+                end_value
+                if end_value is not None
+                else start + max(0.0, brief.duration_seconds or 0.0)
             )
-            captions.append((float(start), float(end), text))
-            # A speech node is only generated when the plan provides an
-            # explicit cue. The brief-as-caption fallback is a caption
-            # only — it does not synthesize a narration audio.
-            if not line.get("explicit"):
+            if end <= start:
                 continue
-            speech_node._ordinal = idx - 1  # type: ignore[attr-defined]
-            speech_node._path = None
-            existing = speech_node._next_path()  # type: ignore[attr-defined]
-            speech_node._ordinal = idx - 1  # type: ignore[attr-defined]
-            locked = (not force) and existing.exists()
-            if locked:
-                speech_node._path = existing  # type: ignore[attr-defined]
-                speech_node.lock()
-            else:
-                speech_node.unlock()
+            captions.append((float(start), float(end), text))
+            self._prepare_node(speech_node, idx, force=force)
             self._trace(trace, TRACE_GENERATE, node_id=f"speech-{idx}", payload=text)
             try:
                 audio_path = asyncio.run(
                     speech_node.generate(text, duration=float(end - start) or None)
                 )
                 any_regen = True
-            except NodeLockedError:
-                if not speech_node.path:
-                    raise
+            except NodeLockedError as exc:
+                if speech_node.path is None:
+                    raise BuildError(
+                        "generate", f"speech node {idx} is locked without an output"
+                    ) from exc
                 audio_path = speech_node.path
-            except (NodeError, ValueError, TypeError) as exc:
+            except Exception as exc:
                 raise BuildError("generate", f"speech node {idx} failed: {exc}") from exc
-            report = speech_node.probe()
+            try:
+                report = speech_node.probe()
+            except Exception as exc:
+                raise BuildError("probe", f"speech node {idx} failed: {exc}") from exc
             self._trace(
                 trace,
                 TRACE_PROBE,
@@ -461,10 +601,10 @@ class BuildService:
         if not nodes:
             raise BuildError("generate", "plan produced no audio tracks; nothing to build")
         if not captions:
-            # No explicit narration cues from the plan — emit a single
-            # caption spanning the full duration so the SRT is still
-            # produced and ffprobe shows ≥ 1 subtitle stream. The text
-            # is the plan's brief.
+            # No explicit narration cues from the plan — use the brief as
+            # one narration cue spanning the full duration. This keeps the
+            # audio-only path's Music + Speech output contract intact while
+            # still producing a caption for the SRT stream.
             text = (plan_dict.get("brief") or brief.description or "").strip()
             if text:
                 captions.append(
@@ -486,7 +626,10 @@ class BuildService:
         so ``ffprobe`` reports a video-less, single-audio, single-sub
         file — which is what the M4 acceptance criterion asks for.
         """
-        ffmpeg_bin = self._ffmpeg or resolve_binary(DEFAULT_FFMPEG)
+        try:
+            ffmpeg_bin = self._ffmpeg or resolve_binary(DEFAULT_FFMPEG)
+        except MixNodeError as exc:
+            raise BuildError("compose", str(exc)) from exc
         cmd: list[str] = [
             ffmpeg_bin,
             "-y",
@@ -504,13 +647,19 @@ class BuildService:
             PREMIERE_CODEC,
             "-b:a",
             "192k",
-            "-shortest",
         ]
+        if srt is None or not srt.exists():
+            # With no subtitle input, the audio stream is the only output
+            # duration and ``-shortest`` preserves the historical behavior.
+            cmd.append("-shortest")
         if srt is not None and srt.exists():
             cmd += ["-map", "1:s", "-c:s", "mov_text"]
         cmd += ["-movflags", "+faststart", out.as_posix()]
         out.parent.mkdir(parents=True, exist_ok=True)
-        proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        except OSError as exc:
+            raise BuildError("compose", f"ffmpeg mp4 mux failed: {exc}") from exc
         if proc.returncode != 0 or not out.exists():
             detail = (proc.stderr or proc.stdout).strip() or "no stderr"
             raise BuildError("compose", f"ffmpeg mp4 mux failed: {detail}")
@@ -539,14 +688,16 @@ class BuildService:
         brief: Brief,
         plan_dict: dict[str, Any],
         trace_path: Path,
+        *,
+        nodes: list[dict[str, Any]],
     ) -> None:
         manifest = ProjectManifest(
             project_id=brief.project_id,
             plan_id=str(plan_dict.get("plan_id") or ""),
             constitution={"title": plan_dict.get("title", brief.project_id)},
             plan=plan_dict,
-            nodes=[],
-            locked_nodes=[],
+            nodes=[_manifest_node_record(node) for node in nodes],
+            locked_nodes=[node["id"] for node in nodes if node.get("locked") and node.get("id")],
             dist_dir=str(proj_dir.parent),
             premiere_path=str(proj_dir / PREMIERE_FILENAME),
             trace_path=str(trace_path),
@@ -558,6 +709,52 @@ class BuildService:
 # ---------------------------------------------------------------------------
 # helpers for the loose plan dict the director returns
 # ---------------------------------------------------------------------------
+
+
+def _manifest_node_record(node: dict[str, Any]) -> dict[str, Any]:
+    """Keep persisted node metadata within the manifest schema."""
+    record = {
+        key: value
+        for key, value in node.items()
+        if key
+        in {
+            "id",
+            "type",
+            "status",
+            "locked",
+            "output_path",
+            "prompt",
+            "duration_seconds",
+        }
+    }
+    if node.get("type") == "speech" and "prompt" not in record:
+        record["prompt"] = node.get("text", "")
+    return record
+
+
+def _expected_node_specs(plan_dict: dict[str, Any], brief: Brief) -> list[dict[str, str]]:
+    """Build stable node identities used to validate resume metadata."""
+    specs: list[dict[str, str]] = []
+    for idx, track in enumerate(_iter_tracks(plan_dict), start=1):
+        specs.append(
+            {
+                "id": f"music-{idx}",
+                "type": "music",
+                "prompt": str(track.get("prompt") or brief.description),
+            }
+        )
+    for idx, line in enumerate(_iter_narration(plan_dict, brief), start=1):
+        text = str(line.get("text") or "").strip()
+        start_value = _coerce_duration(line.get("start"))
+        start = start_value if start_value is not None else 0.0
+        end_value = _coerce_duration(line.get("end"))
+        end = (
+            end_value if end_value is not None else start + max(0.0, brief.duration_seconds or 0.0)
+        )
+        if not text or end <= start:
+            continue
+        specs.append({"id": f"speech-{idx}", "type": "speech", "prompt": text})
+    return specs
 
 
 def _iter_tracks(plan_dict: dict[str, Any]) -> Iterable[dict[str, Any]]:
@@ -579,8 +776,8 @@ def _iter_narration(plan_dict: dict[str, Any], brief: Brief) -> Iterable[dict[st
     structured ``{id, prompt, description, duration_seconds, visual_prompt}``
     entries (no narration field), so the audio-only build treats the
     first scene/shot description as the narration cue. When the plan has
-    no scenes/shot_list, the brief description is used as a single cue
-    spanning the full duration — which is what the M3 acceptance
+    no scenes/shot_list, the brief description is used as a single speech
+    cue spanning the full duration — which is what the M3 acceptance
     criterion expects.
     """
     candidates = plan_dict.get("scenes") or plan_dict.get("shot_list") or []
@@ -603,10 +800,10 @@ def _iter_narration(plan_dict: dict[str, Any], brief: Brief) -> Iterable[dict[st
             }
             cursor = min(total, cursor + dur)
             cue_count += 1
-    if cue_count == 0:
+    if cue_count == 0 and (plan_dict.get("tracks") or plan_dict.get("track")):
         text = (plan_dict.get("brief") or brief.description or "").strip()
         if text:
-            yield {"text": text, "start": 0.0, "end": total, "explicit": False}
+            yield {"text": text, "start": 0.0, "end": total, "explicit": True}
 
 
 def _coerce_duration(value: Any) -> float | None:
@@ -640,6 +837,114 @@ __all__ = [
 # ---------------------------------------------------------------------------
 
 
+def _strip_yaml_comment(value: str) -> str:
+    """Remove an unquoted inline YAML comment from a scalar."""
+    quote: str | None = None
+    escaped = False
+    for index, char in enumerate(value):
+        if escaped:
+            escaped = False
+            continue
+        if char == "\\" and quote == '"':
+            escaped = True
+            continue
+        if char in {'"', "'"}:
+            if quote is None:
+                quote = char
+            elif quote == char:
+                quote = None
+            continue
+        if char == "#" and quote is None and (index == 0 or value[index - 1].isspace()):
+            return value[:index].rstrip()
+    return value.strip()
+
+
+def _brief_scalar(value: str) -> Any:
+    """Parse the scalar subset accepted by a user brief."""
+    value = _strip_yaml_comment(value)
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
+        return value[1:-1] if value[0] == "'" else value[1:-1].replace('\\"', '"')
+    if value == "null":
+        return None
+    if value.lower() in {"true", "false"}:
+        return value.lower() == "true"
+    try:
+        return int(value)
+    except ValueError:
+        try:
+            return float(value)
+        except ValueError:
+            return value
+
+
+def _load_brief_yaml(path: Path) -> dict[str, Any]:
+    """Load the top-level mapping and block scalars used by brief files.
+
+    The project deliberately has no runtime PyYAML dependency. The existing
+    plan serializer handles generated plan files, while briefs additionally
+    need YAML literal/folded block scalars for a multi-line description.
+    """
+    lines = path.read_text(encoding="utf-8").splitlines()
+    data: dict[str, Any] = {}
+    index = 0
+    while index < len(lines):
+        raw = lines[index]
+        if not raw.strip() or raw.lstrip().startswith("#"):
+            index += 1
+            continue
+        if raw[0].isspace():
+            raise ValueError(f"unexpected indentation on line {index + 1}")
+        key, separator, value = raw.partition(":")
+        if not separator or not key.strip():
+            raise ValueError(f"expected 'key: value' on line {index + 1}")
+        key = key.strip()
+        value = _strip_yaml_comment(value)
+        if value.startswith(("|", ">")):
+            style = value[0]
+            index += 1
+            block: list[str] = []
+            while index < len(lines):
+                candidate = lines[index]
+                if candidate.strip() and not candidate[0].isspace():
+                    break
+                block.append(candidate)
+                index += 1
+            nonempty = [line for line in block if line.strip()]
+            indent = min(
+                (len(line) - len(line.lstrip()) for line in nonempty),
+                default=0,
+            )
+            content = [line[indent:] if line else "" for line in block]
+            if style == ">":
+                parsed = " ".join(line.strip() for line in content if line.strip())
+            else:
+                parsed = "\n".join(content)
+            if not value.startswith(("|-", ">-")):
+                parsed += "\n"
+            data[key] = parsed
+            continue
+        if value in {"", "{}"}:
+            nested: dict[str, Any] = {}
+            index += 1
+            while index < len(lines):
+                candidate = lines[index]
+                if not candidate.strip() or candidate.lstrip().startswith("#"):
+                    index += 1
+                    continue
+                if not candidate[0].isspace():
+                    break
+                subkey, sub_separator, subvalue = candidate.strip().partition(":")
+                if not sub_separator or not subkey:
+                    raise ValueError(f"invalid mapping on line {index + 1}")
+                nested[subkey.strip()] = _brief_scalar(subvalue)
+                index += 1
+            data[key] = nested
+            continue
+        data[key] = _brief_scalar(value)
+        index += 1
+    return data
+
+
 def load_brief_from_yaml(path: str | Path) -> Brief:
     """Read a YAML brief from ``path`` and return a :class:`Brief`.
 
@@ -661,8 +966,7 @@ def load_brief_from_yaml(path: str | Path) -> Brief:
     if not p.exists():
         raise BuildError("plan", f"brief file not found: {p}")
     try:
-        from .trace import load_plan_yaml  # already supports general YAML
-    except ImportError as exc:  # pragma: no cover — defensive
-        raise BuildError("plan", "yaml loader unavailable") from exc
-    data = load_plan_yaml(p)
+        data = _load_brief_yaml(p)
+    except (OSError, UnicodeError, ValueError) as exc:
+        raise BuildError("plan", f"could not parse brief {p}: {exc}") from exc
     return Brief.from_dict(data)

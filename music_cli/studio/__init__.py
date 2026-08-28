@@ -9,6 +9,14 @@ from .build import (
     load_brief_from_yaml,
 )
 from .director import CritiqueReport, DirectorError, M3Director
+from .doctor import (
+    CheckResult,
+    check_dist_dir,
+    check_ffmpeg,
+    check_ffprobe,
+    check_gmi_key,
+    run_doctor,
+)
 from .nodes.base import (
     BaseNode,
     NodeError,
@@ -38,10 +46,15 @@ __all__ = [
     "BuildResult",
     "BuildService",
     "Brief",
+    "CheckResult",
     "Constitution",
     "CreativePlan",
     "CritiqueReport",
     "DEFAULT_DIST_DIR",
+    "check_dist_dir",
+    "check_ffmpeg",
+    "check_ffprobe",
+    "check_gmi_key",
     "DirectorError",
     "M3Director",
     "MixNode",
@@ -55,6 +68,7 @@ __all__ = [
     "default_adapter_factory",
     "load_brief_from_yaml",
     "resolve_binary",
+    "run_doctor",
     "SpeechNode",
     "TraceWriter",
     "dump_plan_yaml",

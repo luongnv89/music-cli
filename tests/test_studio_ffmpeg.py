@@ -235,6 +235,23 @@ class TestBuildCommand:
         assert "adelay=2000|2000" in graph
         assert "raw1]" in graph
 
+    def test_narration_is_delayed_and_mixed_after_ducking(self):
+        speech = Path("nodes/narration-1.wav")
+        cmd = self.node._build_command(
+            "ffmpeg",
+            [self.beds[0]],
+            [(2.0, 3.0, "hello")],
+            5.0,
+            Path("nodes/mix-1.wav"),
+            narration=[(speech, 2.0)],
+        )
+        graph = self._graph(cmd)
+        assert "[1:a]aresample=44100" in graph
+        assert "adelay=2000|2000" in graph
+        assert "sidechaincompress=" in graph
+        assert "amix=inputs=2:normalize=0:duration=first" in graph
+        assert "nodes/narration-1.wav" in cmd
+
 
 # ---------------------------------------------------------------------------
 # MixNode.run (subprocess mocked)
@@ -375,3 +392,30 @@ class TestSmoke:
         assert "Chapter 1" in text and "Chapter 2" in text
         assert "00:00:01,000 --> 00:00:02,000" in text
         assert "00:00:03,000 --> 00:00:04,000" in text
+
+    def test_target_duration_pads_short_input(self, tmp_path):
+        nodes_dir = tmp_path / "nodes"
+        nodes_dir.mkdir()
+        bed = _tone(nodes_dir / "music-1.wav", duration=1.0)
+        out = nodes_dir / "mix-1.wav"
+
+        MixNode(ffmpeg=resolve_binary(DEFAULT_FFMPEG)).run(
+            [bed], [(0.0, 0.5, "Chapter 1")], out, duration=2.0
+        )
+
+        probe = subprocess.run(
+            [
+                shutil.which("ffprobe"),
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=nw=1:nk=1",
+                str(out),
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        assert float(probe.stdout.strip()) == pytest.approx(2.0, abs=0.05)

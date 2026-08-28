@@ -187,6 +187,10 @@ class TestBrief:
             Brief.from_dict({"project_id": "  ", "description": "go"})
         assert exc.value.stage == "plan"
 
+    def test_rejects_project_path_traversal(self):
+        with pytest.raises(BuildError, match="lowercase slug"):
+            Brief.from_dict({"project_id": "../outside", "description": "go"})
+
     def test_rejects_empty_description(self):
         with pytest.raises(BuildError) as exc:
             Brief.from_dict({"project_id": "p1", "description": "  "})
@@ -246,8 +250,9 @@ class TestBuildServiceRun:
         # second run with the same brief — locked nodes, no remux
         second = service.run(brief)
         assert not second.regenerated
-        assert second.premiere_mp4 is None  # not re-muxed
+        assert second.premiere_mp4 == first.premiere_mp4  # not re-muxed
         assert first.premiere_mp4.stat().st_mtime == first_mp4_mtime
+        assert len(_adapter.plan_prompts) == 1  # persisted plan is reused
 
     def test_force_regenerates_and_remux(self, tmp_path):
         service, _adapter, _probe = _make_service(tmp_path)
@@ -297,22 +302,56 @@ class TestBuildServiceRun:
 
 
 class TestBriefLoader:
+    def test_load_example_preserves_block_description(self):
+        brief = load_brief_from_yaml(Path("examples/neon-rain.yaml"))
+        assert brief.description.startswith("A neon-drenched synthwave")
+        assert "futuristic city" in brief.description
+
     def test_load_yaml(self, tmp_path):
         path = tmp_path / "neon-rain.yaml"
         path.write_text(
-            "project_id: neon-rain\n"
+            "project_id: neon-rain # output slug\n"
             "description: A noir rooftop chase in the rain.\n"
-            "duration_seconds: 60\n",
+            "duration_seconds: 60 # seconds\n"
+            "taste: # optional\n"
+            "  tempo_bpm: 96\n",
             encoding="utf-8",
         )
         b = load_brief_from_yaml(path)
         assert b.project_id == "neon-rain"
         assert "noir" in b.description
         assert b.duration_seconds == 60.0
+        assert b.taste == {"tempo_bpm": 96}
 
     def test_missing_file_raises(self, tmp_path):
         with pytest.raises(BuildError):
             load_brief_from_yaml(tmp_path / "nope.yaml")
+
+
+# ===========================================================================
+# Default adapter factory
+# ===========================================================================
+
+
+class TestDefaultAdapterFactory:
+    def test_uses_stored_gmi_key(self, tmp_path):
+        brief = Brief.from_dict({"project_id": "p1", "description": "go"})
+        with (
+            mock.patch("music_cli.cloud.secrets.get_api_key", return_value="test-key"),
+            mock.patch("music_cli.cloud.gmi.GMIAdapter") as adapter_cls,
+        ):
+            from music_cli.studio.build import default_adapter_factory
+
+            default_adapter_factory(tmp_path / "p1", brief)
+        adapter_cls.assert_called_once_with("test-key")
+
+    def test_missing_gmi_key_is_a_build_error(self, tmp_path):
+        brief = Brief.from_dict({"project_id": "p1", "description": "go"})
+        with mock.patch("music_cli.cloud.secrets.get_api_key", return_value=None):
+            from music_cli.studio.build import default_adapter_factory
+
+            with pytest.raises(BuildError, match="mc cloud key set gmi"):
+                default_adapter_factory(tmp_path / "p1", brief)
 
 
 # ===========================================================================
