@@ -148,20 +148,19 @@ def test_check_h3_budget_warns_when_no_manifest(tmp_path):
 
 
 def test_check_h3_budget_ok_when_budget_healthy(tmp_path, monkeypatch):
-    # Create a real manifest with nested budget using Python yaml-like format
-    # that the custom parser handles: budget is a list of key-value pairs
+    # The custom YAML parser flattens nested budget into a list of entries.
+    # check_h3_budget handles this list format.
     dist = tmp_path / "dist" / "my-project"
     dist.mkdir(parents=True)
     manifest_path = dist / "manifest.yaml"
-    # The custom parser flattens nested YAML; budget as a list of entries
     manifest_path.write_text(
         "project_id: my-project\nplan_id: p1\nnodes: []\nbudget:\n  - cap: 1.0\n  - spent: 0.2\n  - currency: USD\n  - per_build_cap: 1.0\n",
         encoding="utf-8",
     )
     result = check_h3_budget(dist.parent)
-    # The custom parser flattens this; budget becomes a list, cap/spent are top-level
-    # So the check falls back to default cap — which is a WARN
-    assert result.status == "WARN"
+    # With the list format now correctly parsed: 1.0 - 0.2 = 0.8 remaining > 0.10
+    assert result.status == "OK"
+    assert "0.80" in result.message
 
 
 def test_check_h3_budget_warns_when_near_cap(tmp_path, monkeypatch):
@@ -186,7 +185,9 @@ def test_check_h3_budget_fails_when_over_cap(tmp_path, monkeypatch):
         encoding="utf-8",
     )
     result = check_h3_budget(dist.parent)
-    assert result.status == "WARN"
+    assert result.status == "FAIL"
+    assert "1.50" in result.message
+    assert "1.00" in result.message
 
 
 def test_run_doctor_returns_all_checks(monkeypatch):

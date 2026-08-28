@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import socket
+import time
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
@@ -30,8 +31,6 @@ def _check_network(host: str, port: int = 443, timeout: float = 3.0) -> tuple[bo
             t1 = socket.gettimeofday()
             latency_ms = (t1 - t0) / 1000
         else:
-            import time
-
             t0 = time.monotonic()
             sock.connect((start, port))
             t1 = time.monotonic()
@@ -236,7 +235,7 @@ def check_h3_budget(dist_dir: str | Path = DEFAULT_DIST_DIR) -> CheckResult:
 
     manifest_dict = manifest.to_dict() if hasattr(manifest, "to_dict") else manifest
     budget_data = manifest_dict.get("budget")
-    if not isinstance(budget_data, dict):
+    if not budget_data:
         return CheckResult(
             "h3 budget",
             "WARN",
@@ -244,9 +243,36 @@ def check_h3_budget(dist_dir: str | Path = DEFAULT_DIST_DIR) -> CheckResult:
             "Run a build to see actual spend; cap defaults to $1.00 per build.",
         )
 
-    cap = Decimal(str(budget_data.get("cap", budget_data.get("per_build_cap", 1.0))))
-    spent = Decimal(str(budget_data.get("spent", 0)))
-    currency = budget_data.get("currency", "USD")
+    # The custom YAML parser may flatten nested budget into a list of
+    # {key, value} pairs; handle both dict and list forms.
+    if isinstance(budget_data, dict):
+        cap_val = budget_data.get("cap", budget_data.get("per_build_cap", 1.0))
+        spent_val = budget_data.get("spent", 0)
+        currency = budget_data.get("currency", "USD")
+    elif isinstance(budget_data, list):
+        cap_val = 1.0
+        spent_val = 0
+        currency = "USD"
+        for entry in budget_data:
+            if isinstance(entry, dict):
+                if "cap" in entry:
+                    cap_val = entry["cap"]
+                if "per_build_cap" in entry:
+                    cap_val = entry["per_build_cap"]
+                if "spent" in entry:
+                    spent_val = entry["spent"]
+                if "currency" in entry:
+                    currency = entry["currency"]
+    else:
+        return CheckResult(
+            "h3 budget",
+            "WARN",
+            "budget block has unexpected format; default cap applies",
+            "Run a build to see actual spend; cap defaults to $1.00 per build.",
+        )
+
+    cap = Decimal(str(cap_val))
+    spent = Decimal(str(spent_val))
     remaining = cap - spent
 
     if remaining < 0:
