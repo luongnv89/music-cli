@@ -27,6 +27,37 @@
 
 ---
 
+## MiniMax Week Entry
+
+This repository is a [MiniMax Week](https://www.minimax.io) challenge entry. Since the `pre-minimax-week` tag, music-cli gained a **creative compilation pipeline** (`mc studio`) that turns text prompts into polished audio/video outputs, a multi-provider cloud adapter layer (GMI Cloud, OpenRouter), and decision logging via `trace.jsonl`. Install it and run `mc studio doctor` to verify your setup:
+
+```bash
+pipx install .
+mc studio doctor
+```
+
+### Project Layout
+
+```
+music-cli/
+├── music_cli/
+│   ├── cli/              # CLI command groups (play, radio, ai, cloud, studio)
+│   ├── cloud/            # Cloud adapters (GMI, OpenRouter) + secrets
+│   ├── studio/           # Creative compiler (director, graph, nodes)
+│   │   ├── nodes/        # Processing nodes (ffmpeg, music, speech, video)
+│   │   └── ...           # build.py, doctor.py, graph.py, taste.py, trace.py
+│   └── ...               # daemon, player, sources, youtube
+├── tests/                # Unit + integration tests
+├── examples/             # Example studio build definitions
+├── docs/                 # Documentation
+├── pyproject.toml        # Project config
+└── README.md             # You are here
+```
+
+See [CHALLENGE.md](CHALLENGE.md) for the full file inventory and the [GitHub compare](https://github.com/luongnv89/music-cli/compare/pre-minimax-week...main) between the pre-entry baseline and main.
+
+---
+
 ## Sound Familiar?
 
 - You open Spotify or YouTube to play focus music. Twenty minutes later you're watching a video essay about fonts. Your flow state is gone.

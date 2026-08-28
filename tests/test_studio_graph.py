@@ -12,6 +12,8 @@ Covers:
 
 from __future__ import annotations
 
+import sys
+
 import pytest
 
 from music_cli.studio.graph import (
@@ -95,6 +97,10 @@ class TestNode:
         assert restored.locked == node.locked
         assert restored.lock_reason == node.lock_reason
 
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="Windows file-lock race with TemporaryDirectory cleanup",
+    )
     def test_node_default_output_path(self) -> None:
         node = Node(id="music-1", node_type="music")
         import tempfile

@@ -700,6 +700,7 @@ class BuildService:
                 )
                 speech_node.unlock()
                 self._trace(trace, TRACE_GENERATE, node_id=nid, payload=prompt)
+                audio_path = None
                 try:
                     audio_path = asyncio.run(speech_node.generate(prompt, duration=None))
                     any_regen = True
@@ -722,6 +723,7 @@ class BuildService:
             else:
                 music_node.unlock()
                 self._trace(trace, TRACE_GENERATE, node_id=nid, payload=prompt)
+                audio_path = None
                 try:
                     audio_path = asyncio.run(
                         music_node.generate(prompt, lyrics=None, duration=None)

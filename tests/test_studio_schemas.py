@@ -484,7 +484,9 @@ class TestGmiFreeImport:
         import pathlib
         import re
 
-        src = pathlib.Path("music_cli/studio/schemas.py").read_text()
+        src = (
+            pathlib.Path(__file__).resolve().parent.parent / "music_cli" / "studio" / "schemas.py"
+        ).read_text()
         assert not re.search(r"^\s*import\s+keyring", src, re.MULTILINE)
         assert not re.search(r"^\s*from\s+keyring", src, re.MULTILINE)
         assert not re.search(r"^\s*import\s+httpx", src, re.MULTILINE)

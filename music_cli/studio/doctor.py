@@ -82,7 +82,12 @@ def check_ffprobe() -> CheckResult:
 
 
 def check_gmi_key() -> CheckResult:
-    """Check for a configured GMI credential without exposing its value."""
+    """Check for a configured GMI credential without exposing its value.
+
+    When the ``gmi`` extra (``keyring``) is not installed the check reports
+    ``WARN`` rather than ``FAIL`` so that a base install of music-cli still
+    passes the doctor with a clean exit code.
+    """
     try:
         from ..cloud.secrets import get_api_key
 
@@ -90,15 +95,15 @@ def check_gmi_key() -> CheckResult:
     except Exception as exc:
         return CheckResult(
             "gmi key",
-            "FAIL",
-            f"could not read the OS keyring: {exc}",
+            "WARN",
+            f"gmi extra not installed ({exc}); install with pip install 'coder-music-cli[gmi]'",
             "Install the gmi extra and run: mc cloud key set gmi",
         )
     if not api_key:
         return CheckResult(
             "gmi key",
-            "FAIL",
-            "no GMI Cloud API key is stored",
+            "WARN",
+            "no GMI Cloud API key is stored (optional for doctor; required for cloud builds)",
             "Run: mc cloud key set gmi",
         )
     return CheckResult("gmi key", "OK", "stored in the OS keyring")
