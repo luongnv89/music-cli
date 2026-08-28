@@ -1,0 +1,14 @@
+# Example creative-compiler brief for the MiniMax Week entry.
+#
+# Used by ``mc studio build examples/neon-rain.yaml`` (issue #139, task P3.3)
+# to produce the first audio-only premiere at
+# ``dist/neon-rain/premiere.mp4``. The fields are intentionally
+# minimal — anything beyond ``project_id`` and ``description`` is
+# optional and consumed by the later video, taste, and revise stages.
+
+project_id: neon-rain
+description: |
+  A neon-drenched synthwave short set on a rain-slick night in a
+  futuristic city. Slow synth pads, distant traffic, a single
+  narrator over a wet ambient bed.
+duration_seconds: 60

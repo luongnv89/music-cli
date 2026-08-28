@@ -1,5 +1,13 @@
 """music_cli.studio — creative compiler (MiniMax Week entry)."""
 
+from .build import (
+    Brief,
+    BuildError,
+    BuildResult,
+    BuildService,
+    default_adapter_factory,
+    load_brief_from_yaml,
+)
 from .director import CritiqueReport, DirectorError, M3Director
 from .nodes.base import (
     BaseNode,
@@ -26,6 +34,10 @@ from .trace import (
 
 __all__ = [
     "BaseNode",
+    "BuildError",
+    "BuildResult",
+    "BuildService",
+    "Brief",
     "Constitution",
     "CreativePlan",
     "CritiqueReport",
@@ -40,6 +52,8 @@ __all__ = [
     "NodeProtocol",
     "PlanDiff",
     "ProjectManifest",
+    "default_adapter_factory",
+    "load_brief_from_yaml",
     "resolve_binary",
     "SpeechNode",
     "TraceWriter",
