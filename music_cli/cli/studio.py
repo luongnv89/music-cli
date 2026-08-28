@@ -24,6 +24,7 @@ import click
 from ..studio import trace as _trace
 from ..studio.build import BuildError, BuildService, load_brief_from_yaml
 from ..studio.doctor import run_doctor
+from ..studio.trace import DEFAULT_DIST_DIR
 from .app import main
 from .common import AliasedGroup
 
@@ -154,4 +155,39 @@ def studio_build(
         f"build ok: project={result.project_dir.name} "
         f"plan={result.plan.get('plan_id')} "
         f"premiere={result.premiere_mp4 or result.premiere_wav}"
+    )
+
+
+@studio_group.command("revise")
+@click.argument("project")
+@click.argument("intent")
+@click.option(
+    "--dist-dir",
+    default=str(DEFAULT_DIST_DIR),
+    show_default=True,
+    help="Directory holding build projects.",
+)
+def studio_revise(project: str, intent: str, dist_dir: str) -> None:
+    """Revise PROJECT by regenerating only affected nodes.
+
+    Calls the creative director to produce a plan-diff from INTENT, then
+    re-runs only the nodes that must change.  Unaffected nodes stay locked
+    and their on-disk artifacts are preserved.
+
+    Example::
+
+        mc studio revise my-project "Change the final scene to dawn"
+    """
+    service = BuildService(dist_dir=dist_dir)
+    try:
+        result = service.revise(project, intent)
+    except BuildError as exc:
+        hint = f" Check the plan at `mc studio plan {project}`."
+        raise click.ClickException(f"{exc}{hint}") from exc
+    changed = "regenerated" if result.regenerated else "no nodes changed"
+    click.echo(
+        f"revise ok: project={result.project_dir.name} "
+        f"plan={result.plan.get('plan_id')} "
+        f"premiere={result.premiere_mp4 or result.premiere_wav} "
+        f"({changed})"
     )
