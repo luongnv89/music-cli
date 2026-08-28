@@ -3,11 +3,7 @@
 from __future__ import annotations
 
 import socket
-from decimal import Decimal
-from pathlib import Path
 from unittest import mock
-
-import pytest
 
 from click.testing import CliRunner
 
@@ -16,8 +12,6 @@ from music_cli.studio.doctor import (
     CheckResult,
     check_disk_space,
     check_dist_dir,
-    check_ffmpeg,
-    check_ffprobe,
     check_gmi_key,
     check_h3_budget,
     check_network,

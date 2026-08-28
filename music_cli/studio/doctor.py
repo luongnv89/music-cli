@@ -300,7 +300,7 @@ def check_disk_space(dist_dir: str | Path = DEFAULT_DIST_DIR) -> CheckResult:
     try:
         stat = os.statvfs(str(path))
         free_bytes = stat.f_bavail * stat.f_frsize
-        free_gb = free_bytes / (1024 ** 3)
+        free_gb = free_bytes / (1024**3)
     except OSError:
         return CheckResult(
             "disk space",
