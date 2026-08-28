@@ -47,6 +47,7 @@ from .nodes.base import NodeError, NodeLockedError
 from .nodes.ffmpeg import DEFAULT_FFMPEG, MixNode, MixNodeError, resolve_binary
 from .nodes.music import MusicNode
 from .nodes.speech import SpeechNode
+from .nodes.video import BuildBudget, VideoNode
 from .schemas import CreativePlan, ProjectManifest
 from .trace import (
     DEFAULT_DIST_DIR,
@@ -98,12 +99,14 @@ class BuildResult:
     captions_srt: Path | None = None
     premiere_mp4: Path | None = None
     regenerated: bool = False
+    video_nodes: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "project_dir": str(self.project_dir),
             "plan_id": self.plan.get("plan_id"),
             "nodes": list(self.nodes),
+            "video_nodes": list(self.video_nodes),
             "premiere_wav": str(self.premiere_wav) if self.premiere_wav else None,
             "captions_srt": str(self.captions_srt) if self.captions_srt else None,
             "premiere_mp4": str(self.premiere_mp4) if self.premiere_mp4 else None,
@@ -238,13 +241,22 @@ class BuildService:
 
     # -- public API --------------------------------------------------------
 
-    def run(self, brief: Brief, *, force: bool = False) -> BuildResult:
-        """Run the audio-only build for ``brief`` and return the outcome.
+    def run(
+        self,
+        brief: Brief,
+        *,
+        force: bool = False,
+        confirm: bool = False,
+        no_h3: bool = False,
+        manifest: Any | None = None,
+    ) -> BuildResult:
+        """Run the build for ``brief`` and return the outcome.
 
-        ``force`` ignores the node lock state and regenerates every node
-        (useful for ``--force`` rebuilds or after a schema change).
-        Idempotent by default: re-running with no changes does not
-        regenerate assets or bump the ``premiere.mp4`` mtime.
+        ``force`` ignores the node lock state and regenerates every audio node
+        (useful for ``--force`` rebuilds or after a schema change).  Video
+        scenes are generated only when ``confirm`` or ``no_h3`` is selected;
+        this keeps the P3 audio-only default intact while exposing the P4
+        scene controls before the full composer lands in P4.2.
         """
         if not isinstance(brief, Brief):
             raise BuildError("plan", f"brief must be a Brief, got {type(brief).__name__}")
@@ -363,6 +375,30 @@ class BuildService:
                 result.premiere_mp4 = self._mux_mp4(wav_out, srt_src, mp4_path)
             else:
                 result.premiere_mp4 = mp4_path
+
+            # P4.1 creates individual scene assets.  P4.2 owns joining them
+            # into the premiere, so the existing audio-only output remains
+            # unchanged while the explicit scene flags are opt-in.
+            if confirm or no_h3:
+                video_nodes, video_budget = self._generate_video_nodes(
+                    brief,
+                    plan,
+                    music_node,
+                    trace,
+                    confirm=confirm,
+                    no_h3=no_h3,
+                    manifest=manifest,
+                )
+                result.video_nodes = video_nodes
+                result.nodes = [*nodes, *video_nodes]
+                self._write_manifest(
+                    proj_dir,
+                    brief,
+                    plan_data,
+                    trace_path,
+                    nodes=result.nodes,
+                    budget=video_budget,
+                )
 
         return result
 
@@ -665,6 +701,74 @@ class BuildService:
             raise BuildError("compose", f"ffmpeg mp4 mux failed: {detail}")
         return out
 
+    def _generate_video_nodes(
+        self,
+        brief: Brief,
+        plan: CreativePlan,
+        music_node: MusicNode,
+        trace: TraceWriter,
+        *,
+        confirm: bool,
+        no_h3: bool,
+        manifest: Any | None,
+    ) -> tuple[list[dict[str, Any]], BuildBudget]:
+        """Generate opt-in P4.1 scene assets without composing the premiere."""
+        plan_data = plan.to_dict()
+        candidates = plan_data.get("scenes") or plan_data.get("shot_list") or []
+
+        if manifest is None:
+            manifest_data: dict[str, Any] = {"plan": plan_data}
+        elif isinstance(manifest, dict):
+            manifest_data = dict(manifest)
+            manifest_data["plan"] = plan_data
+        else:
+            to_dict = getattr(manifest, "to_dict", None)
+            manifest_data = dict(to_dict()) if callable(to_dict) else {"plan": plan_data}
+            manifest_data["plan"] = plan_data
+        if not isinstance(candidates, list):
+            return [], BuildBudget.from_manifest(manifest_data)
+        video = VideoNode(
+            music_node.adapter,
+            proj_dir=self.dist_dir / brief.project_id,
+            manifest=manifest_data,
+            no_h3=no_h3,
+            confirm=confirm,
+            cover_art=brief.cover_art,
+        )
+        generated: list[dict[str, Any]] = []
+        total_duration = _coerce_duration(plan_data.get("duration_seconds"))
+        if total_duration is None:
+            total_duration = brief.duration_seconds or 1.0
+
+        for index, scene in enumerate(candidates, start=1):
+            if not isinstance(scene, dict):
+                continue
+            prompt = str(scene.get("visual_prompt") or scene.get("prompt") or "").strip()
+            if not prompt:
+                continue
+            duration = _coerce_duration(scene.get("duration_seconds")) or total_duration
+            caption = str(scene.get("description") or prompt)
+            if index > 1:
+                video.unlock()
+            self._trace(trace, TRACE_GENERATE, node_id=f"scene-{index}", payload=prompt)
+            try:
+                output = asyncio.run(video.generate(prompt, duration, caption=caption))
+            except Exception as exc:
+                raise BuildError("generate", f"video scene {index} failed: {exc}") from exc
+            self._trace(trace, TRACE_PROBE, node_id=f"scene-{index}", payload=str(output))
+            generated.append(
+                {
+                    "id": f"scene-{index}",
+                    "type": "video",
+                    "status": "done",
+                    "locked": True,
+                    "output_path": str(output),
+                    "duration_seconds": duration,
+                    "prompt": prompt,
+                }
+            )
+        return generated, video.budget
+
     # -- helpers -----------------------------------------------------------
 
     @staticmethod
@@ -690,18 +794,27 @@ class BuildService:
         trace_path: Path,
         *,
         nodes: list[dict[str, Any]],
+        budget: BuildBudget | None = None,
     ) -> None:
-        manifest = ProjectManifest(
-            project_id=brief.project_id,
-            plan_id=str(plan_dict.get("plan_id") or ""),
-            constitution={"title": plan_dict.get("title", brief.project_id)},
-            plan=plan_dict,
-            nodes=[_manifest_node_record(node) for node in nodes],
-            locked_nodes=[node["id"] for node in nodes if node.get("locked") and node.get("id")],
-            dist_dir=str(proj_dir.parent),
-            premiere_path=str(proj_dir / PREMIERE_FILENAME),
-            trace_path=str(trace_path),
-        )
+        manifest_data: dict[str, Any] = {
+            "project_id": brief.project_id,
+            "plan_id": str(plan_dict.get("plan_id") or ""),
+            "constitution": {"title": plan_dict.get("title", brief.project_id)},
+            "plan": plan_dict,
+            "nodes": [_manifest_node_record(node) for node in nodes],
+            "locked_nodes": [node["id"] for node in nodes if node.get("locked") and node.get("id")],
+            "dist_dir": str(proj_dir.parent),
+            "premiere_path": str(proj_dir / PREMIERE_FILENAME),
+            "trace_path": str(trace_path),
+        }
+        if budget is not None:
+            manifest_data["budget"] = {
+                "cap": float(budget.cap),
+                "spent": float(budget.spent),
+                "currency": budget.currency,
+                "per_build_cap": float(budget.cap),
+            }
+        manifest = ProjectManifest(manifest_data)
         manifest_path = proj_dir / "manifest.yaml"
         write_plan_yaml(manifest_path, manifest.to_dict())
 

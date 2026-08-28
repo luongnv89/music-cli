@@ -26,6 +26,7 @@ from .nodes.base import (
 from .nodes.ffmpeg import MixNode, MixNodeError, resolve_binary, write_srt
 from .nodes.music import MusicNode
 from .nodes.speech import SpeechNode
+from .nodes.video import BudgetExceeded, BuildBudget, VideoNode
 from .schemas import Constitution, CreativePlan, PlanDiff, ProjectManifest
 from .trace import (
     DEFAULT_DIST_DIR,
@@ -42,10 +43,12 @@ from .trace import (
 
 __all__ = [
     "BaseNode",
+    "BuildBudget",
     "BuildError",
     "BuildResult",
     "BuildService",
     "Brief",
+    "BudgetExceeded",
     "CheckResult",
     "Constitution",
     "CreativePlan",
@@ -71,6 +74,7 @@ __all__ = [
     "run_doctor",
     "SpeechNode",
     "TraceWriter",
+    "VideoNode",
     "dump_plan_yaml",
     "init_project_layout",
     "load_plan_yaml",

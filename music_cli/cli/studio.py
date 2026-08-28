@@ -117,8 +117,27 @@ def studio_trace(project: str, dist_dir: str) -> None:
     default=False,
     help="Regenerate every audio node, ignoring the lock state.",
 )
-def studio_build(brief: str, dist_dir: str, resume: bool, force: bool) -> None:
-    """Run the audio-only build for the YAML BRIEF file."""
+@click.option(
+    "--confirm",
+    is_flag=True,
+    default=False,
+    help="Allow H3 scene generation to exceed the per-build budget cap.",
+)
+@click.option(
+    "--no-h3",
+    is_flag=True,
+    default=False,
+    help="Skip H3 and render captioned static scene visuals instead.",
+)
+def studio_build(
+    brief: str,
+    dist_dir: str,
+    resume: bool,
+    force: bool,
+    confirm: bool,
+    no_h3: bool,
+) -> None:
+    """Run the build for the YAML BRIEF file."""
     if resume and force:
         raise click.UsageError("--resume and --force cannot be used together")
     try:
@@ -127,7 +146,7 @@ def studio_build(brief: str, dist_dir: str, resume: bool, force: bool) -> None:
         raise click.ClickException(str(exc)) from exc
     service = BuildService(dist_dir=dist_dir)
     try:
-        result = service.run(parsed, force=force)
+        result = service.run(parsed, force=force, confirm=confirm, no_h3=no_h3)
     except BuildError as exc:
         hint = f" Resume with `mc studio build --resume {brief}`." if exc.stage != "plan" else ""
         raise click.ClickException(f"{exc}{hint}") from exc
