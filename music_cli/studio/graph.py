@@ -18,14 +18,12 @@ the same dependency wave are sorted by id.
 
 from __future__ import annotations
 
-import asyncio
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from .schemas import CreativePlan, ProjectManifest
-
 
 # ---------------------------------------------------------------------------
 # Exceptions
@@ -88,8 +86,7 @@ class Node:
         """
         if self.locked:
             raise NodeLockedError(
-                f"node {self.id!r} is locked; call unlock(reason) before "
-                f"generating"
+                f"node {self.id!r} is locked; call unlock(reason) before generating"
             )
         # Default: write a placeholder file.  Real nodes override.
         dest = Path(self.output_path) if self.output_path else None
@@ -339,9 +336,7 @@ class ProjectGraph:
         for nid, node in self.nodes.items():
             for dep in node.depends_on:
                 if dep not in self.nodes:
-                    errors.append(
-                        f"node {nid!r} depends on unknown node {dep!r}"
-                    )
+                    errors.append(f"node {nid!r} depends on unknown node {dep!r}")
 
         # 3. Cycle detection
         cycle_errors = self._detect_cycles()
@@ -355,14 +350,14 @@ class ProjectGraph:
         Returns a list of cycle error strings.  Empty means no cycles.
         """
         # Build in-degree map
-        in_degree: dict[str, int] = {nid: 0 for nid in self.nodes}
+        in_degree: dict[str, int] = dict.fromkeys(self.nodes, 0)
         for nid, deps in self._edges.items():
             for dep in deps:
                 if dep in in_degree:
                     in_degree[nid] = in_degree.get(nid, 0)
 
         # Recount properly
-        in_degree = {nid: 0 for nid in self.nodes}
+        in_degree = dict.fromkeys(self.nodes, 0)
         for nid in self.nodes:
             for dep in self._edges.get(nid, set()):
                 if dep in self.nodes:
@@ -395,10 +390,7 @@ class ProjectGraph:
                         queue.append(other_nid)
 
         if visited_count != len(self.nodes):
-            return [
-                "dependency cycle detected among "
-                f"{visited_count}/{len(self.nodes)} nodes"
-            ]
+            return [f"dependency cycle detected among {visited_count}/{len(self.nodes)} nodes"]
         return []
 
     # -- topological order -------------------------------------------------
@@ -517,9 +509,7 @@ class ProjectGraph:
         Returns:
             The updated manifest dict.
         """
-        locked = [
-            nid for nid, node in sorted(self.nodes.items()) if node.locked
-        ]
+        locked = [nid for nid, node in sorted(self.nodes.items()) if node.locked]
         manifest["locked_nodes"] = locked
 
         # Also update individual node lock states in the nodes list
@@ -618,13 +608,8 @@ class ProjectGraph:
     def to_dict(self) -> dict[str, Any]:
         """Serialize the graph to a dict suitable for manifest storage."""
         return {
-            "nodes": {
-                nid: node.to_dict() for nid, node in sorted(self.nodes.items())
-            },
-            "edges": {
-                nid: sorted(deps)
-                for nid, deps in sorted(self._edges.items())
-            },
+            "nodes": {nid: node.to_dict() for nid, node in sorted(self.nodes.items())},
+            "edges": {nid: sorted(deps) for nid, deps in sorted(self._edges.items())},
         }
 
     @classmethod

@@ -17,6 +17,14 @@ from .doctor import (
     check_gmi_key,
     run_doctor,
 )
+from .graph import (
+    GraphCycleError,
+    GraphError,
+    GraphMissingDependency,
+    Node,
+    NodeLockedError,
+    ProjectGraph,
+)
 from .nodes.assemble import AssembleNode, AssembleNodeError
 from .nodes.base import (
     BaseNode,
@@ -29,14 +37,6 @@ from .nodes.music import MusicNode
 from .nodes.speech import SpeechNode
 from .nodes.video import BudgetExceeded, BuildBudget, VideoNode
 from .schemas import Constitution, CreativePlan, PlanDiff, ProjectManifest
-from .graph import (
-    GraphCycleError,
-    GraphError,
-    GraphMissingDependency,
-    Node,
-    NodeLockedError,
-    ProjectGraph,
-)
 from .trace import (
     DEFAULT_DIST_DIR,
     TraceWriter,

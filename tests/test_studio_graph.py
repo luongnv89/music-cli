@@ -16,14 +16,11 @@ import pytest
 
 from music_cli.studio.graph import (
     GraphCycleError,
-    GraphError,
-    GraphMissingDependency,
     Node,
     NodeLockedError,
     ProjectGraph,
 )
 from music_cli.studio.schemas import CreativePlan
-
 
 # ---------------------------------------------------------------------------
 # Node tests
@@ -101,10 +98,10 @@ class TestNode:
     def test_node_default_output_path(self) -> None:
         node = Node(id="music-1", node_type="music")
         import tempfile
-        from pathlib import Path
 
         with tempfile.TemporaryDirectory() as tmpdir:
             import os
+
             os.chdir(tmpdir)
             result = node.generate()
             assert result.exists()
@@ -594,16 +591,18 @@ class TestEdgeCases:
         assert graph.topological_order() == ["a"]
 
     def test_graph_from_plan_empty_tracks_and_scenes(self) -> None:
-        plan = CreativePlan({
-            "plan_id": "p1",
-            "project_id": "proj",
-            "title": "T",
-            "objective": "O",
-            "brief": "B",
-            "duration_seconds": 60,
-            "tracks": [],
-            "scenes": [],
-        })
+        plan = CreativePlan(
+            {
+                "plan_id": "p1",
+                "project_id": "proj",
+                "title": "T",
+                "objective": "O",
+                "brief": "B",
+                "duration_seconds": 60,
+                "tracks": [],
+                "scenes": [],
+            }
+        )
         graph = ProjectGraph.from_plan(plan)
         assert len(graph.nodes) == 0
         assert graph.validate() == []
