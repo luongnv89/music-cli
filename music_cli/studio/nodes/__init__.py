@@ -28,9 +28,12 @@ from .ffmpeg import (
 )
 from .music import MusicNode
 from .speech import SpeechNode
+from .assemble import AssembleNode, AssembleNodeError
 from .video import BudgetExceeded, BuildBudget, VideoNode
 
 __all__ = [
+    "AssembleNode",
+    "AssembleNodeError",
     "BaseNode",
     "BuildBudget",
     "BudgetExceeded",

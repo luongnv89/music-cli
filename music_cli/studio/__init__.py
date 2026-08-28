@@ -23,6 +23,7 @@ from .nodes.base import (
     NodeLockedError,
     NodeProtocol,
 )
+from .nodes.assemble import AssembleNode, AssembleNodeError
 from .nodes.ffmpeg import MixNode, MixNodeError, resolve_binary, write_srt
 from .nodes.music import MusicNode
 from .nodes.speech import SpeechNode
@@ -42,6 +43,8 @@ from .trace import (
 )
 
 __all__ = [
+    "AssembleNode",
+    "AssembleNodeError",
     "BaseNode",
     "BuildBudget",
     "BuildError",
