@@ -22,6 +22,7 @@ call without ever launching a real subprocess.
 
 from __future__ import annotations
 
+import math
 import shutil
 import subprocess
 from collections.abc import Callable, Iterable, Sequence
@@ -151,6 +152,9 @@ class MixNode:
         nodes: Iterable[str | Path],
         captions: Iterable[Sequence[Any]],
         out_path: str | Path,
+        *,
+        duration: float | None = None,
+        narration: Iterable[tuple[str | Path, float]] | None = None,
     ) -> Path:
         """Mix ``nodes`` into ``out_path`` as a single WAV, ducking under narr.
 
@@ -158,6 +162,10 @@ class MixNode:
         ``amix``. ``captions`` is a list of ``(start, end, text)`` cues: the
         timing gates the sidechain key that ducks the bed, and the text is
         written to ``out_path.parent / "captions.srt"`` for later reuse in P4.
+        ``narration`` contains ``(path, start_seconds)`` pairs; those files
+        are delayed to their cue positions and mixed after the music is
+        ducked. When ``duration`` is supplied, audio is padded or trimmed to
+        that target instead of using the longest input duration.
         """
         music_beds = [Path(n) for n in nodes]
         if not music_beds:
@@ -165,6 +173,19 @@ class MixNode:
         for bed in music_beds:
             if not bed.exists():
                 raise MixNodeError(f"missing mix input: {bed}")
+
+        narration_inputs: list[tuple[Path, float]] = []
+        for raw_path, raw_start in narration or ():
+            path = Path(raw_path)
+            if not path.exists():
+                raise MixNodeError(f"missing narration input: {path}")
+            try:
+                start = float(raw_start)
+            except (TypeError, ValueError) as exc:
+                raise MixNodeError("narration start must be a finite number") from exc
+            if not math.isfinite(start) or start < 0:
+                raise MixNodeError("narration start must be a finite non-negative number")
+            narration_inputs.append((path, start))
 
         cue_list = list(captions)
         for cue in cue_list:
@@ -174,10 +195,27 @@ class MixNode:
             if start < 0 or end <= start:
                 raise MixNodeError(f"invalid caption window (start, end)=({start}, {end})")
 
-        total_seconds = max(self._duration(bed) for bed in music_beds)
+        if duration is not None:
+            try:
+                target_duration = float(duration)
+            except (TypeError, ValueError) as exc:
+                raise MixNodeError("duration must be a finite number") from exc
+            if not math.isfinite(target_duration) or target_duration <= 0:
+                raise MixNodeError("duration must be a finite number greater than zero")
+            total_seconds = target_duration
+        else:
+            total_seconds = max(self._duration(bed) for bed in music_beds)
         ffmpeg_bin = self.ffmpeg_bin()
         out = Path(out_path)
-        cmd = self._build_command(ffmpeg_bin, music_beds, cue_list, total_seconds, out)
+        cmd = self._build_command(
+            ffmpeg_bin,
+            music_beds,
+            cue_list,
+            total_seconds,
+            out,
+            narration=narration_inputs,
+        )
+        out.parent.mkdir(parents=True, exist_ok=True)
 
         result = subprocess.run(cmd, capture_output=True, text=True, check=False)
         if result.returncode != 0:
@@ -199,6 +237,8 @@ class MixNode:
         cues: list[Sequence[Any]],
         total_seconds: float,
         out: Path,
+        *,
+        narration: list[tuple[Path, float]] | None = None,
     ) -> list[str]:
         """Assemble the FFmpeg ``argv`` from the node/caption inputs.
 
@@ -210,6 +250,8 @@ class MixNode:
         sr = str(self.sample_rate)
         duration = str(float(total_seconds))
         parts: list[str] = []
+        narration = narration or []
+        music_output = "bed" if narration else "out"
 
         for i, _bed in enumerate(nodes):
             parts.append(f"[{i}:a]aresample={sr},aformat=channel_layouts=stereo[m{i}]")
@@ -239,17 +281,42 @@ class MixNode:
                     f"{key_ins}amix=inputs={len(intervals)}:normalize=0,"
                     f"apad=pad_dur={duration}[keypad]"
                 )
+            parts.append(f"{music_base}apad=pad_dur={duration}[musicpad]")
             parts.append(
-                f"{music_base}[keypad]sidechaincompress="
+                f"[musicpad][keypad]sidechaincompress="
                 f"threshold={self._duck_threshold}:ratio={self._duck_ratio}:"
                 f"attack={self._duck_attack}:release={self._duck_release}[ducked]"
             )
-            parts.append(f"[ducked]aformat=channel_layouts=stereo,atrim=0:{duration}[out]")
+            parts.append(
+                f"[ducked]aformat=channel_layouts=stereo,"
+                f"apad=pad_dur={duration},atrim=0:{duration}[{music_output}]"
+            )
         else:
-            parts.append(f"{music_base}aformat=channel_layouts=stereo,atrim=0:{duration}[out]")
+            parts.append(
+                f"{music_base}aformat=channel_layouts=stereo,"
+                f"apad=pad_dur={duration},atrim=0:{duration}[{music_output}]"
+            )
+
+        if narration:
+            for index, (_path, start) in enumerate(narration):
+                input_index = len(nodes) + index
+                delay_ms = int(round(start * 1000))
+                parts.append(
+                    f"[{input_index}:a]aresample={sr},"
+                    f"aformat=channel_layouts=stereo,adelay={delay_ms}|{delay_ms},"
+                    f"atrim=0:{duration}[n{index}]"
+                )
+            speech_inputs = "".join(f"[n{index}]" for index in range(len(narration)))
+            parts.append(
+                f"[{music_output}]{speech_inputs}"
+                f"amix=inputs={len(narration) + 1}:normalize=0:duration=first,"
+                f"atrim=0:{duration}[out]"
+            )
 
         cmd = [ffmpeg_bin, "-y", "-v", "error"]
         for path in nodes:
+            cmd += ["-i", path.as_posix()]
+        for path, _start in narration:
             cmd += ["-i", path.as_posix()]
         cmd += [
             "-filter_complex",

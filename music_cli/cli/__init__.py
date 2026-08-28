@@ -60,7 +60,7 @@ from .runtime import (
     ensure_daemon,
     start_daemon_background,
 )
-from .studio import studio_group, studio_plan, studio_trace
+from .studio import studio_build, studio_doctor, studio_group, studio_plan, studio_trace
 from .youtube import youtube_cached, youtube_clear, youtube_group, youtube_play, youtube_remove
 
 __all__ = [
@@ -122,6 +122,8 @@ __all__ = [
     "start_daemon_background",
     "status",
     "stop",
+    "studio_build",
+    "studio_doctor",
     "studio_group",
     "studio_plan",
     "studio_trace",
