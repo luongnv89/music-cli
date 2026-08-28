@@ -250,7 +250,7 @@ class MixNode:
 
         cmd = [ffmpeg_bin, "-y", "-v", "error"]
         for path in nodes:
-            cmd += ["-i", str(path)]
+            cmd += ["-i", path.as_posix()]
         cmd += [
             "-filter_complex",
             ";".join(parts),
@@ -260,7 +260,7 @@ class MixNode:
             "2",
             "-ar",
             sr,
-            str(out),
+            out.as_posix(),
         ]
         return cmd
 
