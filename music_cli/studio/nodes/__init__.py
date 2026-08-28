@@ -20,16 +20,26 @@ from .base import (
     default_download,
     run_ffprobe,
 )
+from .ffmpeg import (
+    MixNode,
+    MixNodeError,
+    resolve_binary,
+    write_srt,
+)
 from .music import MusicNode
 from .speech import SpeechNode
 
 __all__ = [
     "BaseNode",
+    "MixNode",
+    "MixNodeError",
     "MusicNode",
     "NodeError",
     "NodeLockedError",
     "NodeProtocol",
     "SpeechNode",
     "default_download",
+    "resolve_binary",
     "run_ffprobe",
+    "write_srt",
 ]
