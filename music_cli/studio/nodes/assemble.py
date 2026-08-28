@@ -12,14 +12,12 @@ ffmpeg; a missing binary raises :class:`AssembleNodeError` with a clear hint.
 
 from __future__ import annotations
 
-import math
-import shutil
 import subprocess
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
-from .ffmpeg import DEFAULT_FFMPEG, MixNodeError, resolve_binary
+from .ffmpeg import DEFAULT_FFMPEG, resolve_binary
 
 #: Default video size used when scene durations are unknown.
 DEFAULT_VIDEO_SIZE = "1280x720"
@@ -56,10 +54,14 @@ def _ffprobe_size(ffmpeg_bin: str, path: Path) -> str | None:
         result = subprocess.run(
             [
                 ffmpeg_bin,
-                "-v", "error",
-                "-select_streams", "v:0",
-                "-show_entries", "stream=width,height",
-                "-of", "csv=p=0",
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=width,height",
+                "-of",
+                "csv=p=0",
                 str(path),
             ],
             capture_output=True,
@@ -83,10 +85,14 @@ def _probe_duration(ffmpeg_bin: str, path: Path) -> float:
         result = subprocess.run(
             [
                 ffmpeg_bin,
-                "-v", "error",
-                "-select_streams", "v:0",
-                "-show_entries", "stream=duration",
-                "-of", "csv=p=0",
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=duration",
+                "-of",
+                "csv=p=0",
                 str(path),
             ],
             capture_output=True,
@@ -220,7 +226,7 @@ class AssembleNode:
         parts: list[str] = []
 
         # Register inputs
-        for i, sp in enumerate(scenes):
+        for _i, sp in enumerate(scenes):
             inputs.extend(["-i", str(sp)])
         inputs.extend(["-i", str(audio)])
         if srt is not None:
@@ -269,19 +275,28 @@ class AssembleNode:
             filter_parts.append(f"[vs]subtitles='{srt.as_posix()}'[final]")
             video_out = "[final]"
 
-        cmd.extend([
-            "-filter_complex",
-            ";".join(filter_parts),
-            "-map", video_out,
-            "-c:v", "libx264",
-            "-pix_fmt", "yuv420p",
-            "-movflags", "+faststart",
-            "-map", f"{n}:a",  # audio from the WAV input (index n)
-            "-c:a", "aac",
-            "-b:a", "192k",
-            "-shortest",
-            str(out.resolve()),
-        ])
+        cmd.extend(
+            [
+                "-filter_complex",
+                ";".join(filter_parts),
+                "-map",
+                video_out,
+                "-c:v",
+                "libx264",
+                "-pix_fmt",
+                "yuv420p",
+                "-movflags",
+                "+faststart",
+                "-map",
+                f"{n}:a",  # audio from the WAV input (index n)
+                "-c:a",
+                "aac",
+                "-b:a",
+                "192k",
+                "-shortest",
+                str(out.resolve()),
+            ]
+        )
 
         return cmd
 

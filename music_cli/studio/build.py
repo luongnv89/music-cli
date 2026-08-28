@@ -402,11 +402,7 @@ class BuildService:
                 )
 
                 # P4.2: assemble scenes with xfade transitions into premiere.mp4
-                scene_paths = [
-                    Path(v["output_path"])
-                    for v in video_nodes
-                    if v.get("output_path")
-                ]
+                scene_paths = [Path(v["output_path"]) for v in video_nodes if v.get("output_path")]
                 if scene_paths and wav_out.exists():
                     srt_for_assembly = wav_out.parent / "captions.srt"
                     premiere_comp = self._assemble_premiere(

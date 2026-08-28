@@ -12,6 +12,7 @@ importable in any install. The audio downloader and probe runner are injectable
 so tests drive a recorded fixture with no network and no bare ``ffprobe``.
 """
 
+from .assemble import AssembleNode, AssembleNodeError
 from .base import (
     BaseNode,
     NodeError,
@@ -28,7 +29,6 @@ from .ffmpeg import (
 )
 from .music import MusicNode
 from .speech import SpeechNode
-from .assemble import AssembleNode, AssembleNodeError
 from .video import BudgetExceeded, BuildBudget, VideoNode
 
 __all__ = [

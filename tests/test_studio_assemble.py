@@ -11,22 +11,19 @@ from __future__ import annotations
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Any
 from unittest import mock
 
 import pytest
 
 from music_cli.studio.nodes.assemble import (
-    AssembleNode,
-    AssembleNodeError,
     DEFAULT_FPS,
     DEFAULT_VIDEO_SIZE,
-    DEFAULT_XFADE_DURATION,
+    AssembleNode,
+    AssembleNodeError,
     _ffprobe_size,
     _probe_duration,
 )
-from music_cli.studio.trace import NODES_DIRNAME, TraceWriter
-
+from music_cli.studio.trace import TraceWriter
 
 # ---------------------------------------------------------------------------
 # helpers
@@ -178,10 +175,7 @@ class TestAssembleNodeCommand:
 
     def test_three_scenes_two_xfade(self, tmp_path):
         node = AssembleNode()
-        scenes = [
-            _write_dummy_mp4(tmp_path / f"scene{i}.mp4", 5.0)
-            for i in range(1, 4)
-        ]
+        scenes = [_write_dummy_mp4(tmp_path / f"scene{i}.mp4", 5.0) for i in range(1, 4)]
         wav = _write_dummy_wav(tmp_path / "audio.wav", 15.0)
         cmd = node._build_command(
             shutil.which("ffmpeg") or "ffmpeg",
@@ -311,7 +305,7 @@ class TestHelpers:
         if ffmpeg_bin:
             result = _ffprobe_size(ffmpeg_bin, scene)
             assert result is None or "x" in result
-            
+
         else:
             # Without ffmpeg, should return None
             result = _ffprobe_size("nonexistent", scene)
@@ -369,9 +363,7 @@ class TestBuildServiceAssembleIntegration:
             mock_run.return_value = mock.Mock(returncode=0, stderr="", stdout="")
             # Mock Path.exists to return True for the output
             with mock.patch.object(Path, "exists", return_value=True):
-                result = service._assemble_premiere(
-                    [scene], wav, srt, out, trace
-                )
+                result = service._assemble_premiere([scene], wav, srt, out, trace)
                 assert result == out
 
     def test_assemble_premiere_returns_none_on_failure(self, tmp_path):
@@ -390,7 +382,5 @@ class TestBuildServiceAssembleIntegration:
                 stderr="error",
                 stdout="",
             )
-            result = service._assemble_premiere(
-                [scene], wav, None, out, trace
-            )
+            result = service._assemble_premiere([scene], wav, None, out, trace)
             assert result is None

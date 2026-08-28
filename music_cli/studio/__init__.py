@@ -17,13 +17,13 @@ from .doctor import (
     check_gmi_key,
     run_doctor,
 )
+from .nodes.assemble import AssembleNode, AssembleNodeError
 from .nodes.base import (
     BaseNode,
     NodeError,
     NodeLockedError,
     NodeProtocol,
 )
-from .nodes.assemble import AssembleNode, AssembleNodeError
 from .nodes.ffmpeg import MixNode, MixNodeError, resolve_binary, write_srt
 from .nodes.music import MusicNode
 from .nodes.speech import SpeechNode
