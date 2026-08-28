@@ -29,11 +29,11 @@ from __future__ import annotations
 import hashlib
 import json
 import time
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from .schemas import CreativePlan, PlanDiff
+from .trace import TraceWriter
 
 #: One initial attempt plus this many corrective retries on parse failure.
 MAX_PARSE_RETRIES = 2
@@ -78,10 +78,6 @@ class DirectorError(Exception):
 
 def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
-
-
-def _now_iso() -> str:
-    return datetime.now(UTC).isoformat()
 
 
 def extract_json(text: str) -> Any:
@@ -270,19 +266,14 @@ class M3Director:
         """Append one decision-log line for a (possibly retried) call."""
         if self.trace_path is None:
             return
-        record = {
-            "step": step,
-            "model": self.model,
-            "ts": _now_iso(),
-            "input_hash": _sha256(prompt),
-            "output_hash": _sha256(output),
-            "latency_ms": round((time.monotonic() - start) * 1000, 3),
-            "retries": retries,
-            "ok": ok,
-        }
-        self.trace_path.parent.mkdir(parents=True, exist_ok=True)
-        with self.trace_path.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+        TraceWriter(self.trace_path, model=self.model).append(
+            step=step,
+            latency_ms=round((time.monotonic() - start) * 1000, 3),
+            input_hash=_sha256(prompt),
+            output_hash=_sha256(output),
+            retries=retries,
+            ok=ok,
+        )
 
 
 def _as_dict(obj: Any) -> Any:

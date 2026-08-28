@@ -2,13 +2,35 @@
 
 from .director import CritiqueReport, DirectorError, M3Director
 from .schemas import Constitution, CreativePlan, PlanDiff, ProjectManifest
+from .trace import (
+    DEFAULT_DIST_DIR,
+    TraceWriter,
+    dump_plan_yaml,
+    init_project_layout,
+    load_plan_yaml,
+    load_trace,
+    project_dir,
+    project_paths,
+    render_trace_table,
+    write_plan_yaml,
+)
 
 __all__ = [
     "Constitution",
     "CreativePlan",
     "CritiqueReport",
+    "DEFAULT_DIST_DIR",
     "DirectorError",
     "M3Director",
     "PlanDiff",
     "ProjectManifest",
+    "TraceWriter",
+    "dump_plan_yaml",
+    "init_project_layout",
+    "load_plan_yaml",
+    "load_trace",
+    "project_dir",
+    "project_paths",
+    "render_trace_table",
+    "write_plan_yaml",
 ]
