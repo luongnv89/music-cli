@@ -64,8 +64,22 @@ VALID_MANIFEST = {
     "plan_id": "plan-001",
     "constitution": {"title": "Neon Rain"},
     "nodes": [
-        {"id": "music-1", "type": "music", "status": "done", "locked": True, "output_path": "nodes/asset-1.wav", "prompt": "rain motif"},
-        {"id": "speech-1", "type": "speech", "status": "done", "locked": True, "output_path": "nodes/asset-2.wav", "prompt": "narration"},
+        {
+            "id": "music-1",
+            "type": "music",
+            "status": "done",
+            "locked": True,
+            "output_path": "nodes/asset-1.wav",
+            "prompt": "rain motif",
+        },
+        {
+            "id": "speech-1",
+            "type": "speech",
+            "status": "done",
+            "locked": True,
+            "output_path": "nodes/asset-2.wav",
+            "prompt": "narration",
+        },
     ],
     "locked_nodes": ["music-1", "speech-1"],
     "dist_dir": str(DEFAULT_DIST_DIR),
@@ -126,9 +140,7 @@ def _make_project(tmp_path: Path, manifest: dict | None = None) -> Path:
     return proj
 
 
-def _fake_adapter_factory(
-    proj_dir: Path, brief: Brief
-) -> tuple[M3Director, MusicNode, SpeechNode]:
+def _fake_adapter_factory(proj_dir: Path, brief: Brief) -> tuple[M3Director, MusicNode, SpeechNode]:
     """Return a trio with injectable nodes."""
     adapter = FakeAdapter()
     director = M3Director(adapter, trace_path=proj_dir / TRACE_FILENAME)
@@ -155,9 +167,7 @@ def _fake_adapter_factory(
     return director, music, speech
 
 
-def _make_service(
-    tmp_path: Path, manifest: dict | None = None
-) -> BuildService:
+def _make_service(tmp_path: Path, manifest: dict | None = None) -> BuildService:
     """Create a BuildService with mocked nodes and mix node."""
     _make_project(tmp_path, manifest)
 
@@ -172,11 +182,13 @@ def _make_service(
         adapter_factory=factory,
         mix_node=mock_mix,
     )
+
     # Mock _mux_mp4 to create a dummy premiere.mp4
     def mock_mux_mp4(wav, srt, out):
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_bytes(b"dummy mp4")
         return out
+
     service._mux_mp4 = mock_mux_mp4
 
     return service
@@ -226,11 +238,13 @@ class TestLockedNodes:
     def test_locked_nodes_not_in_regenerate_list(self, tmp_path):
         """speech-1 is in locked_nodes; only music-1 should regenerate."""
         _make_project(tmp_path)
-        adapter = FakeAdapter({
-            **VALID_DIFF,
-            "regenerate_nodes": ["music-1"],
-            "locked_nodes": ["speech-1"],
-        })
+        adapter = FakeAdapter(
+            {
+                **VALID_DIFF,
+                "regenerate_nodes": ["music-1"],
+                "locked_nodes": ["speech-1"],
+            }
+        )
 
         def factory(proj_dir, brief):
             director, music, speech = _fake_adapter_factory(proj_dir, brief)
@@ -242,7 +256,7 @@ class TestLockedNodes:
             adapter_factory=factory,
             mix_node=MagicMock(),
         )
-        service._mux_mp4 = lambda wav, srt, out: (out.write_bytes(b"dummy mp4") or out)
+        service._mux_mp4 = lambda wav, srt, out: out.write_bytes(b"dummy mp4") or out
         result = service.revise("neon-rain", "revise intent")
         assert result.regenerated is True
 
@@ -253,14 +267,16 @@ class TestLockedNodes:
     def test_revise_with_no_regenerate_nodes(self, tmp_path):
         """When regenerate_nodes is empty, no nodes are touched."""
         _make_project(tmp_path)
-        adapter = FakeAdapter({
-            "from_plan_id": "plan-001",
-            "to_plan_id": "plan-003",
-            "reason": "metadata only",
-            "affected_nodes": [],
-            "regenerate_nodes": [],
-            "locked_nodes": ["music-1", "speech-1"],
-        })
+        adapter = FakeAdapter(
+            {
+                "from_plan_id": "plan-001",
+                "to_plan_id": "plan-003",
+                "reason": "metadata only",
+                "affected_nodes": [],
+                "regenerate_nodes": [],
+                "locked_nodes": ["music-1", "speech-1"],
+            }
+        )
 
         def factory(proj_dir, brief):
             director, music, speech = _fake_adapter_factory(proj_dir, brief)
@@ -272,7 +288,7 @@ class TestLockedNodes:
             adapter_factory=factory,
             mix_node=MagicMock(),
         )
-        service._mux_mp4 = lambda wav, srt, out: (out.write_bytes(b"dummy mp4") or out)
+        service._mux_mp4 = lambda wav, srt, out: out.write_bytes(b"dummy mp4") or out
         result = service.revise("neon-rain", "revise intent")
         assert result.regenerated is False
 
@@ -311,14 +327,16 @@ class TestReviseErrors:
 
     def test_unknown_node_in_diff(self, tmp_path):
         _make_project(tmp_path)
-        adapter = FakeAdapter({
-            "from_plan_id": "plan-001",
-            "to_plan_id": "plan-002",
-            "reason": "bad diff",
-            "affected_nodes": ["nonexistent-node"],
-            "regenerate_nodes": ["nonexistent-node"],
-            "locked_nodes": [],
-        })
+        adapter = FakeAdapter(
+            {
+                "from_plan_id": "plan-001",
+                "to_plan_id": "plan-002",
+                "reason": "bad diff",
+                "affected_nodes": ["nonexistent-node"],
+                "regenerate_nodes": ["nonexistent-node"],
+                "locked_nodes": [],
+            }
+        )
 
         def factory(proj_dir, brief):
             director, music, speech = _fake_adapter_factory(proj_dir, brief)

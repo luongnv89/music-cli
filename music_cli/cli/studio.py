@@ -24,6 +24,7 @@ import click
 from ..studio import trace as _trace
 from ..studio.build import BuildError, BuildService, load_brief_from_yaml
 from ..studio.doctor import run_doctor
+from ..studio.taste import from_playlist as _from_playlist
 from ..studio.trace import DEFAULT_DIST_DIR
 from .app import main
 from .common import AliasedGroup
@@ -130,6 +131,14 @@ def studio_trace(project: str, dist_dir: str) -> None:
     default=False,
     help="Skip H3 and render captioned static scene visuals instead.",
 )
+@click.option(
+    "--from-playlist",
+    type=click.Path(exists=True, dir_okay=False),
+    default=None,
+    help="Path to a local playlist file (M3U/PLS). Extracts an abstract taste "
+    "profile (tempo, key, loudness) to seed the Constitution. No artist or "
+    "track names are included.",
+)
 def studio_build(
     brief: str,
     dist_dir: str,
@@ -137,14 +146,38 @@ def studio_build(
     force: bool,
     confirm: bool,
     no_h3: bool,
+    from_playlist: str | None,
 ) -> None:
     """Run the build for the YAML BRIEF file."""
     if resume and force:
         raise click.UsageError("--resume and --force cannot be used together")
+
+    # Extract abstract taste profile from playlist if requested
+    taste_profile: dict | None = None
+    if from_playlist is not None:
+        try:
+            profile = _from_playlist(from_playlist)
+            taste_profile = profile.to_dict()
+            click.echo(
+                f"taste profile: {profile.track_count} tracks, "
+                f"loudness={profile.mean_loudness_db:.1f} dB, "
+                f"dyn_range={profile.mean_dynamic_range_db:.1f} dB",
+                err=True,
+            )
+        except OSError as exc:
+            raise click.ClickException(str(exc)) from exc
+        except Exception as exc:
+            raise click.ClickException(f"failed to extract taste profile: {exc}") from exc
+
     try:
         parsed = load_brief_from_yaml(brief)
     except BuildError as exc:
         raise click.ClickException(str(exc)) from exc
+
+    # Merge taste profile into the brief if provided
+    if taste_profile is not None:
+        parsed.taste = taste_profile
+
     service = BuildService(dist_dir=dist_dir)
     try:
         result = service.run(parsed, force=force, confirm=confirm, no_h3=no_h3)

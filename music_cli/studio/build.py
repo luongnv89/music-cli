@@ -1213,6 +1213,11 @@ class BuildService:
             "premiere_path": str(proj_dir / PREMIERE_FILENAME),
             "trace_path": str(trace_path),
         }
+        # P6.1: When a taste profile was extracted from a playlist, seed the
+        # Constitution's ``taste_profile`` slot so the creative director can
+        # honour the user's abstract musical preferences.
+        if brief.taste:
+            manifest_data["constitution"]["taste_profile"] = brief.taste
         if budget is not None:
             manifest_data["budget"] = {
                 "cap": float(budget.cap),
