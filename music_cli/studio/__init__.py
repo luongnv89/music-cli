@@ -11,6 +11,14 @@ from .build import (
 from .director import CritiqueReport
 from .doctor import (
     CheckResult,
+    check_disk_space,
+    check_h3_budget,
+    check_network,
+    check_openrouter_key,
+    check_disk_space,
+    check_h3_budget,
+    check_network,
+    check_openrouter_key,
     run_doctor,
 )
 from .graph import (

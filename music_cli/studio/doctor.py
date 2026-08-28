@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import os
+import socket
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 from typing import Literal
 
@@ -11,6 +13,34 @@ from .nodes.ffmpeg import DEFAULT_FFMPEG, DEFAULT_FFPROBE, resolve_binary
 from .trace import DEFAULT_DIST_DIR
 
 CheckStatus = Literal["OK", "WARN", "FAIL"]
+
+
+def _check_network(host: str, port: int = 443, timeout: float = 3.0) -> tuple[bool, float]:
+    """Ping *host*:*port* and return ``(success, latency_ms)``."""
+    try:
+        start = socket.gethostbyname(host)
+    except socket.gaierror:
+        return False, 0.0
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(timeout)
+        t0 = socket.gettimeofday() if hasattr(socket, "gettimeofday") else 0
+        sock.connect((start, port))
+        if t0:
+            t1 = socket.gettimeofday()
+            latency_ms = (t1 - t0) / 1000
+        else:
+            import time
+
+            t0 = time.monotonic()
+            sock.connect((start, port))
+            t1 = time.monotonic()
+            latency_ms = (t1 - t0) * 1000
+        return True, latency_ms
+    except Exception:
+        return False, 0.0
+    finally:
+        sock.close()
 
 
 @dataclass(frozen=True)
@@ -110,17 +140,216 @@ def check_dist_dir(dist_dir: str | Path = DEFAULT_DIST_DIR) -> CheckResult:
     )
 
 
+def check_openrouter_key() -> CheckResult:
+    """Check for an optional OpenRouter API key.
+
+    OpenRouter is used as a fallback provider for text-model requests.
+    The build can proceed without it, so this check reports ``WARN`` when
+    the key is absent rather than ``FAIL``.
+    """
+    try:
+        from ..cloud.secrets import get_api_key
+
+        api_key = get_api_key("openrouter")
+    except Exception as exc:
+        return CheckResult(
+            "openrouter key",
+            "WARN",
+            f"could not read the OS keyring: {exc}",
+            "Install the gmi extra and run: mc cloud key set openrouter",
+        )
+    if not api_key:
+        return CheckResult(
+            "openrouter key",
+            "WARN",
+            "no OpenRouter key is stored (optional)",
+            "Run: mc cloud key set openrouter",
+        )
+    return CheckResult("openrouter key", "OK", "stored in the OS keyring")
+
+
+def check_h3_budget(dist_dir: str | Path = DEFAULT_DIST_DIR) -> CheckResult:
+    """Check the H3 build budget from the latest manifest.
+
+    Reads the ``budget`` block from the most recently written manifest
+    under *dist_dir*.  When no manifest exists the build has not run yet,
+    so we report ``WARN`` with the default per-build cap.
+    """
+    dist = Path(dist_dir)
+    if not dist.is_dir():
+        return CheckResult(
+            "h3 budget",
+            "WARN",
+            "no build has run yet; default cap applies",
+            "Run a build to see actual spend; cap defaults to $1.00 per build.",
+        )
+
+    try:
+        from ..studio.schemas import ProjectManifest
+    except ImportError:
+        return CheckResult(
+            "h3 budget",
+            "WARN",
+            "budget schema unavailable; skipping check",
+            "",
+        )
+
+    # Walk dist/ for the latest manifest (by mtime).
+    candidates: list[tuple[float, Path]] = []
+    for child in dist.iterdir():
+        if child.is_dir():
+            manifest_path = child / "manifest.yaml"
+            if manifest_path.exists():
+                try:
+                    candidates.append((manifest_path.stat().st_mtime, manifest_path))
+                except OSError:
+                    pass
+    if not candidates:
+        return CheckResult(
+            "h3 budget",
+            "WARN",
+            "no build manifest found; default cap applies",
+            "Run a build to see actual spend; cap defaults to $1.00 per build.",
+        )
+
+    _, latest = max(candidates, key=lambda c: c[0])
+    try:
+        from ..studio.trace import load_plan_yaml
+
+        data = load_plan_yaml(latest)
+        if isinstance(data, dict):
+            manifest = ProjectManifest(data)
+        else:
+            return CheckResult(
+                "h3 budget",
+                "WARN",
+                "manifest could not be parsed; default cap applies",
+                "",
+            )
+    except Exception:
+        return CheckResult(
+            "h3 budget",
+            "WARN",
+            "could not read manifest; default cap applies",
+            "",
+        )
+
+    manifest_dict = manifest.to_dict() if hasattr(manifest, "to_dict") else manifest
+    budget_data = manifest_dict.get("budget")
+    if not isinstance(budget_data, dict):
+        return CheckResult(
+            "h3 budget",
+            "WARN",
+            "no budget block in manifest; default cap applies",
+            "Run a build to see actual spend; cap defaults to $1.00 per build.",
+        )
+
+    cap = Decimal(str(budget_data.get("cap", budget_data.get("per_build_cap", 1.0))))
+    spent = Decimal(str(budget_data.get("spent", 0)))
+    currency = budget_data.get("currency", "USD")
+    remaining = cap - spent
+
+    if remaining < 0:
+        return CheckResult(
+            "h3 budget",
+            "FAIL",
+            f"spent {currency} {float(spent):.2f} / cap {currency} {float(cap):.2f}",
+            "Remove old projects from dist/ or increase the cap with --confirm.",
+        )
+    if remaining <= Decimal("0.10"):
+        return CheckResult(
+            "h3 budget",
+            "WARN",
+            f"{currency} {float(remaining):.2f} remaining of {currency} {float(cap):.2f} cap",
+            "Remove old projects from dist/ or pass --confirm to exceed the cap.",
+        )
+    return CheckResult(
+        "h3 budget",
+        "OK",
+        f"{currency} {float(remaining):.2f} remaining of {currency} {float(cap):.2f} cap",
+        "",
+    )
+
+
+def check_network() -> CheckResult:
+    """Ping the GMI Cloud API endpoint to verify network connectivity."""
+    from ..cloud.gmi import GMI_SERVING_CHAT_URL
+
+    parsed = GMI_SERVING_CHAT_URL
+    # Extract host from URL (e.g. https://api.gmi-serving.com/v1/...)
+    host = parsed.replace("https://", "").replace("http://", "").split("/")[0]
+    success, latency_ms = _check_network(host, 443)
+    if not success:
+        return CheckResult(
+            "network",
+            "FAIL",
+            f"cannot reach {host}",
+            "Check your internet connection or proxy settings.",
+        )
+    return CheckResult(
+        "network",
+        "OK",
+        f"{host} reachable ({latency_ms:.0f} ms)",
+        "",
+    )
+
+
+def check_disk_space(dist_dir: str | Path = DEFAULT_DIST_DIR) -> CheckResult:
+    """Check available disk space on the volume holding *dist_dir*."""
+    path = Path(dist_dir).resolve()
+    try:
+        stat = os.statvfs(str(path))
+        free_bytes = stat.f_bavail * stat.f_frsize
+        free_gb = free_bytes / (1024 ** 3)
+    except OSError:
+        return CheckResult(
+            "disk space",
+            "WARN",
+            "could not determine available disk space",
+            "",
+        )
+    # The audio-only build typically produces < 500 MB per project.
+    # Require at least 500 MB free.
+    if free_gb < 0.5:
+        return CheckResult(
+            "disk space",
+            "FAIL",
+            f"only {free_gb:.2f} GB free (need ~0.5 GB)",
+            "Free disk space or choose a different --dist-dir.",
+        )
+    if free_gb < 2.0:
+        return CheckResult(
+            "disk space",
+            "WARN",
+            f"{free_gb:.2f} GB free (recommend >= 2 GB)",
+            "Consider freeing disk space for larger builds.",
+        )
+    return CheckResult("disk space", "OK", f"{free_gb:.1f} GB available")
+
+
 def run_doctor(dist_dir: str | Path = DEFAULT_DIST_DIR) -> list[CheckResult]:
-    """Run all checks required before an audio-only build."""
-    return [check_ffmpeg(), check_ffprobe(), check_gmi_key(), check_dist_dir(dist_dir)]
+    """Run all preflight checks for a studio build."""
+    return [
+        check_ffmpeg(),
+        check_ffprobe(),
+        check_gmi_key(),
+        check_openrouter_key(),
+        check_h3_budget(dist_dir),
+        check_network(),
+        check_disk_space(dist_dir),
+    ]
 
 
 __all__ = [
     "CheckResult",
     "CheckStatus",
+    "check_disk_space",
     "check_dist_dir",
     "check_ffmpeg",
     "check_ffprobe",
     "check_gmi_key",
+    "check_h3_budget",
+    "check_network",
+    "check_openrouter_key",
     "run_doctor",
 ]
