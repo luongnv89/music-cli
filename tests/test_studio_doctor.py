@@ -36,7 +36,8 @@ def test_check_dist_dir_fails_for_file(tmp_path):
 def test_check_gmi_key_does_not_expose_missing_secret():
     with mock.patch("music_cli.cloud.secrets.get_api_key", return_value=None):
         result = check_gmi_key()
-    assert result.status == "FAIL"
+    # GMI key is optional for a base install; WARN keeps doctor green.
+    assert result.status == "WARN"
     assert "key" in result.message.lower()
 
 
