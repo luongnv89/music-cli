@@ -11,6 +11,10 @@ from .build import (
 from .director import CritiqueReport
 from .doctor import (
     CheckResult,
+    check_disk_space,
+    check_h3_budget,
+    check_network,
+    check_openrouter_key,
     run_doctor,
 )
 from .graph import (
@@ -62,6 +66,10 @@ __all__ = [
     "Brief",
     "BudgetExceeded",
     "CheckResult",
+    "check_disk_space",
+    "check_h3_budget",
+    "check_network",
+    "check_openrouter_key",
     "Constitution",
     "CreativePlan",
     "CritiqueReport",
