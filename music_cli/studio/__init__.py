@@ -29,6 +29,14 @@ from .nodes.music import MusicNode
 from .nodes.speech import SpeechNode
 from .nodes.video import BudgetExceeded, BuildBudget, VideoNode
 from .schemas import Constitution, CreativePlan, PlanDiff, ProjectManifest
+from .graph import (
+    GraphCycleError,
+    GraphError,
+    GraphMissingDependency,
+    Node,
+    NodeLockedError,
+    ProjectGraph,
+)
 from .trace import (
     DEFAULT_DIST_DIR,
     TraceWriter,
@@ -57,19 +65,14 @@ __all__ = [
     "CreativePlan",
     "CritiqueReport",
     "DEFAULT_DIST_DIR",
-    "check_dist_dir",
-    "check_ffmpeg",
-    "check_ffprobe",
-    "check_gmi_key",
-    "DirectorError",
-    "M3Director",
-    "MixNode",
-    "MixNodeError",
-    "MusicNode",
-    "NodeError",
+    "GraphCycleError",
+    "GraphError",
+    "GraphMissingDependency",
+    "Node",
     "NodeLockedError",
     "NodeProtocol",
     "PlanDiff",
+    "ProjectGraph",
     "ProjectManifest",
     "default_adapter_factory",
     "load_brief_from_yaml",
