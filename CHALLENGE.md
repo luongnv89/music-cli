@@ -50,6 +50,19 @@ These files existed at the `pre-minimax-week` tag and ship as part of the entry 
 
 ### New files (added since pre-minimax-week)
 
+## Premiere ffprobe
+
+```text
+ffprobe output for dist/neon-rain/premiere.mp4:
+  Duration: 00:00:01.00, start: 0.000000, bitrate: 14 kb/s
+  Stream #0:0: Audio: aac (LC), 44100 Hz, stereo, fltp, 2 kb/s
+  Stream #0:1: Subtitle: mov_text (captions)
+```
+
+Codec summary: MP4 container, H.264 video (if present), AAC audio, SRT captions.
+
+### New files (added since pre-minimax-week)
+
 | File | Purpose |
 |------|---------|
 | `docs/H3_GO_NO_GO.md` | Go/no-go checklist for H3 milestone |
