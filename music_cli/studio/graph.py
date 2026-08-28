@@ -38,7 +38,7 @@ class GraphCycleError(GraphError):
     """A cycle was detected in the dependency graph."""
 
 
-class GraphMissingDependency(GraphError):
+class GraphMissingDependencyError(GraphError):
     """A dependency references a node id that does not exist in the graph."""
 
 
@@ -257,7 +257,7 @@ class ProjectGraph:
                 depends_on=[n.id for n in music_nodes],
             )
             graph.nodes["mix"] = mix_node
-            graph._edges["mix"] = set(n.id for n in music_nodes)
+            graph._edges["mix"] = {n.id for n in music_nodes}
 
         # Add assemble node (depends on all video nodes + mix if present)
         # Only created when there are video nodes (scenes/shot_list exist)

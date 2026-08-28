@@ -20,7 +20,7 @@ from .doctor import (
 from .graph import (
     GraphCycleError,
     GraphError,
-    GraphMissingDependency,
+    GraphMissingDependencyError,
     Node,
     NodeLockedError,
     ProjectGraph,
@@ -67,7 +67,7 @@ __all__ = [
     "DEFAULT_DIST_DIR",
     "GraphCycleError",
     "GraphError",
-    "GraphMissingDependency",
+    "GraphMissingDependencyError",
     "Node",
     "NodeLockedError",
     "NodeProtocol",
