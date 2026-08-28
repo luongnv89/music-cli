@@ -102,7 +102,7 @@ def _manifest_cover_art(manifest: Any) -> str | None:
     return None
 
 
-@dataclass
+@dataclass(init=False)
 class BuildBudget:
     """Mutable per-build H3 budget shared by all scene nodes.
 
@@ -111,16 +111,21 @@ class BuildBudget:
     be billable, and under-counting it would make a retry bypass the ceiling.
     """
 
-    cap: Decimal | int | float | str = DEFAULT_BUILD_CAP
-    spent: Decimal | int | float | str = Decimal("0")
-    currency: str = "USD"
+    cap: Decimal
+    spent: Decimal
+    currency: str
 
-    def __post_init__(self) -> None:
-        self.cap = _decimal(self.cap, "budget cap")
-        self.spent = _decimal(self.spent, "budget spent")
-        if not isinstance(self.currency, str) or not self.currency.strip():
+    def __init__(
+        self,
+        cap: Decimal | int | float | str = DEFAULT_BUILD_CAP,
+        spent: Decimal | int | float | str = Decimal("0"),
+        currency: str = "USD",
+    ) -> None:
+        self.cap = _decimal(cap, "budget cap")
+        self.spent = _decimal(spent, "budget spent")
+        if not isinstance(currency, str) or not currency.strip():
             raise ValueError("budget currency must be a non-empty string")
-        self.currency = self.currency.strip()
+        self.currency = currency.strip()
 
     @classmethod
     def from_manifest(cls, manifest: Any) -> BuildBudget:
