@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from .base import BaseNode, NodeError, NodeLockedError
-from .ffmpeg import DEFAULT_FFMPEG, resolve_binary
+from .ffmpeg import DEFAULT_FFMPEG, MixNodeError, resolve_binary
 
 #: Default maximum H3 spend for one build.
 DEFAULT_BUILD_CAP = Decimal("1.00")
@@ -683,7 +683,7 @@ class VideoNode(BaseNode):
                     text=True,
                     check=False,
                 )
-            except (OSError, ValueError) as exc:
+            except (MixNodeError, OSError, ValueError) as exc:
                 raise NodeError(f"scene: ffmpeg failed to start: {exc}") from exc
             returncode = result.returncode
             stderr = result.stderr or result.stdout or ""
@@ -762,6 +762,9 @@ class VideoNode(BaseNode):
                     return
                 except NodeError as svg_error:
                     raise svg_error from image_error
+        except BaseException:
+            self._remove_output(destination)
+            raise
         finally:
             for path in auxiliary:
                 self._remove_output(path)
