@@ -43,6 +43,7 @@ from pathlib import Path
 from typing import Any
 
 from .director import DirectorError, M3Director
+from .nodes.assemble import AssembleNode, AssembleNodeError
 from .nodes.base import NodeError, NodeLockedError
 from .nodes.ffmpeg import DEFAULT_FFMPEG, MixNode, MixNodeError, resolve_binary
 from .nodes.music import MusicNode
@@ -400,6 +401,20 @@ class BuildService:
                     budget=video_budget,
                 )
 
+                # P4.2: assemble scenes with xfade transitions into premiere.mp4
+                scene_paths = [Path(v["output_path"]) for v in video_nodes if v.get("output_path")]
+                if scene_paths and wav_out.exists():
+                    srt_for_assembly = wav_out.parent / "captions.srt"
+                    premiere_comp = self._assemble_premiere(
+                        scene_paths,
+                        wav_out,
+                        srt_for_assembly if srt_for_assembly.exists() else None,
+                        paths[PREMIERE_FILENAME],
+                        trace,
+                    )
+                    if premiere_comp:
+                        result.premiere_mp4 = premiere_comp
+
         return result
 
     @staticmethod
@@ -700,6 +715,51 @@ class BuildService:
             detail = (proc.stderr or proc.stdout).strip() or "no stderr"
             raise BuildError("compose", f"ffmpeg mp4 mux failed: {detail}")
         return out
+
+    def _assemble_premiere(
+        self,
+        scenes: list[Path],
+        audio: Path,
+        srt: Path | None,
+        out: Path,
+        trace: TraceWriter,
+    ) -> Path | None:
+        """Compose scene MP4s + audio + SRT into a single premiere with xfade.
+
+        Returns the composed premiere path, or None on failure.
+        """
+        try:
+            assemble = AssembleNode(ffmpeg=self._ffmpeg)
+        except AssembleNodeError as exc:
+            self._trace(
+                trace,
+                "assemble",
+                node_id="premiere",
+                payload=f"assemble failed: {exc}",
+            )
+            return None
+        try:
+            result_path = assemble.run(
+                scenes,
+                audio,
+                srt=srt,
+                out_path=out,
+            )
+            self._trace(
+                trace,
+                "assemble",
+                node_id="premiere",
+                payload=str(result_path),
+            )
+            return result_path
+        except AssembleNodeError as exc:
+            self._trace(
+                trace,
+                "assemble",
+                node_id="premiere",
+                payload=f"assemble failed: {exc}",
+            )
+            return None
 
     def _generate_video_nodes(
         self,

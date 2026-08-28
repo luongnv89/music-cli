@@ -17,6 +17,7 @@ from .doctor import (
     check_gmi_key,
     run_doctor,
 )
+from .nodes.assemble import AssembleNode, AssembleNodeError
 from .nodes.base import (
     BaseNode,
     NodeError,
@@ -42,6 +43,8 @@ from .trace import (
 )
 
 __all__ = [
+    "AssembleNode",
+    "AssembleNodeError",
     "BaseNode",
     "BuildBudget",
     "BuildError",
