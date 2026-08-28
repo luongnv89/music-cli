@@ -1,6 +1,14 @@
 """music_cli.studio — creative compiler (MiniMax Week entry)."""
 
 from .director import CritiqueReport, DirectorError, M3Director
+from .nodes.base import (
+    BaseNode,
+    NodeError,
+    NodeLockedError,
+    NodeProtocol,
+)
+from .nodes.music import MusicNode
+from .nodes.speech import SpeechNode
 from .schemas import Constitution, CreativePlan, PlanDiff, ProjectManifest
 from .trace import (
     DEFAULT_DIST_DIR,
@@ -16,14 +24,20 @@ from .trace import (
 )
 
 __all__ = [
+    "BaseNode",
     "Constitution",
     "CreativePlan",
     "CritiqueReport",
     "DEFAULT_DIST_DIR",
     "DirectorError",
     "M3Director",
+    "MusicNode",
+    "NodeError",
+    "NodeLockedError",
+    "NodeProtocol",
     "PlanDiff",
     "ProjectManifest",
+    "SpeechNode",
     "TraceWriter",
     "dump_plan_yaml",
     "init_project_layout",
