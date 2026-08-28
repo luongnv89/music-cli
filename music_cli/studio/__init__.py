@@ -37,6 +37,7 @@ from .nodes.music import MusicNode
 from .nodes.speech import SpeechNode
 from .nodes.video import BudgetExceeded, BuildBudget, VideoNode
 from .schemas import Constitution, CreativePlan, PlanDiff, ProjectManifest
+from .taste import FFProbeError, TasteProfile, from_playlist
 from .trace import (
     DEFAULT_DIST_DIR,
     TraceWriter,
@@ -65,6 +66,7 @@ __all__ = [
     "CreativePlan",
     "CritiqueReport",
     "DEFAULT_DIST_DIR",
+    "FFProbeError",
     "GraphCycleError",
     "GraphError",
     "GraphMissingDependencyError",
@@ -74,7 +76,9 @@ __all__ = [
     "PlanDiff",
     "ProjectGraph",
     "ProjectManifest",
+    "TasteProfile",
     "default_adapter_factory",
+    "from_playlist",
     "load_brief_from_yaml",
     "resolve_binary",
     "run_doctor",
