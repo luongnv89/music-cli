@@ -49,8 +49,7 @@ from .nodes.ffmpeg import DEFAULT_FFMPEG, MixNode, MixNodeError, resolve_binary
 from .nodes.music import MusicNode
 from .nodes.speech import SpeechNode
 from .nodes.video import BuildBudget, VideoNode
-from .schemas import PlanDiff
-from .schemas import CreativePlan, ProjectManifest
+from .schemas import CreativePlan, PlanDiff, ProjectManifest
 from .trace import (
     DEFAULT_DIST_DIR,
     NODES_DIRNAME,
@@ -479,7 +478,9 @@ class BuildService:
                 raise BuildError("plan", f"director.revise failed: {exc}") from exc
             if not isinstance(diff, PlanDiff):
                 try:
-                    diff = PlanDiff.model_validate(diff) if isinstance(diff, dict) else PlanDiff(diff)
+                    diff = (
+                        PlanDiff.model_validate(diff) if isinstance(diff, dict) else PlanDiff(diff)
+                    )
                 except (ValueError, TypeError) as exc:
                     raise BuildError("plan", f"invalid PlanDiff: {exc}") from exc
 
@@ -534,20 +535,26 @@ class BuildService:
                             nid, node_type, music_node, speech_node, intent, trace
                         )
                         any_regen = True
-                        regenerated_nodes.append({
-                            **node,
-                            "output_path": str(audio_path),
-                            "regenerated": True,
-                        })
+                        regenerated_nodes.append(
+                            {
+                                **node,
+                                "output_path": str(audio_path),
+                                "regenerated": True,
+                            }
+                        )
                     except Exception as exc:
-                        raise BuildError("generate", f"node {nid} regeneration failed: {exc}") from exc
+                        raise BuildError(
+                            "generate", f"node {nid} regeneration failed: {exc}"
+                        ) from exc
                 else:
                     # Node stays locked — verify it exists on disk.
                     if output_path and Path(output_path).exists():
-                        regenerated_nodes.append({
-                            **node,
-                            "regenerated": False,
-                        })
+                        regenerated_nodes.append(
+                            {
+                                **node,
+                                "regenerated": False,
+                            }
+                        )
 
             result.regenerated = any_regen
 
@@ -556,9 +563,7 @@ class BuildService:
             plan_dict = manifest_dict.get("plan") or {}
             if not isinstance(plan_dict, dict):
                 plan_dict = {}
-            plan_dict["plan_id"] = diff_data.get(
-                "to_plan_id", plan_dict.get("plan_id", "")
-            )
+            plan_dict["plan_id"] = diff_data.get("to_plan_id", plan_dict.get("plan_id", ""))
             manifest_dict["plan"] = plan_dict
             manifest = ProjectManifest(manifest_dict)
             write_plan_yaml(manifest_path, manifest.to_dict())
@@ -573,11 +578,7 @@ class BuildService:
                 )
                 result.nodes = nodes
 
-                node_paths = [
-                    Path(n["output_path"])
-                    for n in nodes
-                    if n.get("type") == "music"
-                ]
+                node_paths = [Path(n["output_path"]) for n in nodes if n.get("type") == "music"]
                 narration = [
                     (Path(n["output_path"]), float(n.get("start", 0.0)))
                     for n in nodes
@@ -605,7 +606,9 @@ class BuildService:
                     shutil.copy2(srt_src, srt_dst)
                     result.captions_srt = srt_dst
 
-                self._trace(trace, TRACE_COMPOSE, node_id=manifest_dict.get("plan", {}).get("plan_id"))
+                self._trace(
+                    trace, TRACE_COMPOSE, node_id=manifest_dict.get("plan", {}).get("plan_id")
+                )
 
                 mp4_path = paths[PREMIERE_FILENAME]
                 result.premiere_mp4 = self._mux_mp4(wav_out, srt_src, mp4_path)
@@ -673,11 +676,13 @@ class BuildService:
             output_path = node.get("output_path", "")
 
             if ntype == "speech":
-                captions.append((
-                    float(node.get("start", 0.0)),
-                    float(node.get("end", 60.0)),
-                    str(node.get("prompt", "")),
-                ))
+                captions.append(
+                    (
+                        float(node.get("start", 0.0)),
+                        float(node.get("end", 60.0)),
+                        str(node.get("prompt", "")),
+                    )
+                )
                 speech_node.unlock()
                 self._trace(trace, TRACE_GENERATE, node_id=nid, payload=prompt)
                 try:
@@ -689,19 +694,23 @@ class BuildService:
                 except Exception:
                     speech_node.unlock()
                     raise
-                nodes.append({
-                    "id": nid,
-                    "type": "speech",
-                    "status": "done",
-                    "locked": True,
-                    "output_path": str(audio_path) if audio_path else output_path,
-                    "prompt": prompt,
-                })
+                nodes.append(
+                    {
+                        "id": nid,
+                        "type": "speech",
+                        "status": "done",
+                        "locked": True,
+                        "output_path": str(audio_path) if audio_path else output_path,
+                        "prompt": prompt,
+                    }
+                )
             else:
                 music_node.unlock()
                 self._trace(trace, TRACE_GENERATE, node_id=nid, payload=prompt)
                 try:
-                    audio_path = asyncio.run(music_node.generate(prompt, lyrics=None, duration=None))
+                    audio_path = asyncio.run(
+                        music_node.generate(prompt, lyrics=None, duration=None)
+                    )
                     any_regen = True
                     music_node.lock()
                 except NodeLockedError:
@@ -709,14 +718,16 @@ class BuildService:
                 except Exception:
                     music_node.unlock()
                     raise
-                nodes.append({
-                    "id": nid,
-                    "type": "music",
-                    "status": "done",
-                    "locked": True,
-                    "output_path": str(audio_path) if audio_path else output_path,
-                    "prompt": prompt,
-                })
+                nodes.append(
+                    {
+                        "id": nid,
+                        "type": "music",
+                        "status": "done",
+                        "locked": True,
+                        "output_path": str(audio_path) if audio_path else output_path,
+                        "prompt": prompt,
+                    }
+                )
 
         return nodes, captions, any_regen
 

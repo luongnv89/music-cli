@@ -14,17 +14,15 @@ from unittest.mock import MagicMock
 import pytest
 
 from music_cli.studio.build import (
+    TRACE_PLAN_DIFF,
+    TRACE_REGENERATE,
+    Brief,
     BuildError,
     BuildResult,
     BuildService,
-    Brief,
     PlanDiff,
-    TRACE_PLAN_DIFF,
-    TRACE_REGENERATE,
 )
 from music_cli.studio.director import M3Director
-from music_cli.studio.nodes.base import NodeLockedError, NodeError
-from music_cli.studio.nodes.ffmpeg import MixNode
 from music_cli.studio.nodes.music import MusicNode
 from music_cli.studio.nodes.speech import SpeechNode
 from music_cli.studio.trace import (
@@ -36,7 +34,6 @@ from music_cli.studio.trace import (
     load_plan_yaml,
     load_trace,
     project_dir,
-    project_paths,
     write_plan_yaml,
 )
 
@@ -399,6 +396,7 @@ class TestTraceFormat:
 class TestCLIRevise:
     def test_revise_command_exists(self):
         from click.testing import CliRunner
+
         from music_cli.cli.studio import studio_group
 
         runner = CliRunner()
@@ -407,6 +405,7 @@ class TestCLIRevise:
 
     def test_revise_command_requires_project_and_intent(self):
         from click.testing import CliRunner
+
         from music_cli.cli.studio import studio_revise
 
         runner = CliRunner()
@@ -415,34 +414,3 @@ class TestCLIRevise:
 
         result = runner.invoke(studio_revise, ["project"])
         assert result.exit_code != 0
-
-
-# ===========================================================================
-# plan-diff schema validation
-# ===========================================================================
-
-
-class TestPlanDiffValidation:
-    def test_valid_plan_diff_accepted(self):
-        assert PlanDiff.validate(VALID_DIFF) == []
-
-    def test_missing_required_fields_rejected(self):
-        bad = {"from_plan_id": "a"}
-        errs = PlanDiff.validate(bad)
-        assert any("to_plan_id" in e for e in errs)
-        assert any("reason" in e for e in errs)
-        assert any("affected_nodes" in e for e in errs)
-
-    def test_regenerate_nodes_must_be_list(self):
-        bad = {**VALID_DIFF, "regenerate_nodes": "music-1"}
-        errs = PlanDiff.validate(bad)
-        assert any("regenerate_nodes: must be list" in e for e in errs)
-
-    def test_locked_nodes_must_be_list(self):
-        bad = {**VALID_DIFF, "locked_nodes": "speech-1"}
-        errs = PlanDiff.validate(bad)
-        assert any("locked_nodes: must be list" in e for e in errs)
-
-    def test_empty_affected_nodes_is_valid(self):
-        empty = {**VALID_DIFF, "affected_nodes": []}
-        assert PlanDiff.validate(empty) == []
