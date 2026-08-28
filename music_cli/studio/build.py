@@ -33,6 +33,7 @@ wrapper can render an actionable ``mc studio build --resume`` hint.
 from __future__ import annotations
 
 import asyncio
+import json
 import math
 import re
 import shutil
@@ -49,7 +50,7 @@ from .nodes.ffmpeg import DEFAULT_FFMPEG, MixNode, MixNodeError, resolve_binary
 from .nodes.music import MusicNode
 from .nodes.speech import SpeechNode
 from .nodes.video import BuildBudget, VideoNode
-from .schemas import CreativePlan, ProjectManifest
+from .schemas import CreativePlan, PlanDiff, ProjectManifest
 from .trace import (
     DEFAULT_DIST_DIR,
     NODES_DIRNAME,
@@ -60,6 +61,7 @@ from .trace import (
     dump_plan_yaml,
     init_project_layout,
     load_plan_yaml,
+    project_dir,
     project_paths,
     write_plan_yaml,
 )
@@ -69,6 +71,8 @@ TRACE_PLAN = "plan"
 TRACE_GENERATE = "generate"
 TRACE_PROBE = "probe"
 TRACE_COMPOSE = "compose"
+TRACE_PLAN_DIFF = "plan-diff"
+TRACE_REGENERATE = "regenerate"
 
 #: Premiere container — audio-only MP4 with the SRT muxed as a subtitle.
 PREMIERE_CODEC = "aac"
@@ -417,11 +421,352 @@ class BuildService:
 
         return result
 
+    def revise(
+        self,
+        project_id: str,
+        intent: str,
+    ) -> BuildResult:
+        """Revise an existing project by regenerating only affected nodes.
+
+        Calls :meth:`M3Director.revise` to obtain a :class:`PlanDiff`,
+        applies it to the persisted ``ProjectManifest``, and re-runs only
+        the nodes listed in ``regenerate_nodes`` (or ``affected_nodes`` when
+        the diff does not enumerate ``regenerate_nodes``).  Locked nodes are
+        skipped entirely.  The trace records a ``PLAN-DIFF`` entry followed
+        by a ``REGENERATE`` entry for each regenerated node.
+
+        Raises :class:`BuildError` when the project does not exist or when
+        the plan/manifest cannot be loaded.
+        """
+        proj_dir = project_dir(self.dist_dir, project_id)
+        if not proj_dir.is_dir():
+            raise BuildError("plan", f"project '{project_id}' not found under {self.dist_dir}/")
+        paths = project_paths(proj_dir)
+        trace_path = paths[TRACE_FILENAME]
+
+        # Load the persisted plan and manifest.
+        if not paths[PLAN_FILENAME].exists():
+            raise BuildError("plan", f"no plan at {paths[PLAN_FILENAME]}")
+        plan = self._load_persisted_plan(paths[PLAN_FILENAME], Brief(project_id, ""), None)
+        if plan is None:
+            raise BuildError("plan", "persisted plan is invalid")
+
+        # Load the manifest to get the node list.
+        manifest_path = proj_dir / "manifest.yaml"
+        if not manifest_path.exists():
+            raise BuildError("plan", f"no manifest at {manifest_path}")
+        try:
+            manifest_data = load_plan_yaml(manifest_path)
+        except (OSError, ValueError) as exc:
+            raise BuildError("plan", f"could not read manifest: {exc}") from exc
+
+        # Determine which nodes to regenerate.
+        manifest = ProjectManifest(manifest_data)
+        manifest_dict = manifest.to_dict()
+        all_node_ids: set[str] = set()
+        for node in manifest_dict.get("nodes") or []:
+            nid = node.get("id")
+            if nid:
+                all_node_ids.add(nid)
+
+        # Build the brief from the persisted plan for the adapter factory.
+        brief = Brief(
+            project_id=project_id,
+            description=str(plan.to_dict().get("brief", "")),
+        )
+
+        result = BuildResult(project_dir=proj_dir, plan=plan.to_dict())
+
+        try:
+            director, music_node, speech_node = self.adapter_factory(proj_dir, brief)
+        except BuildError:
+            raise
+        except Exception as exc:
+            raise BuildError("plan", f"adapter setup failed: {exc}") from exc
+        director.trace_path = trace_path
+
+        with TraceWriter(trace_path) as trace:
+            # --- Call M3Director.revise to get the PlanDiff ---
+            try:
+                diff = asyncio.run(director.revise(plan, intent))
+            except (DirectorError, TypeError, ValueError) as exc:
+                raise BuildError("plan", f"director.revise failed: {exc}") from exc
+            if not isinstance(diff, PlanDiff):
+                try:
+                    diff = (
+                        PlanDiff.model_validate(diff) if isinstance(diff, dict) else PlanDiff(diff)
+                    )
+                except (ValueError, TypeError) as exc:
+                    raise BuildError("plan", f"invalid PlanDiff: {exc}") from exc
+
+            # Write the PLAN-DIFF trace entry.
+            diff_data = diff.to_dict()
+            self._trace(
+                trace,
+                TRACE_PLAN_DIFF,
+                node_id=diff_data.get("to_plan_id"),
+                payload=json.dumps(diff_data, default=str),
+            )
+
+            # Determine which nodes to regenerate.
+            regenerate_ids: set[str] = set()
+            if diff_data.get("regenerate_nodes"):
+                regenerate_ids = set(diff_data["regenerate_nodes"])
+            elif diff_data.get("affected_nodes"):
+                regenerate_ids = set(diff_data["affected_nodes"])
+            else:
+                # No regeneration requested; just update the plan id.
+                self._update_plan_id(proj_dir, diff_data.get("to_plan_id"))
+                result.regenerated = False
+                return result
+
+            # Validate: regenerate_ids must be a subset of all_node_ids.
+            unknown = regenerate_ids - all_node_ids
+            if unknown:
+                raise BuildError(
+                    "plan",
+                    f"plan-diff references unknown node(s): {', '.join(sorted(unknown))}",
+                )
+
+            # --- Regenerate only affected nodes ---
+            any_regen = False
+            regenerated_nodes: list[dict[str, Any]] = []
+
+            for node in manifest_dict.get("nodes") or []:
+                nid = node.get("id", "")
+                node_type = node.get("type", "")
+                output_path = node.get("output_path", "")
+
+                if nid in regenerate_ids:
+                    # This node needs regeneration.
+                    self._trace(
+                        trace,
+                        TRACE_REGENERATE,
+                        node_id=nid,
+                        payload=f"regenerating {nid} per plan-diff",
+                    )
+                    try:
+                        audio_path = self._regenerate_node(
+                            nid, node_type, music_node, speech_node, intent, trace
+                        )
+                        any_regen = True
+                        regenerated_nodes.append(
+                            {
+                                **node,
+                                "output_path": str(audio_path),
+                                "regenerated": True,
+                            }
+                        )
+                    except Exception as exc:
+                        raise BuildError(
+                            "generate", f"node {nid} regeneration failed: {exc}"
+                        ) from exc
+                else:
+                    # Node stays locked — verify it exists on disk.
+                    if output_path and Path(output_path).exists():
+                        regenerated_nodes.append(
+                            {
+                                **node,
+                                "regenerated": False,
+                            }
+                        )
+
+            result.regenerated = any_regen
+
+            # --- Update the manifest with regenerated nodes ---
+            manifest_dict["nodes"] = regenerated_nodes
+            plan_dict = manifest_dict.get("plan") or {}
+            if not isinstance(plan_dict, dict):
+                plan_dict = {}
+            plan_dict["plan_id"] = diff_data.get("to_plan_id", plan_dict.get("plan_id", ""))
+            manifest_dict["plan"] = plan_dict
+            manifest = ProjectManifest(manifest_dict)
+            write_plan_yaml(manifest_path, manifest.to_dict())
+
+            # --- Update plan.yaml with the new plan_id ---
+            self._update_plan_id(proj_dir, diff_data.get("to_plan_id"))
+
+            # --- Re-mix and re-mux if any node was regenerated ---
+            if any_regen:
+                nodes, captions, _ = self._generate_nodes_from_manifest(
+                    manifest_dict, music_node, speech_node, trace
+                )
+                result.nodes = nodes
+
+                node_paths = [Path(n["output_path"]) for n in nodes if n.get("type") == "music"]
+                narration = [
+                    (Path(n["output_path"]), float(n.get("start", 0.0)))
+                    for n in nodes
+                    if n.get("type") == "speech"
+                ]
+                if not node_paths:
+                    raise BuildError("generate", "revise produced no music tracks")
+                wav_out = proj_dir / NODES_DIRNAME / "premiere.wav"
+                srt_src = wav_out.parent / "captions.srt"
+                mix = self._mix_node or MixNode(ffmpeg=self._ffmpeg)
+                try:
+                    mix.run(
+                        node_paths,
+                        captions,
+                        wav_out,
+                        duration=float(plan.to_dict().get("duration_seconds", 60.0)),
+                        narration=narration,
+                    )
+                except (MixNodeError, NodeError) as exc:
+                    raise BuildError("compose", f"mix failed: {exc}") from exc
+                result.premiere_wav = wav_out
+
+                srt_dst = proj_dir / "captions.srt"
+                if srt_src.exists():
+                    shutil.copy2(srt_src, srt_dst)
+                    result.captions_srt = srt_dst
+
+                self._trace(
+                    trace, TRACE_COMPOSE, node_id=manifest_dict.get("plan", {}).get("plan_id")
+                )
+
+                mp4_path = paths[PREMIERE_FILENAME]
+                result.premiere_mp4 = self._mux_mp4(wav_out, srt_src, mp4_path)
+
+        return result
+
+    def _regenerate_node(
+        self,
+        node_id: str,
+        node_type: str,
+        music_node: MusicNode,
+        speech_node: SpeechNode,
+        intent: str,
+        trace: TraceWriter,
+    ) -> Path:
+        """Regenerate a single node by re-calling the adapter with the intent.
+
+        The node is unlocked, a new prompt incorporating the revision intent
+        is built, and the adapter is called to produce a new audio asset.
+        """
+        if node_type == "speech":
+            speech_node.unlock()
+            # Use the node's existing prompt as base, append the intent.
+            self._trace(trace, TRACE_GENERATE, node_id=node_id, payload=intent)
+            try:
+                path = asyncio.run(speech_node.generate(intent, duration=None))
+                speech_node.lock()
+                return path
+            except Exception:
+                speech_node.unlock()
+                raise
+        else:
+            # music node (or any other type)
+            music_node.unlock()
+            self._trace(trace, TRACE_GENERATE, node_id=node_id, payload=intent)
+            try:
+                path = asyncio.run(music_node.generate(intent, lyrics=None, duration=None))
+                music_node.lock()
+                return path
+            except Exception:
+                music_node.unlock()
+                raise
+
+    def _generate_nodes_from_manifest(
+        self,
+        manifest_dict: dict[str, Any],
+        music_node: MusicNode,
+        speech_node: SpeechNode,
+        trace: TraceWriter,
+    ) -> tuple[list[dict[str, Any]], list[tuple[float, float, str]], bool]:
+        """Re-generate all nodes from the manifest for the revise path.
+
+        Returns ``(nodes, captions, any_regen)``.
+        """
+        nodes: list[dict[str, Any]] = []
+        captions: list[tuple[float, float, str]] = []
+        any_regen = False
+        plan_data = manifest_dict.get("plan", {})
+        brief_description = str(plan_data.get("brief", ""))
+
+        for idx, node in enumerate(manifest_dict.get("nodes") or [], start=1):
+            nid = node.get("id", f"node-{idx}")
+            ntype = node.get("type", "music")
+            prompt = node.get("prompt", brief_description)
+            output_path = node.get("output_path", "")
+
+            if ntype == "speech":
+                captions.append(
+                    (
+                        float(node.get("start", 0.0)),
+                        float(node.get("end", 60.0)),
+                        str(node.get("prompt", "")),
+                    )
+                )
+                speech_node.unlock()
+                self._trace(trace, TRACE_GENERATE, node_id=nid, payload=prompt)
+                try:
+                    audio_path = asyncio.run(speech_node.generate(prompt, duration=None))
+                    any_regen = True
+                    speech_node.lock()
+                except NodeLockedError:
+                    audio_path = Path(output_path) if output_path else None
+                except Exception:
+                    speech_node.unlock()
+                    raise
+                nodes.append(
+                    {
+                        "id": nid,
+                        "type": "speech",
+                        "status": "done",
+                        "locked": True,
+                        "output_path": str(audio_path) if audio_path else output_path,
+                        "prompt": prompt,
+                    }
+                )
+            else:
+                music_node.unlock()
+                self._trace(trace, TRACE_GENERATE, node_id=nid, payload=prompt)
+                try:
+                    audio_path = asyncio.run(
+                        music_node.generate(prompt, lyrics=None, duration=None)
+                    )
+                    any_regen = True
+                    music_node.lock()
+                except NodeLockedError:
+                    audio_path = Path(output_path) if output_path else None
+                except Exception:
+                    music_node.unlock()
+                    raise
+                nodes.append(
+                    {
+                        "id": nid,
+                        "type": "music",
+                        "status": "done",
+                        "locked": True,
+                        "output_path": str(audio_path) if audio_path else output_path,
+                        "prompt": prompt,
+                    }
+                )
+
+        return nodes, captions, any_regen
+
+    @staticmethod
+    def _update_plan_id(proj_dir: Path, new_plan_id: str | None) -> None:
+        """Update the plan.yaml with a new plan_id in-place."""
+        if not new_plan_id:
+            return
+        plan_path = proj_dir / PLAN_FILENAME
+        if not plan_path.exists():
+            return
+        try:
+            data = load_plan_yaml(plan_path)
+            if isinstance(data, dict):
+                data["plan_id"] = new_plan_id
+                write_plan_yaml(plan_path, data)
+        except (OSError, ValueError):
+            pass
+
     @staticmethod
     def _load_persisted_plan(
         path: Path,
         brief: Brief,
-        trace: TraceWriter,
+        trace: TraceWriter | None,
     ) -> CreativePlan | None:
         """Load a valid plan from disk for a resume/no-op build."""
         try:
@@ -432,12 +777,13 @@ class BuildService:
         plan_data = plan.to_dict()
         if plan_data.get("project_id") != brief.project_id:
             return None
-        BuildService._trace(
-            trace,
-            TRACE_PLAN,
-            node_id=plan_data.get("plan_id"),
-            payload=dump_plan_yaml(plan_data),
-        )
+        if trace is not None:
+            BuildService._trace(
+                trace,
+                TRACE_PLAN,
+                node_id=plan_data.get("plan_id"),
+                payload=dump_plan_yaml(plan_data),
+            )
         return plan
 
     @staticmethod
