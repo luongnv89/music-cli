@@ -7,6 +7,7 @@ from .nodes.base import (
     NodeLockedError,
     NodeProtocol,
 )
+from .nodes.ffmpeg import MixNode, MixNodeError, resolve_binary, write_srt
 from .nodes.music import MusicNode
 from .nodes.speech import SpeechNode
 from .schemas import Constitution, CreativePlan, PlanDiff, ProjectManifest
@@ -31,12 +32,15 @@ __all__ = [
     "DEFAULT_DIST_DIR",
     "DirectorError",
     "M3Director",
+    "MixNode",
+    "MixNodeError",
     "MusicNode",
     "NodeError",
     "NodeLockedError",
     "NodeProtocol",
     "PlanDiff",
     "ProjectManifest",
+    "resolve_binary",
     "SpeechNode",
     "TraceWriter",
     "dump_plan_yaml",
@@ -47,4 +51,5 @@ __all__ = [
     "project_paths",
     "render_trace_table",
     "write_plan_yaml",
+    "write_srt",
 ]
