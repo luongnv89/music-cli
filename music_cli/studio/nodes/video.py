@@ -486,7 +486,7 @@ class VideoNode(BaseNode):
         seconds = f"{duration:.6f}"
         cmd = [ffmpeg_bin, "-nostdin", "-y", "-v", "error"]
         if cover is not None:
-            cmd.extend(["-loop", "1", "-i", cover.as_posix()])
+            cmd.extend(["-loop", "1", "-i", str(cover)])
         else:
             cmd.extend(
                 [
@@ -509,7 +509,7 @@ class VideoNode(BaseNode):
                 "libx264",
                 "-pix_fmt",
                 "yuv420p",
-                destination.resolve().as_posix(),
+                str(destination.resolve()),
             ]
         )
         return cmd
@@ -534,7 +534,7 @@ class VideoNode(BaseNode):
         else:
             command.extend(
                 [
-                    cover.resolve().as_posix(),
+                    str(cover.resolve()),
                     "-resize",
                     f"{DEFAULT_VIDEO_SIZE}^",
                     "-gravity",
@@ -545,7 +545,7 @@ class VideoNode(BaseNode):
                 ]
             )
         if font is not None:
-            command.extend(["-font", font.as_posix()])
+            command.extend(["-font", str(font)])
         command.extend(
             [
                 "-fill",
@@ -554,9 +554,9 @@ class VideoNode(BaseNode):
                 "center",
                 "-pointsize",
                 "36",
-                f"caption:@{caption_file.resolve().as_posix()}",
+                f"caption:@{str(caption_file.resolve())}",
                 "-flatten",
-                image_path.resolve().as_posix(),
+                str(image_path.resolve()),
             ]
         )
         return command
@@ -616,7 +616,7 @@ class VideoNode(BaseNode):
             "-loop",
             "1",
             "-i",
-            image_path.as_posix(),
+            str(image_path),
             "-t",
             seconds,
             "-an",
@@ -626,7 +626,7 @@ class VideoNode(BaseNode):
             "libx264",
             "-pix_fmt",
             "yuv420p",
-            destination.resolve().as_posix(),
+            str(destination.resolve()),
         ]
 
     @staticmethod
