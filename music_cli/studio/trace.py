@@ -26,7 +26,7 @@ import hashlib
 import json
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, TextIO
+from typing import Any, Literal, TextIO
 
 # ---------------------------------------------------------------------------
 # dist/<project>/ layout (P2.2 spec)
@@ -112,7 +112,7 @@ class TraceWriter:
         self._fh = self.path.open("a", encoding="utf-8")
         return self
 
-    def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> bool:
+    def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> Literal[False]:
         if self._fh is not None:
             self._fh.close()
             self._fh = None
