@@ -81,7 +81,7 @@ class TestNode:
             node_type="music",
             prompt="test",
             depends_on=["speech-1"],
-            output_path="/tmp/out.wav",
+            output_path="/tmp/out.wav",  # noqa: S108
             locked=True,
             lock_reason="revised",
         )

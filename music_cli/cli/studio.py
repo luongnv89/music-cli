@@ -23,8 +23,8 @@ import click
 
 from ..studio import trace as _trace
 from ..studio.build import BuildError, BuildService, load_brief_from_yaml
-from ..studio.taste import from_playlist as _from_playlist
 from ..studio.doctor import run_doctor
+from ..studio.taste import from_playlist as _from_playlist
 from ..studio.trace import DEFAULT_DIST_DIR
 from .app import main
 from .common import AliasedGroup

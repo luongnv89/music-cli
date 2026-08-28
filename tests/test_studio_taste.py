@@ -8,14 +8,12 @@ output.
 from __future__ import annotations
 
 import json
-import subprocess
 from pathlib import Path
 from unittest import mock
 
 import pytest
 
 from music_cli.studio.taste import (
-    FFProbeError,
     TasteProfile,
     _extract_dynamic_range,
     _extract_key,

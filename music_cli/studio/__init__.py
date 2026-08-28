@@ -8,13 +8,9 @@ from .build import (
     default_adapter_factory,
     load_brief_from_yaml,
 )
-from .director import CritiqueReport, DirectorError, M3Director
+from .director import CritiqueReport
 from .doctor import (
     CheckResult,
-    check_dist_dir,
-    check_ffmpeg,
-    check_ffprobe,
-    check_gmi_key,
     run_doctor,
 )
 from .graph import (
@@ -28,12 +24,17 @@ from .graph import (
 from .nodes.assemble import AssembleNode, AssembleNodeError
 from .nodes.base import (
     BaseNode,
-    NodeError,
-    NodeLockedError,
+    NodeError,  # noqa: F401 - re-exported
+    NodeLockedError,  # noqa: F401,F811 - shadows .graph.NodeLockedError
     NodeProtocol,
 )
-from .nodes.ffmpeg import MixNode, MixNodeError, resolve_binary, write_srt
-from .nodes.music import MusicNode
+from .nodes.ffmpeg import (  # noqa: F401 - re-exported
+    MixNode,
+    MixNodeError,
+    resolve_binary,
+    write_srt,
+)
+from .nodes.music import MusicNode  # noqa: F401 - re-exported
 from .nodes.speech import SpeechNode
 from .nodes.video import BudgetExceeded, BuildBudget, VideoNode
 from .schemas import Constitution, CreativePlan, PlanDiff, ProjectManifest

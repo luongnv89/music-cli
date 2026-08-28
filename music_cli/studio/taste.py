@@ -13,12 +13,11 @@ from __future__ import annotations
 
 import json
 import math
+import shutil
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-
-from .trace import _sha256
 
 # ---------------------------------------------------------------------------
 # data model
@@ -133,12 +132,17 @@ def _run_ffprobe(filepath: str, fmt: str) -> dict[str, Any]:
 
     Raises ``FFProbeError`` when ffprobe is unavailable or returns non-zero.
     """
+    ffprobe_path = shutil.which("ffprobe")
+    if ffprobe_path is None:
+        raise FFProbeError("ffprobe not found in PATH")
     try:
         result = subprocess.run(
             [
-                "ffprobe",
-                "-v", "quiet",
-                "-print_format", "json",
+                ffprobe_path,
+                "-v",
+                "quiet",
+                "-print_format",
+                "json",
                 "-show_format",
                 "-show_streams",
                 filepath,
@@ -186,6 +190,7 @@ def _extract_tempo(probe: dict[str, Any]) -> float | None:
     for val in tags.values():
         if isinstance(val, str):
             import re
+
             m = re.search(r"(\d{2,3})\s*bpm", val, re.IGNORECASE)
             if m:
                 return float(m.group(1))
@@ -203,6 +208,7 @@ def _extract_key(probe: dict[str, Any]) -> str | None:
         val = tags.get(key)
         if val is not None:
             import re
+
             m = re.match(r"([A-Ga-g])([#b])?(m)?", val.strip())
             if m:
                 root = m.group(1).upper()
