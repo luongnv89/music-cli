@@ -25,10 +25,11 @@ def _check_network(host: str, port: int = 443, timeout: float = 3.0) -> tuple[bo
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(timeout)
-        t0 = socket.gettimeofday() if hasattr(socket, "gettimeofday") else 0
-        sock.connect((start, port))
-        if t0:
-            t1 = socket.gettimeofday()
+        _gettimeofday = getattr(socket, "gettimeofday", None)
+        if _gettimeofday:
+            t0 = _gettimeofday()
+            sock.connect((start, port))
+            t1 = _gettimeofday()
             latency_ms = (t1 - t0) / 1000
         else:
             t0 = time.monotonic()
