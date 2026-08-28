@@ -1,6 +1,6 @@
-"""Studio audio nodes — Music 3.0 and Speech 2.8 (issue #137, task P3.1).
+"""Studio nodes for audio assets and H3-backed video scenes.
 
-Each node writes its generated audio into the project's ``nodes/`` directory,
+Each node writes its generated asset into the project's ``nodes/`` directory,
 runs a probe (``ffprobe``), and locks itself on success so a locked asset is
 never regenerated without an explicit :meth:`~music_cli.studio.nodes.base
 .BaseNode.unlock`.
@@ -28,9 +28,12 @@ from .ffmpeg import (
 )
 from .music import MusicNode
 from .speech import SpeechNode
+from .video import BudgetExceeded, BuildBudget, VideoNode
 
 __all__ = [
     "BaseNode",
+    "BuildBudget",
+    "BudgetExceeded",
     "MixNode",
     "MixNodeError",
     "MusicNode",
@@ -38,6 +41,7 @@ __all__ = [
     "NodeLockedError",
     "NodeProtocol",
     "SpeechNode",
+    "VideoNode",
     "default_download",
     "resolve_binary",
     "run_ffprobe",
