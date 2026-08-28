@@ -281,6 +281,7 @@ def load_plan_yaml(path: str | Path) -> dict[str, Any]:
             plan[key] = _yaml_unquote(value)
     return plan
 
+
 # ---------------------------------------------------------------------------
 # trace.jsonl reading / table rendering
 # ---------------------------------------------------------------------------
