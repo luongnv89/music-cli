@@ -179,7 +179,7 @@ class ProjectGraph:
         The plan's scenes, tracks, and shot_list are turned into nodes.
         Dependencies are inferred:
 
-        - Every **mix** node depends on all **music** and **speech** nodes.
+        - Every **mix** node depends on all **music** nodes.
         - Every **assemble** node depends on all **video** nodes and the
           mix (if present).
         - Nodes with explicit ``depends_on`` in the plan override the
@@ -194,10 +194,8 @@ class ProjectGraph:
         graph = cls()
         plan_data = plan.to_dict()
         graph._plan_data = plan_data
-        plan_id = plan_data.get("plan_id", "unknown")
 
         # Collect nodes by type from plan sections
-        scene_nodes: list[Node] = []
         music_nodes: list[Node] = []
         speech_nodes: list[Node] = []
         video_nodes: list[Node] = []
@@ -250,7 +248,7 @@ class ProjectGraph:
             graph.nodes[node.id] = node
             graph._edges[node.id]  # ensure entry exists
 
-        # Add mix node (depends on all music nodes only)
+        # Add mix node (depends on all music nodes)
         if music_nodes:
             mix_node = Node(
                 id="mix",
@@ -349,27 +347,9 @@ class ProjectGraph:
 
         Returns a list of cycle error strings.  Empty means no cycles.
         """
-        # Build in-degree map
-        in_degree: dict[str, int] = dict.fromkeys(self.nodes, 0)
-        for nid, deps in self._edges.items():
-            for dep in deps:
-                if dep in in_degree:
-                    in_degree[nid] = in_degree.get(nid, 0)
-
-        # Recount properly
-        in_degree = dict.fromkeys(self.nodes, 0)
-        for nid in self.nodes:
-            for dep in self._edges.get(nid, set()):
-                if dep in self.nodes:
-                    in_degree[nid] = in_degree.get(nid, 0) + 1
-
-        # Actually we need: edges go FROM dependent TO dependency
-        # So in_degree[node] = number of nodes that depend on this node?
-        # No — for topological sort, in_degree[node] = number of
-        # dependencies this node has (edges pointing to it).
-        # Actually the _edges[nid] = set of nodes that nid depends ON.
-        # So for topo sort: in_degree[nid] = len(_edges[nid])
-        in_degree = {}
+        # _edges[nid] = set of nodes that nid depends ON.
+        # For topo sort: in_degree[nid] = number of unresolved deps.
+        in_degree: dict[str, int] = {}
         for nid in self.nodes:
             in_degree[nid] = len(self._edges.get(nid, set()) & set(self.nodes))
 
