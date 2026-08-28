@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import socket
+import sys
 from unittest import mock
 
+import pytest
 from click.testing import CliRunner
 
 from music_cli.cli import main
@@ -115,6 +117,10 @@ def test_check_network_returns_fail_when_unreachable(monkeypatch):
     assert "cannot reach" in result.message.lower()
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="os.statvfs is Unix-only",
+)
 def test_check_disk_space_ok(tmp_path):
     mock_stat = mock.MagicMock()
     mock_stat.f_bavail = 10_000_000  # plenty
@@ -124,6 +130,10 @@ def test_check_disk_space_ok(tmp_path):
     assert result.status == "OK"
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="os.statvfs is Unix-only",
+)
 def test_check_disk_space_warns_when_low(tmp_path):
     mock_stat = mock.MagicMock()
     mock_stat.f_bavail = 100_000  # ~0.4 GB

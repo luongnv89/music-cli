@@ -523,11 +523,11 @@ class ProjectGraph:
         # Also apply per-node lock state from nodes list
         for manifest_node in manifest.get("nodes", []):
             if isinstance(manifest_node, dict):
-                nid = manifest_node.get("id")
+                nid = manifest_node.get("id") or ""
                 if nid in self.nodes:
                     node = self.nodes[nid]
                     node.locked = bool(manifest_node.get("locked", False))
-                    node.lock_reason = manifest_node.get("lock_reason", "")
+                    node.lock_reason = str(manifest_node.get("lock_reason") or "")
 
     # -- edges -------------------------------------------------------------
 
