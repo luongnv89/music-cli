@@ -18,14 +18,13 @@ from .graph import (
     GraphError,
     GraphMissingDependencyError,
     Node,
-    NodeLockedError,
     ProjectGraph,
 )
 from .nodes.assemble import AssembleNode, AssembleNodeError
 from .nodes.base import (
     BaseNode,
     NodeError,  # noqa: F401 - re-exported
-    NodeLockedError,  # noqa: F401,F811 - shadows .graph.NodeLockedError
+    NodeLockedError,  # noqa: F401 - re-exported
     NodeProtocol,
 )
 from .nodes.ffmpeg import (  # noqa: F401 - re-exported
