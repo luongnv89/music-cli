@@ -273,6 +273,15 @@ mc mood [MOOD]              # list moods or play mood radio
 mc config                   # show config paths
 mc cloud key set gmi        # store GMI Cloud API key in the system keyring
 mc cloud smoke              # one real call per free MiniMax model -> dist/_smoke/
+
+> **API key requirement:** The GMI Cloud key must be authorized for the **audio queue endpoint**
+> (`console.gmicloud.ai/api/v1/ie/requestqueue/apikey/requests`) — not just the text model endpoint
+> (`api.gmi-serving.com`). A key scoped only for text models (e.g. `MiniMaxAI/MiniMax-M3` on the
+> serving endpoint) will pass `mc cloud ping` but will fail with `HTTP 400` during `mc studio build`
+> because Music 3.0 and Speech 2.8 run as async jobs on the queue endpoint. If your key works for
+> text but not audio, you need a key with audio-model access.
+> 
+> Check your key with `mc studio doctor` — it should show `OK: gmi key: stored in the OS keyring`.
 mc daemon start|stop|status # manage daemon
 ```
 

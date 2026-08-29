@@ -42,13 +42,14 @@ MAX_PARSE_RETRIES = 2
 DEFAULT_TRACE_PATH = Path("dist") / "trace.jsonl"
 
 _PLAN_INSTRUCTION = (
-    "You are the creative director of a music project. Respond with a single "
-    "JSON object and nothing else — no prose, no markdown fences — that "
-    "conforms exactly to this CreativePlan schema:\n"
-    "required: plan_id, project_id (slug), title, objective, brief, "
-    "duration_seconds (number)\n"
-    "optional: arc, scenes, shot_list, tracks, motifs, voice, locked_assets, "
-    "validation_rubric, cover_art, version"
+    "Respond with ONLY valid JSON. No markdown. No prose. Start with { and end with }.\n"
+    "REQUIRED: plan_id, project_id (slug), title, objective, brief, duration_seconds.\n"
+    "OPTIONAL: arc, scenes, shot_list, tracks, motifs, voice, locked_assets, "
+    "validation_rubric, cover_art, version.\n"
+    'Example: {"plan_id": "p1", "project_id": "my-project", "title": "T", '
+    '"objective": "O", "brief": "B", "duration_seconds": 60, '
+    '"tracks": [{"id": "t1", "prompt": "p", "description": "d", "duration_seconds": 30}], '
+    '"scenes": [{"id": "s1", "prompt": "p", "description": "d", "duration_seconds": 5.0}]}'
 )
 
 _CRITIQUE_INSTRUCTION = (
@@ -180,8 +181,14 @@ class M3Director:
 
     async def plan(self, brief: str) -> CreativePlan:
         """Ask M3 for a CreativePlan for ``brief``, schema-validated."""
-        prompt = f"{_PLAN_INSTRUCTION}\n\nBrief:\n{brief}"
-        data = await self._ask_json("plan", prompt, CreativePlan)
+        system_prompt = (
+            "You are a creative director. You MUST respond with ONLY valid JSON. "
+            "No markdown. No prose. No code blocks. No explanation. "
+            "Your response must start with { and end with }. "
+            "REQUIRED FIELDS: plan_id, project_id (slug), title, objective, brief, duration_seconds."
+        )
+        prompt = f"Brief:\n{brief}"
+        data = await self._ask_json_with_system("plan", prompt, system_prompt, CreativePlan)
         return CreativePlan(data)
 
     async def critique(self, plan: Any, measurements: Any) -> CritiqueReport:
@@ -205,6 +212,48 @@ class M3Director:
         return PlanDiff(data)
 
     # -- internals --------------------------------------------------------
+
+    async def _ask_json_with_system(
+        self, step: str, prompt: str, system_prompt: str, schema: Any
+    ) -> dict[str, Any]:
+        """Like _ask_json but sends a system message for JSON enforcement."""
+        current_prompt = prompt
+        previous_text: str | None = None
+        start = time.monotonic()
+        last_errors: list[str] = []
+
+        for attempt in range(1 + MAX_PARSE_RETRIES):
+            if previous_text is not None:
+                current_prompt = (
+                    f"{prompt}\n\nYour previous reply was not valid JSON for this "
+                    f"schema. Errors:\n"
+                    + "\n".join(f"- {e}" for e in last_errors)
+                    + f"\n\nPrevious reply:\n{previous_text}\n\n"
+                    "Re-output the exact JSON, corrected. No prose, no markdown fences."
+                )
+            reply = await self._call_with_system(step, current_prompt, system_prompt)
+            text = reply.get("text", "") if isinstance(reply, dict) else str(reply)
+            try:
+                data = extract_json(text)
+                errors = schema.validate(data)
+                if errors:
+                    last_errors = errors
+                    previous_text = text
+                    continue
+                self._trace(step, prompt, text, start, attempt, ok=True)
+                return data
+            except (ValueError, TypeError):
+                last_errors = ["model did not return JSON"]
+                previous_text = text
+                continue
+
+        self._trace(
+            step, prompt, previous_text or "", start, MAX_PARSE_RETRIES, ok=False
+        )
+        raise DirectorError(
+            f"{step}: model failed to produce schema-valid JSON after "
+            f"{1 + MAX_PARSE_RETRIES} attempts; last errors: {'; '.join(last_errors)}"
+        )
 
     async def _ask_json(self, step: str, prompt: str, schema: Any) -> dict[str, Any]:
         """Call M3 and retry on parse/validation failure, tracing each attempt.
@@ -252,6 +301,11 @@ class M3Director:
         if step == "critique":
             return await self._adapter.m3_critique(prompt)
         return await self._adapter.m3_plan(prompt)
+
+    async def _call_with_system(self, step: str, prompt: str, system_prompt: str) -> Any:
+        if step == "critique":
+            return await self._adapter.m3_critique(prompt, system=system_prompt)
+        return await self._adapter.m3_plan(prompt, system=system_prompt)
 
     def _trace(
         self,

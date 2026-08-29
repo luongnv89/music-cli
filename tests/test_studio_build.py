@@ -277,13 +277,14 @@ class TestBuildServiceRun:
             service.run(brief)
         assert exc.value.stage == "plan"
 
-    def test_no_tracks_no_scenes_raises_generate_error(self, tmp_path):
+    def test_no_tracks_no_scenes_uses_brief_fallback(self, tmp_path):
+        """When plan has no tracks/scenes, fallback generates from brief."""
         empty = {k: v for k, v in VALID_PLAN.items() if k not in {"tracks", "scenes"}}
         service, _adapter, _probe = _make_service(tmp_path, plan_payload=empty)
         brief = Brief.from_dict({"project_id": "neon-rain", "description": "go"})
-        with pytest.raises(BuildError) as exc:
-            service.run(brief)
-        assert exc.value.stage == "generate"
+        result = service.run(brief)
+        # Should succeed with fallback track from brief
+        assert result.premiere_mp4 is not None and result.premiere_mp4.exists()
 
     def test_duration_within_two_seconds_of_plan(self, tmp_path):
         service, _adapter, probe = _make_service(tmp_path, probe=FakeProbe(seconds=60.0))

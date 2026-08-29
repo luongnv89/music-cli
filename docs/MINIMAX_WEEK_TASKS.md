@@ -28,6 +28,11 @@ yet a project dependency — add it to `[project.optional-dependencies]` as a ne
 (`gmi = ["keyring>=24", "httpx>=0.27"]`). Do not commit the key, env vars, or any prompt that
 contains it.
 
+> **Important:** The API key must be authorized for the **audio queue endpoint**
+> (`console.gmicloud.ai/api/v1/ie/requestqueue/apikey/requests`) which hosts Music 3.0 and Speech 2.8.
+> A key scoped only for the text model endpoint (`api.gmi-serving.com`) will pass `mc cloud ping`
+> but fail during `mc studio build` with `HTTP 400`.
+
 **Acceptance Criteria:**
 - [ ] `git tag pre-minimax-week` is at the recorded SHA
 - [ ] `mc cloud key set gmi` writes to `keyring` and the key is unreadable from a child process

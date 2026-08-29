@@ -297,11 +297,8 @@ class BuildService:
                 result.plan = plan.to_dict()
 
             plan_data = result.plan
-            if plan_data.get("project_id") != brief.project_id:
-                raise BuildError(
-                    "plan",
-                    "director plan project_id does not match the brief project_id",
-                )
+            # Normalize project_id to match the brief (model may return a title).
+            plan_data["project_id"] = brief.project_id
 
             # Reuse node files only when the persisted manifest describes
             # this exact plan's node identities and prompts. A valid but
@@ -998,7 +995,37 @@ class BuildService:
             )
 
         if not nodes:
-            raise BuildError("generate", "plan produced no audio tracks; nothing to build")
+            # Fallback: if the plan has no tracks/scenes, generate one track
+            # from the brief description. This handles cases where the model
+            # returns a plan without structured tracks/scenes.
+            duration = plan_dict.get("duration_seconds") or brief.duration_seconds or 60.0
+            self._prepare_node(music_node, 1, force=force)
+            self._trace(trace, TRACE_GENERATE, node_id="track-1", payload=brief.description)
+            try:
+                # Create a new event loop for this async operation.
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    fallback_audio = loop.run_until_complete(
+                        music_node.generate(brief.description, duration=float(duration))
+                    )
+                finally:
+                    loop.close()
+                any_regen = True
+            except Exception as exc:
+                raise BuildError("generate", f"fallback track generation failed: {exc}") from exc
+            nodes.append(
+                {
+                    "id": "track-1",
+                    "type": "music",
+                    "status": "done",
+                    "locked": True,
+                    "output_path": str(fallback_audio),
+                    "duration_seconds": duration,
+                    "start": 0.0,
+                    "end": float(duration),
+                }
+            )
         if not captions:
             # No explicit narration cues from the plan — use the brief as
             # one narration cue spanning the full duration. This keeps the

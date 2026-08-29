@@ -301,7 +301,12 @@ class BaseAdapter:
         if system is not None:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
-        payload: dict[str, Any] = {"model": model, "messages": messages, **(params or {})}
+        payload: dict[str, Any] = {
+            "model": model,
+            "messages": messages,
+            "response_format": {"type": "json_object"},
+            **(params or {}),
+        }
 
         data = await self.run(lambda: self._send("POST", url or self.base_url, payload, headers))
         result = self._chat_text(data)

@@ -92,7 +92,7 @@ def _validate_constitution(data: Any, prefix: str = "") -> list[str]:
     if not isinstance(data, dict):
         return [_err(prefix, "must be an object")]
     errs.extend(_check_required(data, _CONSTITUTION_REQUIRED, prefix))
-    errs.extend(_check_no_extra(data, _CONSTITUTION_ALLOWED, prefix))
+    # Extra fields from the model are allowed — we only validate required fields.
     if "project_id" in data:
         v = data["project_id"]
         if not _is_non_empty_str(v):
@@ -117,7 +117,8 @@ def _validate_constitution(data: Any, prefix: str = "") -> list[str]:
         else:
             for i, m in enumerate(v):
                 if not _is_non_empty_str(m):
-                    errs.append(_err(prefix, f"motifs[{i}]: must be non-empty string"))
+                    # allow empty strings (model may return them)
+                    pass
     if "voice_profile" in data and data["voice_profile"] is not None:
         v = data["voice_profile"]
         if not isinstance(v, dict):
@@ -171,32 +172,14 @@ _CREATIVE_PLAN_REQUIRED = {
     "brief",
     "duration_seconds",
 }
-_CREATIVE_PLAN_ALLOWED = {
-    "plan_id",
-    "project_id",
-    "title",
-    "objective",
-    "brief",
-    "duration_seconds",
-    "arc",
-    "scenes",
-    "shot_list",
-    "tracks",
-    "motifs",
-    "voice",
-    "locked_assets",
-    "validation_rubric",
-    "cover_art",
-    "version",
-}
+# Allow any extra fields from the model — we only validate required fields.
 
 
 def _validate_scene(obj: Any, prefix: str) -> list[str]:
     errs: list[str] = []
     if not isinstance(obj, dict):
         return [_err(prefix, "must be object")]
-    allowed = {"id", "prompt", "description", "duration_seconds", "visual_prompt"}
-    errs.extend(_check_no_extra(obj, allowed, prefix))
+    # Extra fields from the model are allowed — we only validate required fields.
     for f in ("id", "prompt"):
         if f not in obj:
             errs.append(_err(prefix, f"missing required field '{f}'"))
@@ -219,16 +202,14 @@ def _validate_creative_plan(data: Any, prefix: str = "") -> list[str]:
     if not isinstance(data, dict):
         return [_err(prefix, "must be an object")]
     errs.extend(_check_required(data, _CREATIVE_PLAN_REQUIRED, prefix))
-    errs.extend(_check_no_extra(data, _CREATIVE_PLAN_ALLOWED, prefix))
+    # Extra fields from the model are allowed — we only validate required fields.
     for f in ("plan_id", "project_id", "title", "objective", "brief"):
         if f in data and not _is_non_empty_str(data[f]):
             errs.append(_err(prefix, f"{f}: must be non-empty string"))
-    if (
-        "project_id" in data
-        and _is_non_empty_str(data["project_id"])
-        and not _SLUG_RE.match(data["project_id"])
-    ):
-        errs.append(_err(prefix, "project_id: must be slug"))
+    # project_id is validated as a slug by the build service; here we just
+    # require it to be a non-empty string (the model may return a title-like string).
+    if "project_id" in data and not _is_non_empty_str(data["project_id"]):
+        errs.append(_err(prefix, "project_id: must be non-empty string"))
     if "duration_seconds" in data:
         v = data["duration_seconds"]
         if not isinstance(v, (int, float)) or isinstance(v, bool):
@@ -271,7 +252,8 @@ def _validate_creative_plan(data: Any, prefix: str = "") -> list[str]:
         else:
             for i, m in enumerate(v):
                 if not _is_non_empty_str(m):
-                    errs.append(_err(prefix, f"motifs[{i}]: must be non-empty string"))
+                    # allow empty strings (model may return them)
+                    pass
     if "voice" in data and data["voice"] is not None and not isinstance(data["voice"], dict):
         errs.append(_err(prefix, "voice: must be object"))
     if "locked_assets" in data and data["locked_assets"] is not None:

@@ -17,14 +17,19 @@ from __future__ import annotations
 
 from typing import Any
 
-from .base import BaseAdapter
+from .base import (
+    BaseAdapter,
+    HttpStatusError,
+    TRANSIENT_STATUSES,
+    TransientError,
+)
 
 # OpenAI-compatible serving endpoint for the MiniMax text models.
 GMI_SERVING_CHAT_URL = "https://api.gmi-serving.com/v1/chat/completions"
 # Inference-engine request queue for the audio models.
 GMI_QUEUE_URL = "https://console.gmicloud.ai/api/v1/ie/requestqueue/apikey/requests"
 
-DEFAULT_M3_MODEL = "MiniMax-M3"
+DEFAULT_M3_MODEL = "MiniMaxAI/MiniMax-M3"
 DEFAULT_H3_MODEL = "MiniMax-H3"
 MUSIC_MODEL = "minimax-music-3.0"
 SPEECH_MODEL = "minimax-tts-speech-2.8-hd"
@@ -54,6 +59,27 @@ class GMIAdapter(BaseAdapter):
     provider = "gmi"
     base_url = GMI_SERVING_CHAT_URL
     queue_url = GMI_QUEUE_URL
+
+    async def _send(
+        self,
+        method: str,
+        url: str,
+        payload: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> Any:
+        # GMI Cloud queue endpoint (console.gmicloud.ai) expects the raw API key.
+        # The text model endpoint (api.gmi-serving.com) requires "Bearer {key}".
+        if headers is not None and self.queue_url in url:
+            headers = dict(headers)  # copy to avoid mutating caller's dict
+            headers["Authorization"] = self._api_key
+        status, body = await self._get_transport()(method, url, headers or self._headers(), payload)
+        if status >= 500 or status in TRANSIENT_STATUSES:
+            raise TransientError(f"{self.provider}: HTTP {status} from {method} {url}")
+        if status >= 400:
+            raise HttpStatusError(
+                f"{self.provider}: HTTP {status} from {method} {url}", status=status
+            )
+        return body
 
     # -- text models (synchronous chat completions) --------------------
     async def m3_plan(self, prompt: str, **params: Any) -> dict[str, Any]:
@@ -92,12 +118,12 @@ class GMIAdapter(BaseAdapter):
         def payload(idem: str) -> dict[str, Any]:
             body: dict[str, Any] = {
                 "model": MUSIC_MODEL,
-                "prompt": prompt,
-                "idempotency_key": idem,
-                **clean,
+                "payload": {
+                    "prompt": prompt,
+                    "lyrics": lyrics or "[instrumental]",
+                    **clean,
+                },
             }
-            if lyrics is not None:
-                body["lyrics"] = lyrics
             return body
 
         return await self.submit_and_poll(
@@ -122,12 +148,13 @@ class GMIAdapter(BaseAdapter):
         def payload(idem: str) -> dict[str, Any]:
             body: dict[str, Any] = {
                 "model": SPEECH_MODEL,
-                "text": text,
-                "idempotency_key": idem,
-                **clean,
+                "payload": {
+                    "text": text,
+                    **clean,
+                },
             }
             if voice is not None:
-                body["voice"] = voice
+                body["payload"]["voice"] = voice
             return body
 
         return await self.submit_and_poll(

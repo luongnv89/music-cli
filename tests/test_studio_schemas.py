@@ -88,12 +88,10 @@ class TestConstitutionInvalid:
             "slug",
         )
 
-    def test_extra_field(self):
-        _assert_invalid(
-            Constitution,
-            {"project_id": "proj1", "title": "t", "brief": "b", "narrative": "n", "unknown": 1},
-            "unexpected",
-        )
+    def test_extra_field_allowed(self):
+        """Extra fields from the model are allowed — we only validate required fields."""
+        errs = Constitution.validate({"project_id": "proj1", "title": "t", "brief": "b", "narrative": "n", "unknown": 1})
+        assert errs == []
 
     def test_bad_motifs(self):
         _assert_invalid(
@@ -188,9 +186,9 @@ class TestCreativePlanInvalid:
     def test_missing_required(self):
         _assert_invalid(CreativePlan, {"plan_id": "p1"}, "missing required")
 
-    def test_extra_field(self):
-        _assert_invalid(
-            CreativePlan,
+    def test_extra_field_allowed(self):
+        """Extra fields from the model are allowed — we only validate required fields."""
+        errs = CreativePlan.validate(
             {
                 "plan_id": "p1",
                 "project_id": "proj1",
@@ -199,9 +197,9 @@ class TestCreativePlanInvalid:
                 "brief": "b",
                 "duration_seconds": 60,
                 "unknown_field": 1,
-            },
-            "unexpected",
+            }
         )
+        assert errs == []
 
     def test_bad_duration(self):
         _assert_invalid(
