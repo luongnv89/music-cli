@@ -1000,7 +1000,7 @@ class BuildService:
             # returns a plan without structured tracks/scenes.
             duration = plan_dict.get("duration_seconds") or brief.duration_seconds or 60.0
             self._prepare_node(music_node, 1, force=force)
-            self._trace(trace, TRACE_GENERATE, node_id="track-1", payload=brief.description)
+            self._trace(trace, TRACE_GENERATE, node_id="music-1", payload=brief.description)
             try:
                 # Create a new event loop for this async operation.
                 loop = asyncio.new_event_loop()
@@ -1012,16 +1012,23 @@ class BuildService:
                 finally:
                     loop.close()
                 any_regen = True
+            except NodeLockedError as exc:
+                if music_node.path is None:
+                    raise BuildError(
+                        "generate", "fallback music node is locked without an output"
+                    ) from exc
+                fallback_audio = music_node.path
             except Exception as exc:
                 raise BuildError("generate", f"fallback track generation failed: {exc}") from exc
             nodes.append(
                 {
-                    "id": "track-1",
+                    "id": "music-1",
                     "type": "music",
                     "status": "done",
                     "locked": True,
                     "output_path": str(fallback_audio),
                     "duration_seconds": duration,
+                    "prompt": brief.description,
                     "start": 0.0,
                     "end": float(duration),
                 }
@@ -1307,6 +1314,11 @@ def _expected_node_specs(plan_dict: dict[str, Any], brief: Brief) -> list[dict[s
         if not text or end <= start:
             continue
         specs.append({"id": f"speech-{idx}", "type": "speech", "prompt": text})
+    if not specs:
+        # No tracks and no narration cues: the generate stage emits a single
+        # fallback music node derived from the brief, so resume validation
+        # must expect the same identity.
+        specs.append({"id": "music-1", "type": "music", "prompt": str(brief.description)})
     return specs
 
 

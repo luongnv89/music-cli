@@ -90,7 +90,9 @@ class TestConstitutionInvalid:
 
     def test_extra_field_allowed(self):
         """Extra fields from the model are allowed — we only validate required fields."""
-        errs = Constitution.validate({"project_id": "proj1", "title": "t", "brief": "b", "narrative": "n", "unknown": 1})
+        errs = Constitution.validate(
+            {"project_id": "proj1", "title": "t", "brief": "b", "narrative": "n", "unknown": 1}
+        )
         assert errs == []
 
     def test_bad_motifs(self):

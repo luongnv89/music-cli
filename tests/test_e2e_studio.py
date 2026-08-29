@@ -32,10 +32,8 @@ import pytest
 from click.testing import CliRunner
 
 from music_cli.cli import main
+from music_cli.studio import VideoNode
 from music_cli.studio.build import (
-    Brief,
-    BuildError,
-    BuildResult,
     BuildService,
 )
 from music_cli.studio.director import M3Director
@@ -86,11 +84,7 @@ def _write_playlist(tmp_path: Path) -> Path:
     """Write a minimal M3U playlist file."""
     path = tmp_path / "playlist.m3u"
     path.write_text(
-        "#EXTM3U\n"
-        "#EXTINF:180,Track One\n"
-        "/tmp/track1.mp3\n"
-        "#EXTINF:240,Track Two\n"
-        "/tmp/track2.mp3\n",
+        "#EXTM3U\n#EXTINF:180,Track One\n/tmp/track1.mp3\n#EXTINF:240,Track Two\n/tmp/track2.mp3\n",
         encoding="utf-8",
     )
     return path
@@ -198,9 +192,7 @@ class RecordingFakeAdapter:
         self.calls.append("speech28_synthesize")
         return {"audio_url": f"memory://speech/{text[:8]}"}
 
-    async def h3_generate(
-        self, prompt: str, **_: object
-    ) -> dict[str, str]:
+    async def h3_generate(self, prompt: str, **_: object) -> dict[str, str]:
         self.calls.append("h3_generate")
         return {"video_url": f"memory://h3/{prompt[:8]}"}
 
@@ -234,7 +226,9 @@ def _read_trace(project_dir: Path) -> list[dict]:
     return records
 
 
-def _invoke_studio(runner: CliRunner, *args, **kwargs) -> tuple[mock._patch, RecordingFakeAdapter, FakeProbe]:
+def _invoke_studio(
+    runner: CliRunner, *args, **kwargs
+) -> tuple[mock._patch, RecordingFakeAdapter, FakeProbe]:
     """Invoke an mc studio command and return the patch list for the adapter factory."""
     adapter = RecordingFakeAdapter()
     probe = FakeProbe(seconds=1.0)
@@ -298,10 +292,10 @@ class TestBuildCommandOptions:
         assert result.exit_code == 0, result.output
         assert flag in result.output, f"Flag {flag!r} missing from build --help"
 
-    def test_resume_and_force_conflict(self, runner: CliRunner) -> None:
+    def test_resume_and_force_conflict(self, runner: CliRunner, tmp_path: Path) -> None:
         """--resume and --force are mutually exclusive."""
-        tmp = Path("/tmp/e2e-studio-test-resume-force")
-        tmp.mkdir(exist_ok=True)
+        tmp = tmp_path / "e2e-studio-test-resume-force"
+        tmp.mkdir(parents=True, exist_ok=True)
         brief = _write_brief(tmp)
         result = runner.invoke(main, ["studio", "build", str(brief), "--resume", "--force"])
         assert result.exit_code != 0
@@ -316,9 +310,9 @@ class TestBuildCommandOptions:
 class TestBuildHappyPath:
     """Full pipeline: brief → plan → generate → compose → premiere.mp4."""
 
-    def test_build_writes_all_artifacts(self, runner: CliRunner) -> None:
-        tmp = Path("/tmp/e2e-studio-happy")
-        tmp.mkdir(exist_ok=True)
+    def test_build_writes_all_artifacts(self, runner: CliRunner, tmp_path: Path) -> None:
+        tmp = tmp_path / "e2e-studio-happy"
+        tmp.mkdir(parents=True, exist_ok=True)
         brief_path = _write_brief(tmp)
         patch, adapter, probe = _invoke_studio(runner, str(brief_path), dist_dir=str(tmp))
 
@@ -348,10 +342,10 @@ class TestBuildHappyPath:
         assert "compose" in steps, "compose stage missing from trace"
         assert steps.count("probe") >= 2, "Expected >=2 probe stages"
 
-    def test_build_creates_project_under_dist(self, runner: CliRunner) -> None:
+    def test_build_creates_project_under_dist(self, runner: CliRunner, tmp_path: Path) -> None:
         """Verify the project lands under the dist dir."""
-        tmp = Path("/tmp/e2e-studio-dist")
-        tmp.mkdir(exist_ok=True)
+        tmp = tmp_path / "e2e-studio-dist"
+        tmp.mkdir(parents=True, exist_ok=True)
         brief_path = _write_brief(tmp)
         patch, _, _ = _invoke_studio(runner, str(brief_path), dist_dir=str(tmp))
 
@@ -364,10 +358,12 @@ class TestBuildHappyPath:
         # The project dir should be under tmp (dist_dir)
         assert (tmp / "e2e-test").is_dir()
 
-    def test_build_output_mentions_project_and_plan(self, runner: CliRunner) -> None:
+    def test_build_output_mentions_project_and_plan(
+        self, runner: CliRunner, tmp_path: Path
+    ) -> None:
         """CLI output should mention project name and plan ID."""
-        tmp = Path("/tmp/e2e-studio-output")
-        tmp.mkdir(exist_ok=True)
+        tmp = tmp_path / "e2e-studio-output"
+        tmp.mkdir(parents=True, exist_ok=True)
         brief_path = _write_brief(tmp)
         patch, _, _ = _invoke_studio(runner, str(brief_path), dist_dir=str(tmp))
 
@@ -389,12 +385,11 @@ class TestBuildHappyPath:
 class TestBuildResume:
     """--resume: completed stages are skipped, missing stages run."""
 
-    def test_resume_skips_completed_nodes(self, runner: CliRunner) -> None:
+    def test_resume_skips_completed_nodes(self, runner: CliRunner, tmp_path: Path) -> None:
         """First build completes; second build with --resume skips everything."""
-        tmp = Path("/tmp/e2e-studio-resume")
-        tmp.mkdir(exist_ok=True)
+        tmp = tmp_path / "e2e-studio-resume"
+        tmp.mkdir(parents=True, exist_ok=True)
         brief_path = _write_brief(tmp)
-        adapter = RecordingFakeAdapter()
         patch, _, _ = _invoke_studio(runner, str(brief_path), dist_dir=str(tmp))
 
         # First build
@@ -418,11 +413,10 @@ class TestBuildResume:
         proj = tmp / "e2e-test"
         assert (proj / "premiere.mp4").exists()
 
-    def test_resume_with_partial_build(self, runner: CliRunner) -> None:
+    def test_resume_with_partial_build(self, runner: CliRunner, tmp_path: Path) -> None:
         """Resume from a partial build (plan exists, but no nodes generated)."""
-        tmp = Path("/tmp/e2e-studio-resume-partial")
-        tmp.mkdir(exist_ok=True)
-        brief_path = _write_brief(tmp)
+        tmp = tmp_path / "e2e-studio-resume-partial"
+        tmp.mkdir(parents=True, exist_ok=True)
 
         # Create a partial project: plan exists, but no nodes dir
         proj = tmp / "e2e-test-partial"
@@ -467,8 +461,12 @@ class TestBuildResume:
 
         def factory(proj_dir, brief):
             director = M3Director(adapter, trace_path=proj_dir / "trace.jsonl")
-            music = MusicNode(adapter, proj_dir=proj_dir, downloader=_fake_download, probe=FakeProbe())
-            speech = SpeechNode(adapter, proj_dir=proj_dir, downloader=_fake_download, probe=FakeProbe())
+            music = MusicNode(
+                adapter, proj_dir=proj_dir, downloader=_fake_download, probe=FakeProbe()
+            )
+            speech = SpeechNode(
+                adapter, proj_dir=proj_dir, downloader=_fake_download, probe=FakeProbe()
+            )
             return director, music, speech
 
         with mock.patch("music_cli.studio.build.default_adapter_factory", factory):
@@ -489,10 +487,10 @@ class TestBuildResume:
 class TestBuildForce:
     """--force: regenerates all nodes and remuxes the premiere."""
 
-    def test_force_regenerates_premiere(self, runner: CliRunner) -> None:
+    def test_force_regenerates_premiere(self, runner: CliRunner, tmp_path: Path) -> None:
         """Build once, then --force should regenerate and update premiere mtime."""
-        tmp = Path("/tmp/e2e-studio-force")
-        tmp.mkdir(exist_ok=True)
+        tmp = tmp_path / "e2e-studio-force"
+        tmp.mkdir(parents=True, exist_ok=True)
         brief_path = _write_brief(tmp)
         patch, adapter, _ = _invoke_studio(runner, str(brief_path), dist_dir=str(tmp))
 
@@ -506,7 +504,6 @@ class TestBuildForce:
         premiere1_mtime = (tmp / "e2e-test" / "premiere.mp4").stat().st_mtime
 
         # Second build with --force
-        adapter2 = RecordingFakeAdapter()
         patch2, _, _ = _invoke_studio(runner, str(brief_path), dist_dir=str(tmp))
 
         with patch2:
@@ -519,10 +516,10 @@ class TestBuildForce:
         premiere2_mtime = (tmp / "e2e-test" / "premiere.mp4").stat().st_mtime
         assert premiere2_mtime > premiere1_mtime, "premiere mtime should change after --force"
 
-    def test_force_regenerates_adapter_calls(self, runner: CliRunner) -> None:
+    def test_force_regenerates_adapter_calls(self, runner: CliRunner, tmp_path: Path) -> None:
         """--force should trigger new adapter calls (not skip via lock)."""
-        tmp = Path("/tmp/e2e-studio-force-calls")
-        tmp.mkdir(exist_ok=True)
+        tmp = tmp_path / "e2e-studio-force-calls"
+        tmp.mkdir(parents=True, exist_ok=True)
         brief_path = _write_brief(tmp)
 
         # First build
@@ -532,7 +529,6 @@ class TestBuildForce:
                 main, ["studio", "build", str(brief_path), "--dist-dir", str(tmp)]
             )
         assert result1.exit_code == 0, result1.output
-        first_call_count = len(adapter1.calls)
 
         # Second build with --force
         patch2, adapter2, _ = _invoke_studio(runner, str(brief_path), dist_dir=str(tmp))
@@ -556,14 +552,35 @@ class TestBuildForce:
 class TestBuildNoH3:
     """--no-h3: skips H3 video generation, uses static fallback."""
 
-    def test_no_h3_skips_h3_calls(self, runner: CliRunner) -> None:
+    def test_no_h3_skips_h3_calls(self, runner: CliRunner, tmp_path: Path) -> None:
         """--no-h3 should not call h3_generate."""
-        tmp = Path("/tmp/e2e-studio-no-h3")
-        tmp.mkdir(exist_ok=True)
+        tmp = tmp_path / "e2e-studio-no-h3"
+        tmp.mkdir(parents=True, exist_ok=True)
         brief_path = _write_brief(tmp)
         patch, adapter, _ = _invoke_studio(runner, str(brief_path), dist_dir=str(tmp))
 
-        with patch:
+        def fake_ffmpeg_runner(command: list[str], cwd: object = None) -> mock.Mock:
+            out = Path(command[-1])
+            out.parent.mkdir(parents=True, exist_ok=True)
+            _write_dummy_wav(out, seconds=1.0)
+            return mock.Mock(returncode=0, stderr="")
+
+        real_video_node = VideoNode
+
+        def stub_video_node(adapter_obj: object, **kwargs: object) -> VideoNode:
+            # Inject hermetic ffmpeg/probe runners so no real ffmpeg runs,
+            # while keeping the real VideoNode (and its no_h3 logic) intact.
+            return real_video_node(
+                adapter_obj,  # type: ignore[arg-type]
+                probe=FakeProbe(),
+                ffmpeg_runner=fake_ffmpeg_runner,  # type: ignore[arg-type]
+                **kwargs,
+            )
+
+        with (
+            mock.patch("music_cli.studio.build.VideoNode", side_effect=stub_video_node),
+            patch,
+        ):
             result = runner.invoke(
                 main,
                 ["studio", "build", str(brief_path), "--dist-dir", str(tmp), "--no-h3"],
@@ -582,10 +599,10 @@ class TestBuildNoH3:
 class TestBuildFromPlaylist:
     """--from-playlist: taste profile is extracted and merged into the brief."""
 
-    def test_from_playlist_accepts_valid_playlist(self, runner: CliRunner) -> None:
+    def test_from_playlist_accepts_valid_playlist(self, runner: CliRunner, tmp_path: Path) -> None:
         """--from-playlist with a valid M3U file should not error."""
-        tmp = Path("/tmp/e2e-studio-playlist")
-        tmp.mkdir(exist_ok=True)
+        tmp = tmp_path / "e2e-studio-playlist"
+        tmp.mkdir(parents=True, exist_ok=True)
         brief_path = _write_brief(tmp)
         playlist_path = _write_playlist(tmp)
         patch, adapter, probe = _invoke_studio(runner, str(brief_path), dist_dir=str(tmp))
@@ -608,10 +625,10 @@ class TestBuildFromPlaylist:
         # a Click usage error (exit 2).
         assert result.exit_code != 2, f"Usage error with --from-playlist:\n{result.output}"
 
-    def test_from_playlist_nonexistent_file(self, runner: CliRunner) -> None:
+    def test_from_playlist_nonexistent_file(self, runner: CliRunner, tmp_path: Path) -> None:
         """--from-playlist with a missing file should exit nonzero."""
-        tmp = Path("/tmp/e2e-studio-playlist-missing")
-        tmp.mkdir(exist_ok=True)
+        tmp = tmp_path / "e2e-studio-playlist-missing"
+        tmp.mkdir(parents=True, exist_ok=True)
         brief_path = _write_brief(tmp)
         result = runner.invoke(
             main,
@@ -634,10 +651,10 @@ class TestBuildFromPlaylist:
 class TestBuildConfirm:
     """--confirm: allows H3 to exceed the per-build budget cap."""
 
-    def test_confirm_flag_accepted(self, runner: CliRunner) -> None:
+    def test_confirm_flag_accepted(self, runner: CliRunner, tmp_path: Path) -> None:
         """--confirm should be accepted without usage error."""
-        tmp = Path("/tmp/e2e-studio-confirm")
-        tmp.mkdir(exist_ok=True)
+        tmp = tmp_path / "e2e-studio-confirm"
+        tmp.mkdir(parents=True, exist_ok=True)
         brief_path = _write_brief(tmp)
         patch, _, _ = _invoke_studio(runner, str(brief_path), dist_dir=str(tmp))
 
@@ -658,22 +675,22 @@ class TestBuildConfirm:
 class TestBuildErrors:
     """Invalid brief and missing files should produce clean errors."""
 
-    def test_missing_brief_file(self, runner: CliRunner) -> None:
-        result = runner.invoke(main, ["studio", "build", "/tmp/nope.yaml"])
+    def test_missing_brief_file(self, runner: CliRunner, tmp_path: Path) -> None:
+        result = runner.invoke(main, ["studio", "build", str(tmp_path / "nope.yaml")])
         assert result.exit_code != 0
 
-    def test_invalid_brief_yaml(self, runner: CliRunner) -> None:
-        tmp = Path("/tmp/e2e-studio-bad-brief")
-        tmp.mkdir(exist_ok=True)
+    def test_invalid_brief_yaml(self, runner: CliRunner, tmp_path: Path) -> None:
+        tmp = tmp_path / "e2e-studio-bad-brief"
+        tmp.mkdir(parents=True, exist_ok=True)
         bad_brief = tmp / "bad.yaml"
         bad_brief.write_text("project_id: ''\ndescription: ''\n", encoding="utf-8")
         result = runner.invoke(main, ["studio", "build", str(bad_brief)])
         assert result.exit_code != 0
         assert "plan" in result.output.lower() or result.exit_code == 2
 
-    def test_brief_with_traversal_project_id(self, runner: CliRunner) -> None:
-        tmp = Path("/tmp/e2e-studio-traversal")
-        tmp.mkdir(exist_ok=True)
+    def test_brief_with_traversal_project_id(self, runner: CliRunner, tmp_path: Path) -> None:
+        tmp = tmp_path / "e2e-studio-traversal"
+        tmp.mkdir(parents=True, exist_ok=True)
         bad_brief = tmp / "traversal.yaml"
         bad_brief.write_text(
             "project_id: ../outside\ndescription: should fail\n",
@@ -701,10 +718,10 @@ class TestReviseCommand:
         result = runner.invoke(main, ["studio", "revise", "nonexistent", "change something"])
         assert result.exit_code != 0
 
-    def test_revise_after_build(self, runner: CliRunner) -> None:
+    def test_revise_after_build(self, runner: CliRunner, tmp_path: Path) -> None:
         """Build a project, then revise it."""
-        tmp = Path("/tmp/e2e-studio-revise")
-        tmp.mkdir(exist_ok=True)
+        tmp = tmp_path / "e2e-studio-revise"
+        tmp.mkdir(parents=True, exist_ok=True)
         brief_path = _write_brief(tmp)
 
         # Build first
@@ -728,14 +745,25 @@ class TestReviseCommand:
 
         def revise_factory(proj_dir, brief):
             director = M3Director(adapter2, trace_path=proj_dir / "trace.jsonl")
-            music = MusicNode(adapter2, proj_dir=proj_dir, downloader=_fake_download, probe=FakeProbe())
-            speech = SpeechNode(adapter2, proj_dir=proj_dir, downloader=_fake_download, probe=FakeProbe())
+            music = MusicNode(
+                adapter2, proj_dir=proj_dir, downloader=_fake_download, probe=FakeProbe()
+            )
+            speech = SpeechNode(
+                adapter2, proj_dir=proj_dir, downloader=_fake_download, probe=FakeProbe()
+            )
             return director, music, speech
 
         with mock.patch("music_cli.studio.build.default_adapter_factory", revise_factory):
             result = runner.invoke(
                 main,
-                ["studio", "revise", "e2e-test", "Change the music to be faster", "--dist-dir", str(tmp)],
+                [
+                    "studio",
+                    "revise",
+                    "e2e-test",
+                    "Change the music to be faster",
+                    "--dist-dir",
+                    str(tmp),
+                ],
             )
 
         # Revise may succeed or fail depending on internal logic,
@@ -756,31 +784,30 @@ class TestDoctorCommand:
         assert result.exit_code == 0
         assert "Usage:" in result.output
 
-    def test_doctor_exits_ok_with_dist_dir(self, runner: CliRunner) -> None:
+    def test_doctor_exits_ok_with_dist_dir(self, runner: CliRunner, tmp_path: Path) -> None:
         """Doctor should exit 0 when all checks pass (or warn)."""
-        tmp = Path("/tmp/e2e-studio-doctor")
-        tmp.mkdir(exist_ok=True)
+        tmp = tmp_path / "e2e-studio-doctor"
+        tmp.mkdir(parents=True, exist_ok=True)
         result = runner.invoke(main, ["studio", "doctor", "--dist-dir", str(tmp)])
         # Doctor may exit 0 or non-zero depending on environment
         # (e.g., no ffmpeg installed). The key is it should not crash.
         assert result.exit_code in (0, 1), f"Doctor crashed:\n{result.output}"
 
-    def test_doctor_output_contains_checks(self, runner: CliRunner) -> None:
+    def test_doctor_output_contains_checks(self, runner: CliRunner, tmp_path: Path) -> None:
         """Doctor output should mention check names."""
-        tmp = Path("/tmp/e2e-studio-doctor-output")
-        tmp.mkdir(exist_ok=True)
+        tmp = tmp_path / "e2e-studio-doctor-output"
+        tmp.mkdir(parents=True, exist_ok=True)
         result = runner.invoke(main, ["studio", "doctor", "--dist-dir", str(tmp)])
         output = result.output.lower()
         # At least some check names should appear
         assert any(
-            kw in output
-            for kw in ("ffmpeg", "gmi", "dist", "network", "disk", "openrouter", "h3")
+            kw in output for kw in ("ffmpeg", "gmi", "dist", "network", "disk", "openrouter", "h3")
         ), f"Doctor output missing check names:\n{result.output}"
 
-    def test_doctor_with_fix_messages(self, runner: CliRunner) -> None:
+    def test_doctor_with_fix_messages(self, runner: CliRunner, tmp_path: Path) -> None:
         """Doctor should show 'fix:' lines for failed/warned checks."""
-        tmp = Path("/tmp/e2e-studio-doctor-fix")
-        tmp.mkdir(exist_ok=True)
+        tmp = tmp_path / "e2e-studio-doctor-fix"
+        tmp.mkdir(parents=True, exist_ok=True)
         result = runner.invoke(main, ["studio", "doctor", "--dist-dir", str(tmp)])
         # If there are warnings/failures, fix hints should be present
         if "FAIL" in result.output or "WARN" in result.output:
@@ -803,10 +830,10 @@ class TestPlanCommand:
         result = runner.invoke(main, ["studio", "plan", "nonexistent"])
         assert result.exit_code != 0
 
-    def test_plan_after_build(self, runner: CliRunner) -> None:
+    def test_plan_after_build(self, runner: CliRunner, tmp_path: Path) -> None:
         """Build a project, then inspect its plan."""
-        tmp = Path("/tmp/e2e-studio-plan")
-        tmp.mkdir(exist_ok=True)
+        tmp = tmp_path / "e2e-studio-plan"
+        tmp.mkdir(parents=True, exist_ok=True)
         brief_path = _write_brief(tmp)
         patch, _, _ = _invoke_studio(runner, str(brief_path), dist_dir=str(tmp))
 
@@ -838,10 +865,10 @@ class TestTraceCommand:
         result = runner.invoke(main, ["studio", "trace", "nonexistent"])
         assert result.exit_code != 0
 
-    def test_trace_after_build(self, runner: CliRunner) -> None:
+    def test_trace_after_build(self, runner: CliRunner, tmp_path: Path) -> None:
         """Build a project, then inspect its trace."""
-        tmp = Path("/tmp/e2e-studio-trace")
-        tmp.mkdir(exist_ok=True)
+        tmp = tmp_path / "e2e-studio-trace"
+        tmp.mkdir(parents=True, exist_ok=True)
         brief_path = _write_brief(tmp)
         patch, _, _ = _invoke_studio(runner, str(brief_path), dist_dir=str(tmp))
 
@@ -864,10 +891,10 @@ class TestTraceCommand:
 class TestMultiCommandWorkflow:
     """Integrated workflows that span multiple commands."""
 
-    def test_build_then_plan_then_trace(self, runner: CliRunner) -> None:
+    def test_build_then_plan_then_trace(self, runner: CliRunner, tmp_path: Path) -> None:
         """Build → plan → trace: the full inspection workflow."""
-        tmp = Path("/tmp/e2e-studio-workflow")
-        tmp.mkdir(exist_ok=True)
+        tmp = tmp_path / "e2e-studio-workflow"
+        tmp.mkdir(parents=True, exist_ok=True)
         brief_path = _write_brief(tmp)
         patch, _, _ = _invoke_studio(runner, str(brief_path), dist_dir=str(tmp))
 
@@ -885,10 +912,10 @@ class TestMultiCommandWorkflow:
         result_trace = runner.invoke(main, ["studio", "trace", "e2e-test", "--dist-dir", str(tmp)])
         assert result_trace.exit_code == 0, result_trace.output
 
-    def test_doctor_before_and_after_build(self, runner: CliRunner) -> None:
+    def test_doctor_before_and_after_build(self, runner: CliRunner, tmp_path: Path) -> None:
         """Doctor should show different h3 budget status before vs after build."""
-        tmp = Path("/tmp/e2e-studio-doctor-workflow")
-        tmp.mkdir(exist_ok=True)
+        tmp = tmp_path / "e2e-studio-doctor-workflow"
+        tmp.mkdir(parents=True, exist_ok=True)
 
         # Before build: h3 budget should warn (no builds yet)
         result_before = runner.invoke(main, ["studio", "doctor", "--dist-dir", str(tmp)])
@@ -928,10 +955,10 @@ class TestStudioErrorCases:
         # Should not be a clean success
         assert result.exit_code != 0
 
-    def test_plan_with_dist_dir(self, runner: CliRunner) -> None:
+    def test_plan_with_dist_dir(self, runner: CliRunner, tmp_path: Path) -> None:
         """plan and trace should accept --dist-dir."""
-        tmp = Path("/tmp/e2e-studio-distdir")
-        tmp.mkdir(exist_ok=True)
+        tmp = tmp_path / "e2e-studio-distdir"
+        tmp.mkdir(parents=True, exist_ok=True)
         brief_path = _write_brief(tmp)
         patch, _, _ = _invoke_studio(runner, str(brief_path), dist_dir=str(tmp))
 
@@ -942,12 +969,8 @@ class TestStudioErrorCases:
         assert result.exit_code == 0, result.output
 
         # Both plan and trace with explicit --dist-dir
-        result_plan = runner.invoke(
-            main, ["studio", "plan", "e2e-test", "--dist-dir", str(tmp)]
-        )
+        result_plan = runner.invoke(main, ["studio", "plan", "e2e-test", "--dist-dir", str(tmp)])
         assert result_plan.exit_code == 0, result_plan.output
 
-        result_trace = runner.invoke(
-            main, ["studio", "trace", "e2e-test", "--dist-dir", str(tmp)]
-        )
+        result_trace = runner.invoke(main, ["studio", "trace", "e2e-test", "--dist-dir", str(tmp)])
         assert result_trace.exit_code == 0, result_trace.output

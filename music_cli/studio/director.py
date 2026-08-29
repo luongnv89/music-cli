@@ -247,9 +247,7 @@ class M3Director:
                 previous_text = text
                 continue
 
-        self._trace(
-            step, prompt, previous_text or "", start, MAX_PARSE_RETRIES, ok=False
-        )
+        self._trace(step, prompt, previous_text or "", start, MAX_PARSE_RETRIES, ok=False)
         raise DirectorError(
             f"{step}: model failed to produce schema-valid JSON after "
             f"{1 + MAX_PARSE_RETRIES} attempts; last errors: {'; '.join(last_errors)}"

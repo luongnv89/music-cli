@@ -286,6 +286,38 @@ class TestBuildServiceRun:
         # Should succeed with fallback track from brief
         assert result.premiere_mp4 is not None and result.premiere_mp4.exists()
 
+    def test_fallback_resume_does_not_recall_audio_adapter(self, tmp_path):
+        """A resumed fallback build reuses the persisted track without new adapter calls."""
+        empty = {k: v for k, v in VALID_PLAN.items() if k not in {"tracks", "scenes"}}
+        plan_text = json.dumps(empty)
+        probe = FakeProbe(seconds=1.0)
+
+        class CountingAdapter(FakeAdapter):
+            def __init__(self) -> None:
+                super().__init__(plan_text)
+                self.generate_calls = 0
+
+            async def music3_generate(self, prompt, **kwargs):
+                self.generate_calls += 1
+                return await super().music3_generate(prompt, **kwargs)
+
+        adapter = CountingAdapter()
+        service = BuildService(
+            dist_dir=tmp_path,
+            adapter_factory=lambda proj_dir, brief: _service_factory(
+                adapter, probe, proj_dir, brief
+            ),
+        )
+        brief = Brief.from_dict({"project_id": "neon-rain", "description": "go"})
+        first = service.run(brief)
+        assert first.regenerated
+        assert adapter.generate_calls == 1
+
+        second = service.run(brief)
+        assert not second.regenerated
+        assert adapter.generate_calls == 1  # fallback track was reused, not regenerated
+        assert second.premiere_mp4 is not None and second.premiere_mp4.exists()
+
     def test_duration_within_two_seconds_of_plan(self, tmp_path):
         service, _adapter, probe = _make_service(tmp_path, probe=FakeProbe(seconds=60.0))
         brief = Brief.from_dict({"project_id": "neon-rain", "description": "go"})
