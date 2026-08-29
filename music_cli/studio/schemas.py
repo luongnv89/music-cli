@@ -114,11 +114,6 @@ def _validate_constitution(data: Any, prefix: str = "") -> list[str]:
         v = data["motifs"]
         if not isinstance(v, list):
             errs.append(_err(prefix, "motifs: must be list of strings"))
-        else:
-            for i, m in enumerate(v):
-                if not _is_non_empty_str(m):
-                    # allow empty strings (model may return them)
-                    pass
     if "voice_profile" in data and data["voice_profile"] is not None:
         v = data["voice_profile"]
         if not isinstance(v, dict):
@@ -249,11 +244,6 @@ def _validate_creative_plan(data: Any, prefix: str = "") -> list[str]:
         v = data["motifs"]
         if not isinstance(v, list):
             errs.append(_err(prefix, "motifs: must be list of strings"))
-        else:
-            for i, m in enumerate(v):
-                if not _is_non_empty_str(m):
-                    # allow empty strings (model may return them)
-                    pass
     if "voice" in data and data["voice"] is not None and not isinstance(data["voice"], dict):
         errs.append(_err(prefix, "voice: must be object"))
     if "locked_assets" in data and data["locked_assets"] is not None:

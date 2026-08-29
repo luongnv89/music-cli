@@ -28,7 +28,7 @@
    pipx install music-cli[minimax,gmi]
    mc studio doctor
    ```
-4. **Section 3 (Constitution)**: 
+4. **Section 3 (Constitution)**:
    ```bash
    cat CHALLENGE.md
    cat music_cli/studio/schemas.py | head -30

@@ -254,6 +254,26 @@ class TestBuildServiceRun:
         assert first.premiere_mp4.stat().st_mtime == first_mp4_mtime
         assert len(_adapter.plan_prompts) == 1  # persisted plan is reused
 
+    def test_plan_with_wrong_project_id_is_normalized_before_persist(self, tmp_path):
+        """Regression (F4): a model-invented plan project_id must be
+        normalized to the brief's id BEFORE the plan file is written, so a
+        second run resumes from the persisted plan instead of re-planning."""
+        bad_plan = dict(VALID_PLAN)
+        bad_plan["project_id"] = "model-invented-id"
+        service, adapter, _probe = _make_service(tmp_path, plan_payload=bad_plan)
+        brief = Brief.from_dict({"project_id": "neon-rain", "description": "go"})
+
+        first = service.run(brief)
+        # plan file on disk carries the brief's id, not the model's
+        persisted = (tmp_path / "neon-rain" / "plan.yaml").read_text()
+        assert "project_id: neon-rain" in persisted
+        assert first.plan["project_id"] == "neon-rain"
+
+        # second run resumes: no new m3_plan call, nodes not regenerated
+        second = service.run(brief)
+        assert not second.regenerated
+        assert len(adapter.plan_prompts) == 1
+
     def test_force_regenerates_and_remux(self, tmp_path):
         service, _adapter, _probe = _make_service(tmp_path)
         brief = Brief.from_dict({"project_id": "neon-rain", "description": "go"})
@@ -285,6 +305,38 @@ class TestBuildServiceRun:
         result = service.run(brief)
         # Should succeed with fallback track from brief
         assert result.premiere_mp4 is not None and result.premiere_mp4.exists()
+
+    def test_fallback_resume_does_not_recall_audio_adapter(self, tmp_path):
+        """A resumed fallback build reuses the persisted track without new adapter calls."""
+        empty = {k: v for k, v in VALID_PLAN.items() if k not in {"tracks", "scenes"}}
+        plan_text = json.dumps(empty)
+        probe = FakeProbe(seconds=1.0)
+
+        class CountingAdapter(FakeAdapter):
+            def __init__(self) -> None:
+                super().__init__(plan_text)
+                self.generate_calls = 0
+
+            async def music3_generate(self, prompt, **kwargs):
+                self.generate_calls += 1
+                return await super().music3_generate(prompt, **kwargs)
+
+        adapter = CountingAdapter()
+        service = BuildService(
+            dist_dir=tmp_path,
+            adapter_factory=lambda proj_dir, brief: _service_factory(
+                adapter, probe, proj_dir, brief
+            ),
+        )
+        brief = Brief.from_dict({"project_id": "neon-rain", "description": "go"})
+        first = service.run(brief)
+        assert first.regenerated
+        assert adapter.generate_calls == 1
+
+        second = service.run(brief)
+        assert not second.regenerated
+        assert adapter.generate_calls == 1  # fallback track was reused, not regenerated
+        assert second.premiere_mp4 is not None and second.premiere_mp4.exists()
 
     def test_duration_within_two_seconds_of_plan(self, tmp_path):
         service, _adapter, probe = _make_service(tmp_path, probe=FakeProbe(seconds=60.0))

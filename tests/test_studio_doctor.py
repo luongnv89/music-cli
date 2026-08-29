@@ -144,6 +144,14 @@ def test_check_disk_space_warns_when_low(tmp_path):
     assert "free" in result.message.lower()
 
 
+def test_check_disk_space_warns_without_statvfs(tmp_path):
+    """Platforms without os.statvfs (e.g. Windows) get a WARN, not a crash."""
+    with mock.patch("music_cli.studio.doctor.os", spec=[]):
+        result = check_disk_space(tmp_path / "dist")
+    assert result.status == "WARN"
+    assert "disk space" in result.message.lower()
+
+
 def test_check_h3_budget_warns_when_no_builds(tmp_path):
     result = check_h3_budget(tmp_path / "nonexistent")
     assert result.status == "WARN"
