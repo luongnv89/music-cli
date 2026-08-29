@@ -280,7 +280,7 @@ mc cloud smoke              # one real call per free MiniMax model -> dist/_smok
 > serving endpoint) will pass `mc cloud ping` but will fail with `HTTP 400` during `mc studio build`
 > because Music 3.0 and Speech 2.8 run as async jobs on the queue endpoint. If your key works for
 > text but not audio, you need a key with audio-model access.
-> 
+>
 > Check your key with `mc studio doctor` — it should show `OK: gmi key: stored in the OS keyring`.
 mc daemon start|stop|status # manage daemon
 ```
