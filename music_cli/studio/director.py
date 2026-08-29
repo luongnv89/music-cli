@@ -188,7 +188,7 @@ class M3Director:
             "REQUIRED FIELDS: plan_id, project_id (slug), title, objective, brief, duration_seconds."
         )
         prompt = f"Brief:\n{brief}"
-        data = await self._ask_json_with_system("plan", prompt, system_prompt, CreativePlan)
+        data = await self._ask_json("plan", prompt, CreativePlan, system_prompt=system_prompt)
         return CreativePlan(data)
 
     async def critique(self, plan: Any, measurements: Any) -> CritiqueReport:
@@ -213,53 +213,16 @@ class M3Director:
 
     # -- internals --------------------------------------------------------
 
-    async def _ask_json_with_system(
-        self, step: str, prompt: str, system_prompt: str, schema: Any
+    async def _ask_json(
+        self, step: str, prompt: str, schema: Any, *, system_prompt: str | None = None
     ) -> dict[str, Any]:
-        """Like _ask_json but sends a system message for JSON enforcement."""
-        current_prompt = prompt
-        previous_text: str | None = None
-        start = time.monotonic()
-        last_errors: list[str] = []
-
-        for attempt in range(1 + MAX_PARSE_RETRIES):
-            if previous_text is not None:
-                current_prompt = (
-                    f"{prompt}\n\nYour previous reply was not valid JSON for this "
-                    f"schema. Errors:\n"
-                    + "\n".join(f"- {e}" for e in last_errors)
-                    + f"\n\nPrevious reply:\n{previous_text}\n\n"
-                    "Re-output the exact JSON, corrected. No prose, no markdown fences."
-                )
-            reply = await self._call_with_system(step, current_prompt, system_prompt)
-            text = reply.get("text", "") if isinstance(reply, dict) else str(reply)
-            try:
-                data = extract_json(text)
-                errors = schema.validate(data)
-                if errors:
-                    last_errors = errors
-                    previous_text = text
-                    continue
-                self._trace(step, prompt, text, start, attempt, ok=True)
-                return data
-            except (ValueError, TypeError):
-                last_errors = ["model did not return JSON"]
-                previous_text = text
-                continue
-
-        self._trace(step, prompt, previous_text or "", start, MAX_PARSE_RETRIES, ok=False)
-        raise DirectorError(
-            f"{step}: model failed to produce schema-valid JSON after "
-            f"{1 + MAX_PARSE_RETRIES} attempts; last errors: {'; '.join(last_errors)}"
-        )
-
-    async def _ask_json(self, step: str, prompt: str, schema: Any) -> dict[str, Any]:
         """Call M3 and retry on parse/validation failure, tracing each attempt.
 
-        Up to ``1 + MAX_PARSE_RETRIES`` attempts; each failed attempt gets a
-        corrective prompt embedding the validation errors and the invalid
-        reply with a "re-output the exact JSON" instruction. Raises
-        :class:`DirectorError` when every attempt fails.
+        When ``system_prompt`` is set it is sent as the system message for
+        JSON enforcement. Up to ``1 + MAX_PARSE_RETRIES`` attempts; each
+        failed attempt gets a corrective prompt embedding the validation
+        errors and the invalid reply with a "re-output the exact JSON"
+        instruction. Raises :class:`DirectorError` when every attempt fails.
         """
         current_prompt = prompt
         previous_text: str | None = None
@@ -275,7 +238,10 @@ class M3Director:
                     + f"\n\nPrevious reply:\n{previous_text}\n\n"
                     "Re-output the exact JSON, corrected. No prose, no markdown fences."
                 )
-            reply = await self._call(step, current_prompt)
+            if system_prompt is not None:
+                reply = await self._call_with_system(step, current_prompt, system_prompt)
+            else:
+                reply = await self._call(step, current_prompt)
             text = reply.get("text", "") if isinstance(reply, dict) else str(reply)
             try:
                 data = extract_json(text)
