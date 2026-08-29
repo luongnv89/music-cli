@@ -292,13 +292,15 @@ class BuildService:
             if plan is None:
                 plan = self._plan(director, brief, trace)
                 result.plan = plan.to_dict()
+                # Normalize project_id to match the brief (model may return a
+                # title) BEFORE persisting, so the plan file, the in-memory
+                # plan, and resume validation all agree.
+                result.plan["project_id"] = brief.project_id
                 self._write_plan(paths[PLAN_FILENAME], result.plan)
             else:
                 result.plan = plan.to_dict()
 
             plan_data = result.plan
-            # Normalize project_id to match the brief (model may return a title).
-            plan_data["project_id"] = brief.project_id
 
             # Reuse node files only when the persisted manifest describes
             # this exact plan's node identities and prompts. A valid but

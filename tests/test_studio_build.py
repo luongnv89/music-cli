@@ -254,6 +254,26 @@ class TestBuildServiceRun:
         assert first.premiere_mp4.stat().st_mtime == first_mp4_mtime
         assert len(_adapter.plan_prompts) == 1  # persisted plan is reused
 
+    def test_plan_with_wrong_project_id_is_normalized_before_persist(self, tmp_path):
+        """Regression (F4): a model-invented plan project_id must be
+        normalized to the brief's id BEFORE the plan file is written, so a
+        second run resumes from the persisted plan instead of re-planning."""
+        bad_plan = dict(VALID_PLAN)
+        bad_plan["project_id"] = "model-invented-id"
+        service, adapter, _probe = _make_service(tmp_path, plan_payload=bad_plan)
+        brief = Brief.from_dict({"project_id": "neon-rain", "description": "go"})
+
+        first = service.run(brief)
+        # plan file on disk carries the brief's id, not the model's
+        persisted = (tmp_path / "neon-rain" / "plan.yaml").read_text()
+        assert "project_id: neon-rain" in persisted
+        assert first.plan["project_id"] == "neon-rain"
+
+        # second run resumes: no new m3_plan call, nodes not regenerated
+        second = service.run(brief)
+        assert not second.regenerated
+        assert len(adapter.plan_prompts) == 1
+
     def test_force_regenerates_and_remux(self, tmp_path):
         service, _adapter, _probe = _make_service(tmp_path)
         brief = Brief.from_dict({"project_id": "neon-rain", "description": "go"})
