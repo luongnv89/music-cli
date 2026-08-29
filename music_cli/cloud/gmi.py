@@ -17,12 +17,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .base import (
-    TRANSIENT_STATUSES,
-    BaseAdapter,
-    HttpStatusError,
-    TransientError,
-)
+from .base import BaseAdapter
 
 # OpenAI-compatible serving endpoint for the MiniMax text models.
 GMI_SERVING_CHAT_URL = "https://api.gmi-serving.com/v1/chat/completions"
@@ -68,18 +63,12 @@ class GMIAdapter(BaseAdapter):
         headers: dict[str, str] | None = None,
     ) -> Any:
         # GMI Cloud queue endpoint (console.gmicloud.ai) expects the raw API key.
-        # The text model endpoint (api.gmi-serving.com) requires "Bearer {key}".
+        # The text model endpoint (api.gmi-serving.com) requires "Bearer {key}"
+        # (the BaseAdapter default).
         if headers is not None and self.queue_url in url:
             headers = dict(headers)  # copy to avoid mutating caller's dict
             headers["Authorization"] = self._api_key
-        status, body = await self._get_transport()(method, url, headers or self._headers(), payload)
-        if status >= 500 or status in TRANSIENT_STATUSES:
-            raise TransientError(f"{self.provider}: HTTP {status} from {method} {url}")
-        if status >= 400:
-            raise HttpStatusError(
-                f"{self.provider}: HTTP {status} from {method} {url}", status=status
-            )
-        return body
+        return await super()._send(method, url, payload, headers)
 
     # -- text models (synchronous chat completions) --------------------
     async def m3_plan(self, prompt: str, **params: Any) -> dict[str, Any]:
