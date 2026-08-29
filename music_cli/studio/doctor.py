@@ -329,8 +329,18 @@ def check_network() -> CheckResult:
 def check_disk_space(dist_dir: str | Path = DEFAULT_DIST_DIR) -> CheckResult:
     """Check available disk space on the volume holding *dist_dir*."""
     path = Path(dist_dir).resolve()
+    statvfs = getattr(os, "statvfs", None)
+    if statvfs is None:
+        # os.statvfs is Unix-only; on platforms without it (e.g. Windows)
+        # report a warning rather than crashing the whole doctor run.
+        return CheckResult(
+            "disk space",
+            "WARN",
+            "could not determine available disk space on this platform",
+            "",
+        )
     try:
-        stat = os.statvfs(str(path))
+        stat = statvfs(str(path))
         free_bytes = stat.f_bavail * stat.f_frsize
         free_gb = free_bytes / (1024**3)
     except OSError:
