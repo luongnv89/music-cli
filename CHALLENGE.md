@@ -48,26 +48,29 @@ These files existed at the `pre-minimax-week` tag and ship as part of the entry 
 | `README.md` | Updated with MiniMax Week section |
 | `pyproject.toml` | Added `minimax` and `gmi` extras |
 
-### New files (added since pre-minimax-week)
+## Premiere validation
 
-## Premiere ffprobe
+No verified live `dist/neon-rain/premiere.mp4` exists yet. The latest build attempts
+persisted a valid M3 plan and trace but stopped during GMI audio generation; Speech 2.8 HD
+remains unavailable because the provider reports persistent `503` capacity errors. Do not
+interpret hermetic test fixtures as a recorded premiere or `ffprobe` result.
 
-```text
-ffprobe output for dist/neon-rain/premiere.mp4:
-  Duration: 00:00:01.00, start: 0.000000, bitrate: 14 kb/s
-  Stream #0:0: Audio: aac (LC), 44100 Hz, stereo, fltp, 2 kb/s
-  Stream #0:1: Subtitle: mov_text (captions)
+After GMI capacity recovers, run:
+
+```bash
+mc studio build examples/neon-rain.yaml --force --no-h3
+ffprobe dist/neon-rain/premiere.mp4
 ```
-
-Codec summary: MP4 container, H.264 video (if present), AAC audio, SRT captions.
 
 ### New files (added since pre-minimax-week)
 
 | File | Purpose |
 |------|---------|
-| `docs/H3_GO_NO_GO.md` | Go/no-go checklist for H3 milestone |
-| `docs/MINIMAX_WEEK_LOG.md` | Development log for MiniMax Week |
-| `docs/MINIMAX_WEEK_TASKS.md` | Task breakdown for MiniMax Week |
+| `docs/minimax-week/H3_GO_NO_GO.md` | Go/no-go checklist for H3 milestone |
+| `docs/minimax-week/MINIMAX_WEEK_PLAN.md` | Source implementation plan and current milestone status |
+| `docs/minimax-week/MINIMAX_WEEK_LOG.md` | Development log for MiniMax Week |
+| `docs/minimax-week/MINIMAX_WEEK_TASKS.md` | Task breakdown for MiniMax Week |
+| `docs/minimax-week/troubleshooting.md` | Validated setup and live-provider troubleshooting |
 | `examples/neon-rain.yaml` | Example studio build definition |
 | `music_cli/cli/cloud.py` | Cloud command group (GMI / OpenRouter) |
 | `music_cli/cli/cloud_smoke.py` | Cloud smoke-test command |

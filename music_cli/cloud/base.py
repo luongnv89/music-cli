@@ -147,11 +147,21 @@ class BaseAdapter:
                 "Install it with: pip install 'coder-music-cli[gmi]'"
             ) from exc
 
-        client = httpx.AsyncClient(timeout=60.0)
+        # Keep enough read time for a slow queue submission. The separate
+        # poll timeout governs how long an accepted job may remain pending.
+        client = httpx.AsyncClient(timeout=120.0)
         self._client = client
 
         async def transport(method, url, headers, payload):
-            response = await client.request(method, url, headers=headers, json=payload)
+            try:
+                response = await client.request(method, url, headers=headers, json=payload)
+            except httpx.TransportError as exc:
+                # Network and timeout failures are retryable just like 5xx
+                # responses. Include the exception type because httpx timeout
+                # exceptions commonly have an empty string representation.
+                raise TransientError(
+                    f"{self.provider}: {type(exc).__name__} from {method} {url}"
+                ) from exc
             try:
                 body: Any = response.json()
             except ValueError:
@@ -241,8 +251,8 @@ class BaseAdapter:
         *,
         headers: dict[str, str] | None = None,
         should_cancel: Callable[[], bool] | None = None,
-        terminal_status: str = "completed",
-        failure_status: str = "failed",
+        terminal_status: str | tuple[str, ...] = "completed",
+        failure_status: str | tuple[str, ...] = "failed",
     ) -> dict[str, Any]:
         """Poll an async job until it reaches a terminal state.
 
@@ -254,6 +264,10 @@ class BaseAdapter:
         stays valid, so a later call resumes polling it rather than
         submitting a duplicate.
         """
+        terminal_statuses = (
+            (terminal_status,) if isinstance(terminal_status, str) else terminal_status
+        )
+        failure_statuses = (failure_status,) if isinstance(failure_status, str) else failure_status
         loop = asyncio.get_running_loop()
         deadline = loop.time() + self._poll_timeout
         while True:
@@ -261,9 +275,9 @@ class BaseAdapter:
                 raise PollCancelledError(f"{self.provider}: job polling cancelled")
             body = await self._send("GET", url, headers=headers)
             status = body.get("status") if isinstance(body, dict) else None
-            if status == terminal_status:
+            if status in terminal_statuses:
                 return body
-            if status == failure_status:
+            if status in failure_statuses:
                 error = body.get("error", "unknown error") if isinstance(body, dict) else body
                 raise AdapterError(f"{self.provider}: job failed: {error}")
             if loop.time() >= deadline:
@@ -323,6 +337,8 @@ class BaseAdapter:
         submit_url: str,
         submit_payload: Callable[[str], dict[str, Any]],
         result_of: Callable[[dict[str, Any]], dict[str, Any]],
+        terminal_status: str | tuple[str, ...] = "completed",
+        failure_status: str | tuple[str, ...] = "failed",
     ) -> dict[str, Any]:
         """Cache-aside wrapper around an async queue job: submit -> poll -> result.
 
@@ -374,7 +390,12 @@ class BaseAdapter:
             if job_id is None:
                 await submit()
             try:
-                return await self.poll(poll_url(), headers=headers)
+                return await self.poll(
+                    poll_url(),
+                    headers=headers,
+                    terminal_status=terminal_status,
+                    failure_status=failure_status,
+                )
             except PollCancelledError:
                 raise
             except AdapterError as exc:
@@ -392,7 +413,12 @@ class BaseAdapter:
                     job_id = None
                     resumed = False
                     await submit()
-                    return await self.poll(poll_url(), headers=headers)
+                    return await self.poll(
+                        poll_url(),
+                        headers=headers,
+                        terminal_status=terminal_status,
+                        failure_status=failure_status,
+                    )
                 raise
 
         outcome = await self.run(operation)

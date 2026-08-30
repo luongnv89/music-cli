@@ -33,13 +33,16 @@ wrapper can render an actionable ``mc studio build --resume`` hint.
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import json
+import logging
 import math
 import re
 import shutil
 import subprocess
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
+from functools import wraps
 from pathlib import Path
 from typing import Any
 
@@ -77,6 +80,92 @@ TRACE_REGENERATE = "regenerate"
 #: Premiere container — audio-only MP4 with the SRT muxed as a subtitle.
 PREMIERE_CODEC = "aac"
 _PROJECT_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{1,62}$")
+
+_LOGGER = logging.getLogger(__name__)
+_ACTIVE_ASYNC_RUNNER: contextvars.ContextVar[Callable[[Any], Any] | None] = contextvars.ContextVar(
+    "build_async_runner", default=None
+)
+_ACTIVE_ADAPTERS: contextvars.ContextVar[tuple[Any, ...]] = contextvars.ContextVar(
+    "build_active_adapters", default=()
+)
+
+
+def _run_async(coro: Any) -> Any:
+    """Run one coroutine on the current build operation's shared event loop."""
+    runner = _ACTIVE_ASYNC_RUNNER.get()
+    return runner(coro) if runner is not None else asyncio.run(coro)
+
+
+def _exception_detail(exc: Exception) -> str:
+    """Return the useful exception chain, including provider status causes."""
+    details: list[str] = []
+    current: BaseException | None = exc
+    seen: set[int] = set()
+    while isinstance(current, Exception) and id(current) not in seen:
+        seen.add(id(current))
+        detail = str(current).strip() or type(current).__name__
+        if detail not in details:
+            details.append(detail)
+        current = current.__cause__ or current.__context__
+    return ": ".join(details)
+
+
+def _register_adapters(*components: Any) -> None:
+    """Register adapters owned by build components for end-of-operation cleanup."""
+    adapters = list(_ACTIVE_ADAPTERS.get())
+    for component in components:
+        for attribute in ("_adapter", "adapter"):
+            adapter = getattr(component, attribute, None)
+            if adapter is not None and all(adapter is not known for known in adapters):
+                adapters.append(adapter)
+                break
+    _ACTIVE_ADAPTERS.set(tuple(adapters))
+
+
+async def _close_adapters(adapters: tuple[Any, ...]) -> None:
+    """Close adapter-owned async resources without masking a build failure."""
+    import inspect
+
+    for adapter in adapters:
+        close = getattr(adapter, "aclose", None)
+        if not callable(close):
+            continue
+        try:
+            result = close()
+            if inspect.isawaitable(result):
+                await result
+        except Exception:
+            _LOGGER.warning("failed to close cloud adapter", exc_info=True)
+
+
+def _run_with_async_runner(method: Callable[..., Any]) -> Callable[..., Any]:
+    """Give one synchronous build/revise operation one shared asyncio loop."""
+
+    @wraps(method)
+    def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            pass
+        else:
+            raise RuntimeError(f"{method.__name__}() cannot be called from a running event loop")
+
+        with asyncio.Runner() as runner:
+            runner_token = _ACTIVE_ASYNC_RUNNER.set(runner.run)
+            adapters_token = _ACTIVE_ADAPTERS.set(())
+            try:
+                return method(self, *args, **kwargs)
+            finally:
+                adapters = _ACTIVE_ADAPTERS.get()
+                if adapters:
+                    try:
+                        runner.run(_close_adapters(adapters))
+                    except Exception:
+                        _LOGGER.warning("failed to clean up build adapters", exc_info=True)
+                _ACTIVE_ADAPTERS.reset(adapters_token)
+                _ACTIVE_ASYNC_RUNNER.reset(runner_token)
+
+    return wrapper
 
 
 class BuildError(RuntimeError):
@@ -246,6 +335,7 @@ class BuildService:
 
     # -- public API --------------------------------------------------------
 
+    @_run_with_async_runner
     def run(
         self,
         brief: Brief,
@@ -279,6 +369,7 @@ class BuildService:
         # Re-point the director at the project's trace so all lines land in
         # the right file regardless of what the factory set up.
         director.trace_path = trace_path
+        _register_adapters(director, music_node, speech_node)
 
         with TraceWriter(trace_path) as trace:
             # A non-forced invocation is also the resume path. Reuse the
@@ -420,6 +511,7 @@ class BuildService:
 
         return result
 
+    @_run_with_async_runner
     def revise(
         self,
         project_id: str,
@@ -483,11 +575,12 @@ class BuildService:
         except Exception as exc:
             raise BuildError("plan", f"adapter setup failed: {exc}") from exc
         director.trace_path = trace_path
+        _register_adapters(director, music_node, speech_node)
 
         with TraceWriter(trace_path) as trace:
             # --- Call M3Director.revise to get the PlanDiff ---
             try:
-                diff = asyncio.run(director.revise(plan, intent))
+                diff = _run_async(director.revise(plan, intent))
             except (DirectorError, TypeError, ValueError) as exc:
                 raise BuildError("plan", f"director.revise failed: {exc}") from exc
             if not isinstance(diff, PlanDiff):
@@ -648,7 +741,7 @@ class BuildService:
             # Use the node's existing prompt as base, append the intent.
             self._trace(trace, TRACE_GENERATE, node_id=node_id, payload=intent)
             try:
-                path = asyncio.run(speech_node.generate(intent, duration=None))
+                path = _run_async(speech_node.generate(intent, duration=None))
                 speech_node.lock()
                 return path
             except Exception:
@@ -659,7 +752,7 @@ class BuildService:
             music_node.unlock()
             self._trace(trace, TRACE_GENERATE, node_id=node_id, payload=intent)
             try:
-                path = asyncio.run(music_node.generate(intent, lyrics=None, duration=None))
+                path = _run_async(music_node.generate(intent, lyrics=None, duration=None))
                 music_node.lock()
                 return path
             except Exception:
@@ -701,7 +794,7 @@ class BuildService:
                 self._trace(trace, TRACE_GENERATE, node_id=nid, payload=prompt)
                 audio_path = None
                 try:
-                    audio_path = asyncio.run(speech_node.generate(prompt, duration=None))
+                    audio_path = _run_async(speech_node.generate(prompt, duration=None))
                     any_regen = True
                     speech_node.lock()
                 except NodeLockedError:
@@ -724,9 +817,7 @@ class BuildService:
                 self._trace(trace, TRACE_GENERATE, node_id=nid, payload=prompt)
                 audio_path = None
                 try:
-                    audio_path = asyncio.run(
-                        music_node.generate(prompt, lyrics=None, duration=None)
-                    )
+                    audio_path = _run_async(music_node.generate(prompt, lyrics=None, duration=None))
                     any_regen = True
                     music_node.lock()
                 except NodeLockedError:
@@ -793,9 +884,18 @@ class BuildService:
         plan_data: dict[str, Any],
         brief: Brief,
     ) -> bool:
-        """Return whether persisted node metadata matches the current plan."""
+        """Return whether persisted node metadata matches the current plan.
+
+        A manifest is written only after the complete audio stage succeeds.
+        During a partial build, the persisted plan plus probeable ordinal node
+        files are the resume record; rejecting that state would regenerate
+        every completed track after a later node fails.
+        """
+        manifest_path = proj_dir / "manifest.yaml"
+        if not manifest_path.exists():
+            return True
         try:
-            manifest = load_plan_yaml(proj_dir / "manifest.yaml")
+            manifest = load_plan_yaml(manifest_path)
         except (OSError, TypeError, ValueError):
             return False
         if manifest.get("plan_id") != plan_data.get("plan_id"):
@@ -804,9 +904,14 @@ class BuildService:
         if not isinstance(actual, list):
             return False
         expected = _expected_node_specs(plan_data, brief)
-        if len(actual) != len(expected):
+        # A manifest is also a checkpoint while audio generation is in
+        # progress, so a valid prefix is enough to resume. Extra or reordered
+        # records still indicate a different plan. Video nodes are added after
+        # the audio stage (P4.1) and are allowed as extra entries.
+        actual_audio = [n for n in actual if isinstance(n, dict) and n.get("type") in ("music", "speech")]
+        if len(actual_audio) > len(expected):
             return False
-        for item, spec in zip(actual, expected, strict=True):
+        for item, spec in zip(actual_audio, expected, strict=False):
             if not isinstance(item, dict):
                 return False
             if any(item.get(key) != value for key, value in spec.items()):
@@ -821,12 +926,19 @@ class BuildService:
         brief: Brief,
         trace: TraceWriter,
     ) -> CreativePlan:
+        director_brief = brief.description
+        if brief.duration_seconds is not None:
+            director_brief += f"\nRequested total duration: {brief.duration_seconds:g} seconds."
+        if brief.taste:
+            director_brief += "\nAbstract taste profile:\n" + json.dumps(
+                brief.taste, sort_keys=True, separators=(",", ":")
+            )
         try:
-            coro = director.plan(brief.description)
+            coro = director.plan(director_brief)
         except (DirectorError, TypeError, ValueError) as exc:
             raise BuildError("plan", f"director.plan failed: {exc}") from exc
         try:
-            plan_obj = asyncio.run(coro)
+            plan_obj = _run_async(coro)
         except Exception as exc:
             # ``BuildService.run`` is synchronous, so an active event loop is
             # an unsupported caller context just like an adapter failure.
@@ -908,7 +1020,7 @@ class BuildService:
             self._prepare_node(music_node, idx, force=force)
             self._trace(trace, TRACE_GENERATE, node_id=f"music-{idx}", payload=prompt)
             try:
-                audio_path = asyncio.run(
+                audio_path = _run_async(
                     music_node.generate(prompt, lyrics=lyrics, duration=duration)
                 )
                 any_regen = True
@@ -919,7 +1031,9 @@ class BuildService:
                     ) from exc
                 audio_path = music_node.path
             except Exception as exc:
-                raise BuildError("generate", f"music node {idx} failed: {exc}") from exc
+                raise BuildError(
+                    "generate", f"music node {idx} failed: {_exception_detail(exc)}"
+                ) from exc
             try:
                 report = music_node.probe()
             except Exception as exc:
@@ -941,6 +1055,13 @@ class BuildService:
                     "prompt": prompt,
                 }
             )
+            self._write_manifest(
+                trace.path.parent,
+                brief,
+                plan_dict,
+                trace.path,
+                nodes=nodes,
+            )
 
         for idx, line in enumerate(_iter_narration(plan_dict, brief), start=1):
             text = str(line.get("text") or "").strip()
@@ -960,7 +1081,7 @@ class BuildService:
             self._prepare_node(speech_node, idx, force=force)
             self._trace(trace, TRACE_GENERATE, node_id=f"speech-{idx}", payload=text)
             try:
-                audio_path = asyncio.run(
+                audio_path = _run_async(
                     speech_node.generate(text, duration=float(end - start) or None)
                 )
                 any_regen = True
@@ -971,7 +1092,9 @@ class BuildService:
                     ) from exc
                 audio_path = speech_node.path
             except Exception as exc:
-                raise BuildError("generate", f"speech node {idx} failed: {exc}") from exc
+                raise BuildError(
+                    "generate", f"speech node {idx} failed: {_exception_detail(exc)}"
+                ) from exc
             try:
                 report = speech_node.probe()
             except Exception as exc:
@@ -995,6 +1118,13 @@ class BuildService:
                     "text": text,
                 }
             )
+            self._write_manifest(
+                trace.path.parent,
+                brief,
+                plan_dict,
+                trace.path,
+                nodes=nodes,
+            )
 
         if not nodes:
             # Fallback: if the plan has no tracks/scenes, generate one track
@@ -1004,15 +1134,9 @@ class BuildService:
             self._prepare_node(music_node, 1, force=force)
             self._trace(trace, TRACE_GENERATE, node_id="music-1", payload=brief.description)
             try:
-                # Create a new event loop for this async operation.
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                try:
-                    fallback_audio = loop.run_until_complete(
-                        music_node.generate(brief.description, duration=float(duration))
-                    )
-                finally:
-                    loop.close()
+                fallback_audio = _run_async(
+                    music_node.generate(brief.description, duration=float(duration))
+                )
                 any_regen = True
             except NodeLockedError as exc:
                 if music_node.path is None:
@@ -1021,7 +1145,9 @@ class BuildService:
                     ) from exc
                 fallback_audio = music_node.path
             except Exception as exc:
-                raise BuildError("generate", f"fallback track generation failed: {exc}") from exc
+                raise BuildError(
+                    "generate", f"fallback track generation failed: {_exception_detail(exc)}"
+                ) from exc
             nodes.append(
                 {
                     "id": "music-1",
@@ -1034,6 +1160,13 @@ class BuildService:
                     "start": 0.0,
                     "end": float(duration),
                 }
+            )
+            self._write_manifest(
+                trace.path.parent,
+                brief,
+                plan_dict,
+                trace.path,
+                nodes=nodes,
             )
         if not captions:
             # No explicit narration cues from the plan — use the brief as
@@ -1196,9 +1329,11 @@ class BuildService:
                 video.unlock()
             self._trace(trace, TRACE_GENERATE, node_id=f"scene-{index}", payload=prompt)
             try:
-                output = asyncio.run(video.generate(prompt, duration, caption=caption))
+                output = _run_async(video.generate(prompt, duration, caption=caption))
             except Exception as exc:
-                raise BuildError("generate", f"video scene {index} failed: {exc}") from exc
+                raise BuildError(
+                    "generate", f"video scene {index} failed: {_exception_detail(exc)}"
+                ) from exc
             self._trace(trace, TRACE_PROBE, node_id=f"scene-{index}", payload=str(output))
             generated.append(
                 {

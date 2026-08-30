@@ -22,7 +22,7 @@ GMI_SERVING_CHAT_URL = "https://api.gmi-serving.com/v1/chat/completions"
 # Inference-engine request queue for the audio models (Music 3.0, Speech 2.8).
 GMI_QUEUE_URL = "https://console.gmicloud.ai/api/v1/ie/requestqueue/apikey/requests"
 
-DEFAULT_M3_MODEL = "MiniMax-M3"
+DEFAULT_M3_MODEL = "MiniMaxAI/MiniMax-M3"
 MUSIC_MODEL = "minimax-music-3.0"
 SPEECH_MODEL = "minimax-tts-speech-2.8-hd"
 

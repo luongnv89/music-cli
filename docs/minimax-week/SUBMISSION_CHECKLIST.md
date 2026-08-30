@@ -57,7 +57,7 @@ rebuild, all from the terminal.
 ### Post-submission
 
 - [ ] Screenshot of acknowledgement page saved to `docs/`
-- [ ] Log entry added to `docs/MINIMAX_WEEK_LOG.md`
+- [ ] Log entry added to [`MINIMAX_WEEK_LOG.md`](./MINIMAX_WEEK_LOG.md)
 - [ ] Submission URL noted for reference
 
 ### Deadline

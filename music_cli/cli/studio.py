@@ -182,7 +182,15 @@ def studio_build(
     try:
         result = service.run(parsed, force=force, confirm=confirm, no_h3=no_h3)
     except BuildError as exc:
-        hint = f" Resume with `mc studio build --resume {brief}`." if exc.stage != "plan" else ""
+        if exc.stage != "plan":
+            resume_flags = "--resume"
+            if no_h3:
+                resume_flags += " --no-h3"
+            elif confirm:
+                resume_flags += " --confirm"
+            hint = f" Resume with `mc studio build {resume_flags} {brief}`."
+        else:
+            hint = ""
         raise click.ClickException(f"{exc}{hint}") from exc
     click.echo(
         f"build ok: project={result.project_dir.name} "

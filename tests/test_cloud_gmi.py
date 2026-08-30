@@ -12,6 +12,7 @@ import inspect
 import json
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 import pytest
 
@@ -138,6 +139,17 @@ async def test_m3_critique_uses_critique_system_prompt(tmp_path):
     assert "critic" in payload["messages"][0]["content"].lower()
 
 
+async def test_m3_plan_honors_caller_system_prompt(tmp_path):
+    fixture = load_fixture()
+    transport = RecordedTransport(chat_script(fixture["m3_chat_completion"]))
+    adapter = make_adapter(transport, tmp_path)
+    custom = "Return the runtime plan shape."
+    await adapter.m3_plan("build a plan", system=custom)
+    payload = transport.calls[0]["payload"]
+    assert payload["messages"][0] == {"role": "system", "content": custom}
+    assert "system" not in payload
+
+
 async def test_h3_generate_returns_recorded_text(tmp_path):
     fixture = load_fixture()
     adapter = make_adapter(RecordedTransport(chat_script(fixture["h3_chat_completion"])), tmp_path)
@@ -183,6 +195,40 @@ async def test_music3_generate_polls_async_job(tmp_path):
     assert "rec-music-001" in transport.calls[-1]["url"]
 
 
+async def test_music3_payload_uses_queue_audio_settings(tmp_path):
+    fixture = load_fixture()
+    transport = RecordedTransport(music_script(fixture))
+    adapter = make_adapter(transport, tmp_path)
+    await adapter.music3_generate("indie folk, melancholic", duration=60)
+    payload = transport.calls[0]["payload"]["payload"]
+    assert payload["format"] == "mp3"
+    assert payload["sample_rate"] == 44100
+    assert payload["bitrate"] == 256000
+    assert "duration" not in payload
+    assert UUID(transport.calls[0]["headers"]["Idempotency-Key"]).version == 4
+
+
+async def test_music3_accepts_gmi_success_terminal_status(tmp_path):
+    fixture = load_fixture()
+    fixture["music_poll_completed"]["body"]["status"] = "success"
+    transport = RecordedTransport(music_script(fixture))
+    adapter = make_adapter(transport, tmp_path)
+    result = await adapter.music3_generate("indie folk, melancholic")
+    assert result["audio_url"] == fixture["music_poll_completed"]["body"]["audio_url"]
+
+
+async def test_gmi_nested_outcome_audio_url_is_normalized(tmp_path):
+    fixture = load_fixture()
+    body = fixture["music_poll_completed"]["body"]
+    audio_url = body.pop("audio_url")
+    body["status"] = "success"
+    body["outcome"] = {"audio_url": audio_url}
+    transport = RecordedTransport(music_script(fixture))
+    adapter = make_adapter(transport, tmp_path)
+    result = await adapter.music3_generate("indie folk, melancholic")
+    assert result["audio_url"] == audio_url
+
+
 async def test_speech28_synthesize_extracts_media_url(tmp_path):
     fixture = load_fixture()
     transport = RecordedTransport(speech_script(fixture))
@@ -190,6 +236,20 @@ async def test_speech28_synthesize_extracts_media_url(tmp_path):
     result = await adapter.speech28_synthesize("hello world")
     expected = fixture["speech_poll_completed"]["body"]["media_urls"][0]["url"]
     assert result["audio_url"] == expected
+
+
+async def test_speech28_payload_uses_voice_id_and_audio_settings(tmp_path):
+    fixture = load_fixture()
+    transport = RecordedTransport(speech_script(fixture))
+    adapter = make_adapter(transport, tmp_path)
+    await adapter.speech28_synthesize("hello world", duration=5)
+    payload = transport.calls[0]["payload"]["payload"]
+    assert payload["voice_id"] == "English_expressive_narrator"
+    assert payload["format"] == "mp3"
+    assert payload["audio_sample_rate"] == "32000"
+    assert payload["bitrate"] == "128000"
+    assert payload["channel"] == "2"
+    assert "duration" not in payload
 
 
 async def test_music3_generate_cache_hit_skips_queue(tmp_path):

@@ -9,6 +9,7 @@ covers the Click ``mc studio build`` command with a :class:`click.testing
 
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 from unittest import mock
@@ -64,8 +65,18 @@ class FakeAdapter:
     def __init__(self, *replies: str) -> None:
         self.replies = list(replies)
         self.plan_prompts: list[str] = []
+        self.loop_ids: list[int] = []
+        self.closed = False
+
+    def _record_loop(self) -> None:
+        self.loop_ids.append(id(asyncio.get_running_loop()))
+
+    async def aclose(self) -> None:
+        self._record_loop()
+        self.closed = True
 
     async def m3_plan(self, prompt: str, **_: object) -> dict[str, str]:
+        self._record_loop()
         self.plan_prompts.append(prompt)
         idx = len(self.plan_prompts) - 1
         if idx < len(self.replies):
@@ -73,16 +84,19 @@ class FakeAdapter:
         return {"text": self.replies[-1]}
 
     async def m3_critique(self, prompt: str, **_: object) -> dict[str, str]:
+        self._record_loop()
         return {"text": json.dumps({"ok": True, "issues": [], "repairs": []})}
 
     async def music3_generate(
         self, prompt: str, *, lyrics: str | None = None, **_: object
     ) -> dict[str, str]:
+        self._record_loop()
         return {"audio_url": f"memory://{prompt}"}
 
     async def speech28_synthesize(
         self, text: str, *, voice: str | None = None, **_: object
     ) -> dict[str, str]:
+        self._record_loop()
         return {"audio_url": f"memory://speech/{text[:8]}"}
 
 
@@ -241,6 +255,10 @@ class TestBuildServiceRun:
         assert len(adapter.plan_prompts) == 1
         # probe was called for the music and speech node
         assert len(probe.calls) >= 2
+        # All async adapter calls, including cleanup, share one loop.
+        assert len(adapter.loop_ids) >= 3
+        assert len(set(adapter.loop_ids)) == 1
+        assert adapter.closed
 
     def test_idempotent_no_op_run_skips_premiere_remux(self, tmp_path):
         service, _adapter, _probe = _make_service(tmp_path)
@@ -337,6 +355,45 @@ class TestBuildServiceRun:
         assert not second.regenerated
         assert adapter.generate_calls == 1  # fallback track was reused, not regenerated
         assert second.premiere_mp4 is not None and second.premiere_mp4.exists()
+
+    def test_partial_build_resume_reuses_completed_music_nodes(self, tmp_path):
+        class PartialAdapter(FakeAdapter):
+            def __init__(self) -> None:
+                super().__init__(json.dumps(VALID_PLAN))
+                self.music_calls = 0
+                self.speech_available = False
+
+            async def music3_generate(self, prompt, *, lyrics=None, **kwargs):
+                self.music_calls += 1
+                return await super().music3_generate(prompt, lyrics=lyrics, **kwargs)
+
+            async def speech28_synthesize(self, text, *, voice=None, **kwargs):
+                if not self.speech_available:
+                    raise RuntimeError("Speech capacity unavailable")
+                return await super().speech28_synthesize(text, voice=voice, **kwargs)
+
+        adapter = PartialAdapter()
+        probe = FakeProbe(seconds=1.0)
+        service = BuildService(
+            dist_dir=tmp_path,
+            adapter_factory=lambda proj_dir, brief: _service_factory(
+                adapter, probe, proj_dir, brief
+            ),
+        )
+        brief = Brief.from_dict({"project_id": "neon-rain", "description": "go"})
+
+        with pytest.raises(BuildError, match="Speech capacity unavailable"):
+            service.run(brief)
+        assert adapter.music_calls == 1
+        assert (tmp_path / "neon-rain" / "nodes" / "song-1.wav").exists()
+        partial_manifest = tmp_path / "neon-rain" / "manifest.yaml"
+        assert partial_manifest.exists()
+        assert "music-1" in partial_manifest.read_text()
+
+        adapter.speech_available = True
+        result = service.run(brief)
+        assert adapter.music_calls == 1
+        assert result.premiere_mp4 is not None and result.premiere_mp4.exists()
 
     def test_duration_within_two_seconds_of_plan(self, tmp_path):
         service, _adapter, probe = _make_service(tmp_path, probe=FakeProbe(seconds=60.0))

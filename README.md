@@ -231,7 +231,7 @@ curl -fsSL https://raw.githubusercontent.com/luongnv89/music-cli/main/install.sh
 | [AI Playbook](docs/AI_PLAYBOOK.md) | AI music generation guide with examples |
 | [Architecture](docs/architecture.md) | System design and diagrams |
 | [Development](docs/development.md) | Contributing guide |
-| [Troubleshooting](docs/troubleshooting.md) | Validated fixes from runbook checks |
+| [Troubleshooting](docs/minimax-week/troubleshooting.md) | Validated fixes from runbook checks |
 | [Decisions Log](docs/DECISIONS.md) | Doc-reconciliation decisions with sources |
 | [Changelog](CHANGELOG.md) | Version history and release notes |
 

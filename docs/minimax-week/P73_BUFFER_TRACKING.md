@@ -51,6 +51,6 @@ After this deadline, the submission is locked.
 ## Post-Submission
 
 - [ ] Submission confirmation saved
-- [ ] Notes added to `docs/MINIMAX_WEEK_LOG.md`
+- [ ] Notes added to [`MINIMAX_WEEK_LOG.md`](./MINIMAX_WEEK_LOG.md)
 - [ ] Any follow-up questions answered
 - [ ] Final README polish completed

@@ -616,7 +616,7 @@ class VideoNode(BaseNode):
             "-loop",
             "1",
             "-i",
-            str(image_path),
+            str(Path(image_path).resolve()),
             "-t",
             seconds,
             "-an",
@@ -628,6 +628,42 @@ class VideoNode(BaseNode):
             "yuv420p",
             str(destination.resolve()),
         ]
+
+    def _color_fallback_command(
+        self,
+        ffmpeg_bin: str,
+        destination: Path,
+        duration: float,
+    ) -> list[str]:
+        """Return ffmpeg argv for a plain colour video (no drawtext)."""
+        seconds = f"{duration:.6f}"
+        return [
+            ffmpeg_bin,
+            "-nostdin",
+            "-y",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            f"color=c=black:s={DEFAULT_VIDEO_SIZE}:r={DEFAULT_VIDEO_FPS}:d={seconds}",
+            "-t",
+            seconds,
+            "-r",
+            str(DEFAULT_VIDEO_FPS),
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            str(destination.resolve()),
+        ]
+
+    def _render_color_fallback(self, destination: Path, duration: float) -> None:
+        """Render a plain black video when all caption renderers fail."""
+        ffmpeg_bin = self._ffmpeg or DEFAULT_FFMPEG
+        self._run_ffmpeg(self._color_fallback_command(ffmpeg_bin, destination, duration))
+        if not destination.exists():
+            raise NodeError("scene: ffmpeg colour fallback produced no output")
 
     @staticmethod
     def _write_caption_svg(path: Path, caption: str, cover: Path | None = None) -> None:
@@ -668,14 +704,38 @@ class VideoNode(BaseNode):
         """Render a caption card when the local ffmpeg lacks drawtext."""
         svg_path = self._nodes_dir / f"{destination.stem}.svg"
         self._write_caption_svg(svg_path, caption, cover=cover)
+        ffmpeg_bin = self._ffmpeg or DEFAULT_FFMPEG
+        # First try direct SVG input (works when ffmpeg has librsvg).
         try:
-            ffmpeg_bin = self._ffmpeg or DEFAULT_FFMPEG
             self._run_ffmpeg(self._still_image_command(ffmpeg_bin, destination, duration, svg_path))
+            if not destination.exists():
+                raise NodeError("scene: ffmpeg SVG fallback produced no output")
+            return
+        except NodeError:
+            self._remove_output(destination)
+            # Fall through to PNG conversion below.
+        # Convert SVG to PNG via ImageMagick so ffmpeg can read it without librsvg.
+        png_path = self._nodes_dir / f"{destination.stem}-svg.png"
+        try:
+            binary = shutil.which("magick") or shutil.which("convert")
+            if binary is None:
+                raise NodeError("scene: no ImageMagick binary for SVG conversion")
+            # magick SVG -> PNG (flatten to remove alpha)
+            cmd = [binary, str(svg_path.resolve()), "-background", "black", "-flatten", str(png_path.resolve())]
+            result = subprocess.run(
+                cmd, cwd=self._nodes_dir, capture_output=True, text=True, check=False
+            )
+            if result.returncode != 0 or not png_path.exists():
+                detail = (result.stderr or result.stdout or "no stderr").strip()
+                raise NodeError(f"scene: SVG to PNG conversion failed: {detail[-500:]}")
+            self._run_ffmpeg(self._still_image_command(ffmpeg_bin, destination, duration, png_path))
             if not destination.exists():
                 raise NodeError("scene: ffmpeg SVG fallback produced no output")
         except NodeError:
             self._remove_output(destination)
             raise
+        finally:
+            self._remove_output(png_path)
 
     def _run_ffmpeg(self, command: list[str]) -> None:
         """Run an injected or real ffmpeg process without invoking a shell."""
@@ -781,7 +841,12 @@ class VideoNode(BaseNode):
                     self._render_svg_fallback(destination, duration, caption, cover)
                     return
                 except NodeError as svg_error:
-                    raise svg_error from image_error
+                    # Ultimate fallback: plain colour video so --no-h3 never hard-fails.
+                    try:
+                        self._render_color_fallback(destination, duration)
+                        return
+                    except NodeError as color_error:
+                        raise color_error from svg_error
         except BaseException:
             self._remove_output(destination)
             raise

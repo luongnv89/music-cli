@@ -182,10 +182,15 @@ class M3Director:
     async def plan(self, brief: str) -> CreativePlan:
         """Ask M3 for a CreativePlan for ``brief``, schema-validated."""
         system_prompt = (
-            "You are a creative director. You MUST respond with ONLY valid JSON. "
-            "No markdown. No prose. No code blocks. No explanation. "
-            "Your response must start with { and end with }. "
-            "REQUIRED FIELDS: plan_id, project_id (slug), title, objective, brief, duration_seconds."
+            "You are a creative director for an audio/video build pipeline. "
+            "You MUST respond with ONLY valid JSON. No markdown, prose, code blocks, "
+            "or explanation. Your response must start with { and end with }. "
+            "REQUIRED FIELDS: plan_id (a slug like neon-rain), project_id (slug), "
+            "title (a short descriptive title, e.g. 'Neon Rain'), objective, brief, "
+            "duration_seconds (an integer). Every required string field MUST be non-empty. "
+            "Also include at least one item in `tracks` and at least one item in `scenes`. "
+            "Each track must have id, prompt, and duration_seconds. Each scene must have "
+            "id, prompt, description, and duration_seconds. Use the requested brief duration."
         )
         prompt = f"Brief:\n{brief}"
         data = await self._ask_json("plan", prompt, CreativePlan, system_prompt=system_prompt)
@@ -231,10 +236,24 @@ class M3Director:
 
         for attempt in range(1 + MAX_PARSE_RETRIES):
             if previous_text is not None:
+                # Build a corrective prompt that is explicit about each failing field.
+                # For empty-string fields, give a concrete example so the model knows
+                # what to produce.  This is critical for M3 which sometimes returns
+                # structurally correct JSON but with empty required strings.
+                corrective_parts: list[str] = []
+                for err in last_errors:
+                    if err.endswith(": must be non-empty string"):
+                        field = err.rsplit(":", 1)[0].strip()
+                        corrective_parts.append(
+                            f"- {field} is empty — provide a short descriptive title. "
+                            f'Example: "{field}: Neon Rain"'
+                        )
+                    else:
+                        corrective_parts.append(f"- {err}")
                 current_prompt = (
                     f"{prompt}\n\nYour previous reply was not valid JSON for this "
                     "schema. Errors:\n"
-                    + "\n".join(f"- {e}" for e in last_errors)
+                    + "\n".join(f"- {e}" for e in corrective_parts)
                     + f"\n\nPrevious reply:\n{previous_text}\n\n"
                     "Re-output the exact JSON, corrected. No prose, no markdown fences."
                 )
