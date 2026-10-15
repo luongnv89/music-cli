@@ -66,8 +66,9 @@ repos:
         name: pytest e2e (fast, no daemon)
         language: system
         # Run only test_e2e.py; skip the slow ai/youtube/daemon-integration
-        # tests that require external processes.
-        entry: python -m pytest tests/test_e2e.py -x -q --no-header --tb=short
+        # tests that require external processes. --no-cov: this one-file subset
+        # can never meet the whole-suite --cov-fail-under floor from pyproject.
+        entry: python -m pytest tests/test_e2e.py -x -q --no-header --tb=short --no-cov
         types: [python]
         pass_filenames: false
         always_run: false
