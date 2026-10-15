@@ -843,7 +843,7 @@ class VideoNode(BaseNode):
                     cover,
                 )
                 return
-            except NodeError as image_error:
+            except NodeError:
                 try:
                     self._render_svg_fallback(destination, duration, caption, cover)
                     return
