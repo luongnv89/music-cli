@@ -27,16 +27,7 @@
 
 ---
 
-## MiniMax Week Entry
-
-This repository is a [MiniMax Week](https://www.minimax.io) challenge entry. Since the `pre-minimax-week` tag, music-cli gained a **creative compilation pipeline** (`mc studio`) that turns text prompts into polished audio/video outputs, a multi-provider cloud adapter layer (GMI Cloud, OpenRouter), and decision logging via `trace.jsonl`. Install it and run `mc studio doctor` to verify your setup:
-
-```bash
-pipx install .
-mc studio doctor
-```
-
-### Project Layout
+## Project Layout
 
 ```
 music-cli/
@@ -53,8 +44,6 @@ music-cli/
 ├── pyproject.toml        # Project config
 └── README.md             # You are here
 ```
-
-See [CHALLENGE.md](CHALLENGE.md) for the full file inventory and the [GitHub compare](https://github.com/luongnv89/music-cli/compare/pre-minimax-week...main) between the pre-entry baseline and main.
 
 ---
 
@@ -231,7 +220,7 @@ curl -fsSL https://raw.githubusercontent.com/luongnv89/music-cli/main/install.sh
 | [AI Playbook](docs/AI_PLAYBOOK.md) | AI music generation guide with examples |
 | [Architecture](docs/architecture.md) | System design and diagrams |
 | [Development](docs/development.md) | Contributing guide |
-| [Troubleshooting](docs/minimax-week/troubleshooting.md) | Validated fixes from runbook checks |
+| [Troubleshooting](docs/troubleshooting.md) | Validated fixes from runbook checks |
 | [Decisions Log](docs/DECISIONS.md) | Doc-reconciliation decisions with sources |
 | [Changelog](CHANGELOG.md) | Version history and release notes |
 

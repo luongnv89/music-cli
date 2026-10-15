@@ -1,4 +1,4 @@
-"""music_cli.studio — creative compiler (MiniMax Week entry)."""
+"""music_cli.studio — creative compiler."""
 
 from .build import (
     Brief,
