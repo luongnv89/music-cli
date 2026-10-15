@@ -8,9 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Expand the bundled radio list from 41 to 100 stations across more genres (ambient, indie, eclectic, hip-hop, soul, reggae, country/folk, lounge, classical, news) and languages (German, Dutch, Portuguese, Asian, world); every stream was verified to decode audio. Existing users get the new stations with `mc radio update`.
+- Add `scripts/validate_radios.py`, which decodes a few seconds of every bundled stream (plus the mood/time map URLs) with ffmpeg and exits non-zero on any dead station.
 - Add `mc cloud smoke`: fires one real API call at each free MiniMax model on GMI Cloud (M3 text reasoning, Music 3.0 song generation, Speech 2.8 TTS), polls the inference-engine request queue for the audio models, and writes outputs plus a timestamped latency/size/format summary under `dist/_smoke/` ([#152](https://github.com/luongnv89/music-cli/issues/152)).
 - Add the `mc cloud key` command group (`set`/`get`/`delete`/`list`) storing cloud provider API keys in the OS keyring via `keyring`; provider `gmi` (GMI Cloud) is supported, and keys never touch config files, environment variables, or git ([#151](https://github.com/luongnv89/music-cli/issues/151)).
 - Add the `gmi` optional extra (`pip install 'coder-music-cli[gmi]'`) declaring `keyring>=24` and `httpx>=0.27` for the upcoming GMI Cloud / MiniMax adapter layer ([#151](https://github.com/luongnv89/music-cli/issues/151)).
+
+### Fixed
+- Replace dead default stream URLs for BBC Radio 3, Radio Italia, RTL 102.5, Radio Deejay, Radio Capital and RDS; drop the offline Salsa Radio stream and the removed Anjunadeep YouTube live stream. Existing users should pick **Overwrite** in `mc radio update` to replace the dead URLs; **Merge** appends the working ones but leaves the old dead lines in place.
 
 ## [0.11.0] - 2026-08-22
 
