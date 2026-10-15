@@ -70,7 +70,7 @@ Developers deserve a music player that respects the way they work: in the termin
 
 - **Zero context-switching.** Start, pause, and skip tracks without leaving your terminal. Four keystrokes, not four clicks.
 - **Always playing.** A persistent background daemon means your music survives terminal closes, SSH sessions, and IDE restarts.
-- **40+ curated radio stations.** Lo-fi, synthwave, deep house, jazz — ready out of the box. No account required.
+- **100 curated radio stations.** Lo-fi, synthwave, jazz, classical, indie, hip-hop, world music — ready out of the box. No account required.
 - **AI-generated music.** Generate unique focus tracks with MusicGen, AudioLDM, or Bark. Your music, your mood, no subscription.
 - **YouTube audio streaming.** Paste a URL, get audio — streamed via a yt-dlp→ffplay pipe, nothing downloaded to disk (`music_cli/sources/youtube.py:120`, `music_cli/player/ffplay.py:156`). Played videos land in a replay history you can revisit with `mc yt`.
 
@@ -96,7 +96,7 @@ mc status           # What's playing + an inspirational quote
    mc pause    # meeting time
    mc resume   # back to work
    ```
-4. **Explore** — discover 40+ stations, generate AI tracks, or stream from YouTube.
+4. **Explore** — discover 100 stations, generate AI tracks, or stream from YouTube.
    ```bash
    mc radio                        # Browse stations
    mc ai play -p "jazz piano"     # Generate a track
@@ -112,7 +112,7 @@ mc status           # What's playing + an inspirational quote
 | Feature | Details |
 |---------|---------|
 | **Background daemon** | Music survives terminal closes and IDE restarts |
-| **40+ radio stations** | Lo-fi, synthwave, deep house, jazz, French, Spanish, Italian stations — no account needed (41 pre-configured, `music_cli/config.py:207-281`) |
+| **100 radio stations** | Lo-fi, synthwave, jazz, classical, rock, hip-hop, news, plus French, Spanish, Italian, German, Dutch, Portuguese, Asian and world stations — no account needed (100 pre-configured, `music_cli/config.py:207-384`) |
 | **AI music generation** | MusicGen, AudioLDM, Bark — generate unique tracks from text prompts |
 | **YouTube audio** | Paste a URL, stream audio via yt-dlp→ffplay. Played videos are kept in a replay history (`mc yt`) for one-command replay (`music_cli/youtube_history.py:92-104`) |
 | **Context-aware** | Auto-selects music based on time of day and your mood |
@@ -356,14 +356,24 @@ mc radio remove 10
 
 ### Pre-configured Stations
 
-41 stations across multiple genres and languages (`music_cli/config.py:207-281`):
+100 stations across multiple genres and languages (`music_cli/config.py:207-384`), each checked to decode real audio with `scripts/validate_radios.py`:
 
-- **Chill/Lo-fi**: ChillHop, SomaFM (Groove Salad, Drone Zone, Space Station)
-- **Electronic**: Deep House, DEF CON Radio, Beat Blender
+- **Chill/Lo-fi & Ambient**: ChillHop, SomaFM (Groove Salad, Drone Zone, Deep Space One), Slow Focus [NTS], Ambient Sleeping Pill
+- **Electronic**: Deep House, DEF CON Radio, Beat Blender, Techno [rautemusik], Radio FG
+- **Pop/Rock/Indie**: Top Hits, 80s Hits, BBC Radio 1/2/6 Music, KEXP, Radio Caroline, Metal [SomaFM]
+- **Eclectic**: Radio Paradise, KCRW Eclectic 24, WFMU, NTS Radio 1, Radio Nova, ByteFM
+- **Hip-Hop/Soul/Reggae**: BBC Radio 1Xtra, Capital XTRA, Seven Inch Soul, Heavyweight Reggae, FIP Reggae
 - **Synthwave**: Nightride FM, Chillsynth FM, Darksynth FM, Datawave FM, Spacesynth FM
-- **French**: FIP Radio, France Inter, France Musique, Mouv
-- **Spanish**: Salsa Radio, Tropical 100, Los 40 Principales, Cadena SER
-- **Italian**: Radio Italia, RTL 102.5, Radio 105, Virgin Radio Italy
+- **Jazz & Blues**: Jazz24, Radio Swiss Jazz, WWOZ New Orleans, TSF Jazz, Jazz Radio Blues
+- **Country/Folk**: Boot Liquor, 181.fm Kickin' Country, Celtic Music Radio
+- **Classical**: Classical (Radio Swiss Classic), BBC Radio 3, Classic FM, Venice Classic Radio, Klassik Radio
+- **News/Talk**: BBC World Service, NPR 24 Hour, Deutschlandfunk, France Inter
+- **French**: FIP (Radio, Rock, Jazz, Electro, Groove, Monde), France Musique, Mouv
+- **Spanish/Latin**: Los 40 Principales, Cadena SER, Cadena 100, Tropical 100 Salsa, Cumbias Inmortales, Argentine Tango Radio
+- **Italian**: Radio Italia, RTL 102.5, Radio 105, Virgin Radio Italy, Radio Deejay, RDS, Radio Capital
+- **German/Dutch**: 1LIVE, Radio Bob, NPO Radio 2, NPO 3FM
+- **Portuguese**: Antena 1 Brasil, Bossa Jazz Brasil, Radio Comercial, Antena 1 Fado
+- **Asian & World**: Listen.moe J-Pop/K-Pop, SBS PopAsia, Mirchi Top 20, Suburbs of Goa, LagosJump Radio, Trace FM, Radio Orient
 
 </details>
 

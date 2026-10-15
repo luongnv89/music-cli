@@ -216,20 +216,48 @@ Groove Salad [SomaFM]|http://ice1.somafm.com/groovesalad-128-mp3
 Drone Zone [SomaFM]|http://ice1.somafm.com/dronezone-128-mp3
 Space Station Soma|http://ice1.somafm.com/spacestation-128-mp3
 Hirschmilch Chillout|http://hirschmilch.de:7000/chillout.mp3
+Slow Focus [NTS]|https://stream-mixtape-geo.ntslive.net/mixtape
 
 # Electronic
 Deep House|https://streams.ilovemusic.de/iloveradio14.mp3
-Anjunadeep Radio|https://www.youtube.com/watch?v=D4MdHQOILdw
 DEF CON Radio [SomaFM]|http://ice1.somafm.com/defcon-128-mp3
 Beat Blender [SomaFM]|http://ice1.somafm.com/beatblender-128-mp3
+Techno [rautemusik]|https://streams.rautemusik.fm/techno/mp3-192/
+
+# Ambient
+Ambient Sleeping Pill|https://radio.stereoscenic.com/asp-h
+Deep Space One [SomaFM]|http://ice1.somafm.com/deepspaceone-128-mp3
 
 # Pop/Hits
 Top Hits|https://streams.ilovemusic.de/iloveradio1.mp3
 80s Hits|https://streams.ilovemusic.de/iloveradio4.mp3
+BBC Radio 1|http://as-hls-ww-live.akamaized.net/pool_01505109/live/ww/bbc_radio_one/bbc_radio_one.isml/bbc_radio_one-audio%3d128000.norewind.m3u8
+BBC Radio 2|http://as-hls-ww-live.akamaized.net/pool_74208725/live/ww/bbc_radio_two/bbc_radio_two.isml/bbc_radio_two-audio%3d128000.norewind.m3u8
+Radio Swiss Pop|http://stream.srg-ssr.ch/m/rsp/mp3_128
 
 # Rock
 Rock Radio|https://streams.ilovemusic.de/iloveradio3.mp3
 Metal [SomaFM]|http://ice1.somafm.com/metal-128-mp3
+Radio Caroline|http://sc6.radiocaroline.net:8040/stream
+
+# Indie/Alternative
+KEXP|https://kexp-mp3-128.streamguys1.com/kexp128.mp3
+BBC Radio 6 Music|http://as-hls-ww-live.akamaized.net/pool_81827798/live/ww/bbc_6music/bbc_6music.isml/bbc_6music-audio%3d128000.norewind.m3u8
+Indie Pop Rocks [SomaFM]|http://ice1.somafm.com/indiepop-128-mp3
+
+# Eclectic
+Radio Paradise|http://stream.radioparadise.com/mp3-192
+KCRW Eclectic 24|https://streams.kcrw.com/e24_mp3
+WFMU|http://stream0.wfmu.org/freeform-128k
+NTS Radio 1|https://stream-relay-geo.ntslive.net/stream
+
+# Hip-Hop/R&B
+BBC Radio 1Xtra|http://as-hls-ww-live.akamaized.net/pool_92079267/live/ww/bbc_1xtra/bbc_1xtra.isml/bbc_1xtra-audio%3d128000.norewind.m3u8
+Capital XTRA|https://media-ice.musicradio.com/CapitalXTRANationalMP3
+100% Hip Hop [NTS]|https://stream-mixtape-geo.ntslive.net/mixtape2
+
+# Soul/Funk
+Seven Inch Soul [SomaFM]|http://ice1.somafm.com/7soul-128-mp3
 
 # Synthwave/Retrowave
 Nightride FM|https://stream.nightride.fm/nightride.mp3
@@ -240,10 +268,30 @@ Spacesynth FM|https://stream.nightride.fm/spacesynth.mp3
 
 # Jazz
 Jazz [SomaFM]|http://ice1.somafm.com/secretagent-128-mp3
+Jazz24|https://knkx-live-a.edge.audiocdn.com/6285_128k
+Radio Swiss Jazz|http://stream.srg-ssr.ch/m/rsj/mp3_128
+WWOZ New Orleans|https://wwoz-sc.streamguys1.com/wwoz-hi.mp3
+
+# Country/Folk
+Boot Liquor [SomaFM]|http://ice1.somafm.com/bootliquor-128-mp3
+181.fm Kickin' Country|http://listen.181fm.com/181-kickincountry_128k.mp3
+Celtic Music Radio|https://uksoutha.streaming.broadcast.radio/celtic
+
+# Reggae
+Heavyweight Reggae [SomaFM]|http://ice1.somafm.com/reggae-128-mp3
+
+# Lounge
+Illinois Street Lounge [SomaFM]|http://ice1.somafm.com/illstreet-128-mp3
 
 # Classical
 Classical|http://stream.srg-ssr.ch/m/rsc_de/mp3_128
-BBC Radio 3|http://stream.live.vc.bbcmedia.co.uk/bbc_radio_three
+BBC Radio 3|http://as-hls-ww-live.akamaized.net/pool_23461179/live/ww/bbc_radio_three/bbc_radio_three.isml/bbc_radio_three-audio%3d128000.norewind.m3u8
+Classic FM|https://media-ice.musicradio.com/ClassicFMMP3
+Venice Classic Radio|https://uk2.streamingpulse.com/ssl/vcr1
+
+# News/Talk
+BBC World Service|http://as-hls-ww-live.akamaized.net/pool_87948813/live/ww/bbc_world_service/bbc_world_service.isml/bbc_world_service-audio%3d128000.norewind.m3u8
+NPR 24 Hour|https://npr-ice.streamguys1.com/live.mp3
 
 # ========== FRENCH ==========
 
@@ -256,28 +304,83 @@ FIP Jazz|http://icecast.radiofrance.fr/fipjazz-midfi.mp3
 FIP Electro|http://icecast.radiofrance.fr/fipelectro-midfi.mp3
 Mouv|http://icecast.radiofrance.fr/mouv-midfi.mp3
 
+# French Jazz/Groove
+FIP Groove|http://icecast.radiofrance.fr/fipgroove-midfi.mp3
+FIP Reggae|http://icecast.radiofrance.fr/fipreggae-midfi.mp3
+TSF Jazz|https://tsfjazz.ice.infomaniak.ch/tsfjazz-high.mp3
+Jazz Radio Blues|http://jazzblues.ice.infomaniak.ch/jazzblues-high.mp3
+
+# French Eclectic
+Radio Nova|https://novazz.ice.infomaniak.ch/novazz-128.mp3
+Radio FG|http://radiofg.impek.com/fg
+
 # ========== SPANISH ==========
 
 # Latin/Salsa
-Salsa Radio|http://157.230.221.44:2002/stream/1/
 Tropical 100 Salsa|http://tropical100.net:8008/stream/1/
 SalsaMexico|http://colombiawebs.com.co:8106/stream/1/
 Los 40 Principales|https://playerservices.streamtheworld.com/api/livestream-redirect/LOS40.mp3
+Cumbias Inmortales|https://panel.retrolandigital.com/listen/cumbias_inmortales_radio/listen
+Argentine Tango Radio|https://ais-edge94-nyc04.cdnstream.com/2202_128.mp3
 
 # Spanish Pop/Rock
 Radio Maria Spain|http://dreamsiteradiocp.com:8060/stream/1/
 Cadena SER|https://playerservices.streamtheworld.com/api/livestream-redirect/CADENASER.mp3
+Cadena 100|http://cadena100-streamers-mp3.flumotion.com/cope/cadena100.mp3
+Rock FM Spain|http://flucast-bl04.flumotion.com/cope/rockfm-low.mp3
 
 # ========== ITALIAN ==========
 
 # Italian Radio
-Radio Italia|http://radioitalia.net/stream/1/
-RTL 102.5|http://streamingp.shoutcast.com/RTL1025?lang=*
+Radio Italia|https://radioitaliasmi.akamaized.net/hls/live/2093120/RISMI/master.m3u8
+RTL 102.5|https://dd782ed59e2a4e86aabf6fc508674b59.msvdn.net/live/S97044836/tbbP8T1ZRPBL/playlist_audio.m3u8
 Radio 105|https://icecast.unitedradio.it/Radio105.mp3
 Virgin Radio Italy|https://icecast.unitedradio.it/Virgin.mp3
-Radio Deejay|https://icecast.unitedradio.it/RadioDeejay.mp3
-RDS Radio|http://stream.rds.it:8000/rds64k.mp3
-Radio Capital|https://icecast.unitedradio.it/Capital.mp3
+Radio Deejay|https://4c4b867c89244861ac216426883d1ad0.msvdn.net/radiodeejay/radiodeejay/master_ma.m3u8
+RDS Radio|https://stream.rds.radio/audio/rds.stream_aac64/chunklist.m3u8
+Radio Capital|https://4c4b867c89244861ac216426883d1ad0.msvdn.net/radiocapital/radiocapital/master_ma.m3u8
+
+# ========== GERMAN ==========
+
+# German Radio
+Deutschlandfunk|https://st01.sslstream.dlf.de/dlf/01/128/mp3/stream.mp3
+1LIVE|https://wdr-1live-live.icecastssl.wdr.de/wdr/1live/live/mp3/128/stream.mp3
+Radio Bob|http://streams.radiobob.de/bob-national/mp3-192/mediaplayer
+ByteFM|https://bytefm.cast.addradio.de/bytefm/main/high/stream
+Klassik Radio|https://live.streams.klassikradio.de/klassikradio-deutschland/stream/mp3
+
+# ========== DUTCH ==========
+
+# Dutch Radio
+NPO Radio 2|https://icecast.omroep.nl/radio2-bb-mp3
+NPO 3FM|https://icecast.omroep.nl/3fm-bb-mp3
+
+# ========== PORTUGUESE ==========
+
+# Brazilian/Portuguese
+Antena 1 Brasil|http://antena1.newradio.it/stream
+Bossa Jazz Brasil|https://centova5.transmissaodigital.com:20104/live
+Radio Comercial|https://stream-icy.bauermedia.pt/comercial.mp3
+Antena 1 Fado|http://radiocast.rtp.pt/antena1fado80a.mp3
+
+# ========== ASIAN ==========
+
+# J-Pop/K-Pop
+Listen.moe J-Pop|https://listen.moe/fallback
+Listen.moe K-Pop|https://listen.moe/kpop/fallback
+SBS PopAsia|https://sbs-ice.streamguys1.com/sbs-popasia-sbs-web
+
+# Bollywood/Indian
+Mirchi Top 20|https://drive.uber.radio/uber/bollywoodnow/icecast.audio
+Suburbs of Goa [SomaFM]|http://ice1.somafm.com/suburbsofgoa-128-mp3
+
+# ========== WORLD ==========
+
+# African/Middle Eastern
+LagosJump Radio|https://radio.lagosjumpradio.com/listen/lagosjump_radio/radio.mp3
+Trace FM|http://stream.trace.tv/trace_fm_ci-midfi.aac
+Radio Orient|https://stream.rcs.revma.com/7hnrkawf4p8uv.mp3
+FIP Monde|http://icecast.radiofrance.fr/fipworld-midfi.mp3
 """
 
     def __init__(self, config_dir: Path | None = None):

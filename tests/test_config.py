@@ -323,3 +323,42 @@ class TestRadiosCache:
 
         config.radios_file.write_text("Back|https://stream.example/back\n")
         assert config.get_radios() == [("Back", "https://stream.example/back")]
+
+
+class TestDefaultRadios:
+    """Offline checks on the bundled station list.
+
+    Stream liveness is checked separately by ``scripts/validate_radios.py``,
+    which needs the network and is kept out of the test suite.
+    """
+
+    def test_ships_100_unique_named_stations(self, tmp_path: Path) -> None:
+        radios = Config(config_dir=tmp_path).get_radios()
+        names = [name for name, _ in radios]
+        urls = [url for _, url in radios]
+
+        assert len(radios) == 100
+        assert len(set(names)) == len(names)
+        # merge_radios() dedupes by URL, so a repeated URL would never merge.
+        assert len(set(urls)) == len(urls)
+        assert all(url.startswith(("http://", "https://")) for url in urls)
+        assert all(name != url for name, url in radios)
+
+    def test_every_station_has_a_category(self, tmp_path: Path) -> None:
+        categorized = Config(config_dir=tmp_path).get_radios_categorized()
+
+        assert len(categorized) == 100
+        assert all(radio["category"] != "Other" for radio in categorized)
+
+    def test_each_station_name_resolves_to_itself(self, tmp_path: Path) -> None:
+        """Name lookup is a first substring match; no station may shadow another."""
+        from music_cli.sources.radio import RadioSource
+
+        config = Config(config_dir=tmp_path)
+        source = RadioSource()
+        source.config = config
+        source._youtube_available = True
+
+        for name, url in config.get_radios():
+            track = source.get_station_by_name(name)
+            assert track is not None and track.source == url, name
