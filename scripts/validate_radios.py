@@ -32,7 +32,7 @@ def default_streams() -> list[tuple[str, str]]:
         streams.append((name.strip(), (url or name).strip()))
     known = {url for _, url in streams}
     for key in ("mood_radio_map", "time_radio_map"):
-        for label, url in Config.DEFAULT_CONFIG[key].items():  # type: ignore[union-attr]
+        for label, url in Config.DEFAULT_CONFIG[key].items():  # type: ignore[attr-defined]
             if url not in known:
                 streams.append((f"{key}:{label}", url))
                 known.add(url)
