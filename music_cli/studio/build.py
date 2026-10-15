@@ -908,7 +908,9 @@ class BuildService:
         # progress, so a valid prefix is enough to resume. Extra or reordered
         # records still indicate a different plan. Video nodes are added after
         # the audio stage (P4.1) and are allowed as extra entries.
-        actual_audio = [n for n in actual if isinstance(n, dict) and n.get("type") in ("music", "speech")]
+        actual_audio = [
+            n for n in actual if isinstance(n, dict) and n.get("type") in ("music", "speech")
+        ]
         if len(actual_audio) > len(expected):
             return False
         for item, spec in zip(actual_audio, expected, strict=False):

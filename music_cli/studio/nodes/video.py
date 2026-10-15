@@ -721,7 +721,14 @@ class VideoNode(BaseNode):
             if binary is None:
                 raise NodeError("scene: no ImageMagick binary for SVG conversion")
             # magick SVG -> PNG (flatten to remove alpha)
-            cmd = [binary, str(svg_path.resolve()), "-background", "black", "-flatten", str(png_path.resolve())]
+            cmd = [
+                binary,
+                str(svg_path.resolve()),
+                "-background",
+                "black",
+                "-flatten",
+                str(png_path.resolve()),
+            ]
             result = subprocess.run(
                 cmd, cwd=self._nodes_dir, capture_output=True, text=True, check=False
             )
@@ -836,7 +843,7 @@ class VideoNode(BaseNode):
                     cover,
                 )
                 return
-            except NodeError as image_error:
+            except NodeError:
                 try:
                     self._render_svg_fallback(destination, duration, caption, cover)
                     return
