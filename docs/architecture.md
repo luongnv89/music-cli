@@ -61,6 +61,8 @@ graph TB
 | History | `history.py` | Playback logging |
 | Config | `config.py` | Settings management |
 | Platform | `platform/` | Cross-platform abstractions |
+| Cloud | `cloud/` | Async GMI Cloud / OpenRouter adapters, OS-keyring key storage (`cloud/secrets.py`), on-disk result cache |
+| Studio | `studio/` | `mc studio` pipeline: M3 director, project dependency graph, build/revise service, trace, doctor |
 
 ### Daemon Architecture
 
@@ -202,6 +204,7 @@ created by `music_cli/config.py`.
 - PyTorch, transformers, diffusers >= 0.39.0, scipy, tqdm (`pyproject.toml:41-49`)
 - MiniMax Music 3 uses the pinned `[minimax]` extra (`pyproject.toml:51-57`)
 - YouTube streaming uses yt-dlp >= 2026.7.4 (`pyproject.toml:58-62`)
+- Cloud studio (`mc cloud`, `mc studio`) uses the `[gmi]` extra: keyring >= 24, httpx >= 0.27 (`pyproject.toml:65-68`)
 
 ## Design Decisions
 

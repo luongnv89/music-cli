@@ -66,6 +66,9 @@ pip install -e .
 
 # With AI support (~5GB download)
 pip install 'coder-music-cli[ai]'
+
+# With cloud studio support (GMI Cloud / MiniMax: mc cloud, mc studio)
+pip install 'coder-music-cli[gmi]'
 ```
 
 ## Commands Reference
@@ -106,6 +109,27 @@ pip install 'coder-music-cli[ai]'
 | `mc ai replay <num>` | Replay a track by number |
 | `mc ai remove <num>` | Remove a track |
 | `mc ai model` | List available AI models |
+
+### Cloud & Studio
+
+Needs `pip install 'coder-music-cli[gmi]'`, FFmpeg/ffprobe and a GMI Cloud API key authorized for the audio request queue.
+
+| Command | Description |
+|---------|-------------|
+| `mc cloud key set <provider>` | Store an API key in the OS keyring (`gmi`, `openrouter`) |
+| `mc cloud key get\|delete <provider>` | Read back or remove a stored key |
+| `mc cloud key list` | List providers with stored keys |
+| `mc cloud ping [provider]` | Check that providers are reachable (exits 1 on failure) |
+| `mc cloud smoke` | One real call per free MiniMax model; outputs under `dist/_smoke/` |
+| `mc studio doctor` | Preflight check with a fix hint for anything missing |
+| `mc studio build <brief.yaml>` | Build a mixed, captioned `dist/<project>/premiere.mp4` (see `examples/neon-rain.yaml`) |
+| `mc studio build ... --no-h3` | Add captioned static scene cards rendered locally |
+| `mc studio build ... --confirm` | Add MiniMax H3 video scenes, allowing spend past the budget cap |
+| `mc studio build ... --from-playlist <file.m3u>` | Seed the plan with abstract taste traits (tempo, key, loudness) |
+| `mc studio build ... --resume` / `--force` | Resume a failed build / start over with a fresh plan |
+| `mc studio revise <project> "<intent>"` | Regenerate only the parts the change affects |
+| `mc studio plan <project>` | Show the stored plan |
+| `mc studio trace <project>` | Show the build trace as a table |
 
 ### YouTube Replay History
 
@@ -404,6 +428,8 @@ mc radio update
 # [O] Overwrite - Replace with new defaults (backs up old file)
 # [K] Keep      - Keep your current stations unchanged
 ```
+
+> **Upgrading to v0.12.0:** choose **Overwrite** to pick up the new stations and the repaired BBC Radio 3 / Italian stream URLs (your old `radios.txt` is backed up). **Merge** only appends new stations and keeps the old dead URLs in place.
 
 The Merge/Overwrite/Keep prompt is implemented in `music_cli/cli/radio.py:210-212`.
 

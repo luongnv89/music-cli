@@ -135,7 +135,7 @@ python -m build
 twine check dist/*
 
 # Install locally built package
-pip install dist/coder_music_cli-0.11.0-py3-none-any.whl
+pip install dist/coder_music_cli-0.12.0-py3-none-any.whl
 ```
 
 ## Adding Features
@@ -318,10 +318,10 @@ Two workflows live in `.github/workflows/`:
 # Update version in BOTH places:
 #   music_cli/__init__.py (__version__) and pyproject.toml ([project].version)
 # Commit changes
-git add -A && git commit -m "Bump version to 0.11.0"
+git add -A && git commit -m "Bump version to 0.12.0"
 
 # Create and push tag — release.yml does the rest
-git tag v0.11.0
+git tag v0.12.0
 git push origin main --tags
 ```
 

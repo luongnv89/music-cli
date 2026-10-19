@@ -103,6 +103,7 @@ mc status           # What's playing + an inspirational quote
 | **Background daemon** | Music survives terminal closes and IDE restarts |
 | **100 radio stations** | Lo-fi, synthwave, jazz, classical, rock, hip-hop, news, plus French, Spanish, Italian, German, Dutch, Portuguese, Asian and world stations — no account needed (100 pre-configured, `music_cli/config.py:207-384`) |
 | **AI music generation** | MusicGen, AudioLDM, Bark — generate unique tracks from text prompts |
+| **AI studio** | `mc studio build brief.yaml` turns a written brief into a mixed, captioned `premiere.mp4` with MiniMax models on GMI Cloud; `mc studio revise` changes it in plain words (needs the `[gmi]` extra and a GMI Cloud key; `music_cli/cli/studio.py`) |
 | **YouTube audio** | Paste a URL, stream audio via yt-dlp→ffplay. Played videos are kept in a replay history (`mc yt`) for one-command replay (`music_cli/youtube_history.py:92-104`) |
 | **Context-aware** | Auto-selects music based on time of day and your mood |
 | **Local MP3 playback** | Shuffle your own library with `--auto` |
@@ -156,7 +157,7 @@ pip install 'coder-music-cli[ai]'
 # MiniMax Music 3 (~24GB VRAM; CUDA/bfloat16 required)
 pip install 'coder-music-cli[minimax]'
 
-# GMI Cloud credentials (keyring-backed API key storage for `mc cloud`)
+# GMI Cloud / MiniMax adapters + keyring API key storage (`mc cloud`, `mc studio`)
 pip install 'coder-music-cli[gmi]'
 
 # Both
@@ -192,7 +193,7 @@ The base install is tiny. The `[ai]` extra downloads ~5GB (PyTorch + HuggingFace
 music-cli is not a replacement for your music library. It's a lightweight, terminal-native player for background music while coding. No browser tabs, no electron apps, no accounts.
 
 **Is it actively maintained?**
-Yes. The latest release is v0.11.0 (`music_cli/__init__.py:3`). Check the [changelog](CHANGELOG.md) for recent updates.
+Yes. The latest release is v0.12.0 (`music_cli/__init__.py:3`). Check the [changelog](CHANGELOG.md) for recent updates.
 
 **Can I add my own radio stations?**
 Absolutely. Run `mc radio add` or edit `~/.config/music-cli/radios.txt` directly. Format: `Station Name|stream-url`.
@@ -261,7 +262,17 @@ mc mood [MOOD]              # list moods or play mood radio
 
 mc config                   # show config paths
 mc cloud key set gmi        # store GMI Cloud API key in the system keyring
+mc cloud key get|delete|list # manage stored keys (providers: gmi, openrouter)
+mc cloud ping [PROVIDER]    # check each provider is reachable
 mc cloud smoke              # one real call per free MiniMax model -> dist/_smoke/
+
+mc studio doctor            # preflight: ffmpeg, keys, budget, endpoint, disk
+mc studio build BRIEF.yaml  # brief -> dist/<project>/premiere.mp4 (--resume, --force, --no-h3, --confirm, --from-playlist)
+mc studio revise P "INTENT" # regenerate only the parts the change affects
+mc studio plan P / trace P  # show a project's plan / build trace
+
+mc daemon start|stop|status # manage daemon
+```
 
 > **API key requirement:** The GMI Cloud key must be authorized for the **audio queue endpoint**
 > (`console.gmicloud.ai/api/v1/ie/requestqueue/apikey/requests`) — not just the text model endpoint
@@ -271,8 +282,6 @@ mc cloud smoke              # one real call per free MiniMax model -> dist/_smok
 > text but not audio, you need a key with audio-model access.
 >
 > Check your key with `mc studio doctor` — it should show `OK: gmi key: stored in the OS keyring`.
-mc daemon start|stop|status # manage daemon
-```
 
 > **Note:** `music-cli` still works as the full command name for all commands.
 
@@ -533,6 +542,8 @@ mc radio update
 # [K] Keep    - Keep your current stations unchanged
 ```
 
+> **Upgrading to v0.12.0:** choose **Overwrite** to pick up the new stations and the repaired BBC Radio 3 / Italian stream URLs (your old `radios.txt` is backed up). **Merge** only appends new stations and keeps the old dead URLs in place.
+
 ### Add Custom Stations
 
 ```bash
@@ -560,7 +571,7 @@ Context: morning / weekday
 
 "Music gives a soul to the universe, wings to the mind, flight to the imagination." - Plato
 
-Version: 0.11.0
+Version: 0.12.0
 GitHub: https://github.com/luongnv89/music-cli
 ```
 
